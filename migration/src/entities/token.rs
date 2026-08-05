@@ -23,6 +23,8 @@ pub struct Model {
     pub client_auth: String,
     #[sea_orm(column_name = "deviceId")]
     pub device_id: Option<DbId>,
+    #[sea_orm(column_name = "externalDeviceId")]
+    pub external_device_id: Option<String>,
     pub parameters: String,
     pub details: Option<String>,
     pub code: Option<String>,

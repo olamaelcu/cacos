@@ -7,6 +7,8 @@ use time::OffsetDateTime;
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: DbId,
+    #[sea_orm(column_name = "deviceId")]
+    pub device_id: String,
     #[sea_orm(column_name = "sessionId")]
     pub session_id: String,
     #[sea_orm(column_name = "userAgent")]

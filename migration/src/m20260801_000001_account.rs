@@ -335,8 +335,17 @@ impl MigrationTrait for Migration {
                     .table(authorization_request::Entity)
                     .if_not_exists()
                     .col(pk_db_id(authorization_request::Column::Id))
+                    .col(
+                        ColumnDef::new(authorization_request::Column::RequestId)
+                            .string()
+                            .not_null(),
+                    )
                     .col(ColumnDef::new(authorization_request::Column::Did).string())
                     .col(db_id_null(authorization_request::Column::DeviceId))
+                    .col(
+                        ColumnDef::new(authorization_request::Column::ExternalDeviceId)
+                            .string(),
+                    )
                     .col(
                         ColumnDef::new(authorization_request::Column::ClientId)
                             .string()
@@ -358,6 +367,19 @@ impl MigrationTrait for Migration {
                             .not_null(),
                     )
                     .col(ColumnDef::new(authorization_request::Column::Code).string())
+                    .to_owned(),
+            )
+            .await?;
+        // "requestId" is the opaque, externally-meaningful identifier that
+        // rsky-oauth generates and passes through the OAuthStore trait; the
+        // surrogate `id` DbId ULID is cacos-internal.
+        manager
+            .create_index(
+                Index::create()
+                    .name("uq_authorization_request_request_id")
+                    .unique()
+                    .table(authorization_request::Entity)
+                    .col(authorization_request::Column::RequestId)
                     .to_owned(),
             )
             .await?;
@@ -384,6 +406,11 @@ impl MigrationTrait for Migration {
                     .if_not_exists()
                     .col(pk_db_id(device::Column::Id))
                     .col(
+                        ColumnDef::new(device::Column::DeviceId)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
                         ColumnDef::new(device::Column::SessionId)
                             .string()
                             .not_null(),
@@ -399,6 +426,19 @@ impl MigrationTrait for Migration {
                             .timestamp()
                             .not_null(),
                     )
+                    .to_owned(),
+            )
+            .await?;
+        // "deviceId" is the opaque, externally-meaningful identifier that
+        // rsky-oauth (or the headless RemoteClient) supplies; the surrogate
+        // `id` DbId ULID is cacos-internal.
+        manager
+            .create_index(
+                Index::create()
+                    .name("uq_device_device_id")
+                    .unique()
+                    .table(device::Entity)
+                    .col(device::Column::DeviceId)
                     .to_owned(),
             )
             .await?;
@@ -551,6 +591,7 @@ impl MigrationTrait for Migration {
                             .not_null(),
                     )
                     .col(db_id_null(token::Column::DeviceId))
+                    .col(ColumnDef::new(token::Column::ExternalDeviceId).string())
                     .col(
                         ColumnDef::new(token::Column::Parameters)
                             .string()

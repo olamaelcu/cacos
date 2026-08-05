@@ -8,9 +8,17 @@ use time::OffsetDateTime;
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: DbId,
+    #[sea_orm(column_name = "requestId")]
+    pub request_id: String,
     pub did: Option<Did>,
+    /// Surrogate FK to the device row.
     #[sea_orm(column_name = "deviceId")]
     pub device_id: Option<DbId>,
+    /// Opaque external device id supplied by rsky-oauth / the RemoteClient.
+    /// Preserves the trait-level `RequestData::device_id: Option<String>`
+    /// across read/write round-trips when the row only stores the DbId FK.
+    #[sea_orm(column_name = "externalDeviceId")]
+    pub external_device_id: Option<String>,
     #[sea_orm(column_name = "clientId")]
     pub client_id: String,
     #[sea_orm(column_name = "clientAuth")]

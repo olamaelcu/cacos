@@ -2,6 +2,7 @@
 //! `helpers/`.
 
 pub mod helpers;
+pub mod oauth_store;
 #[cfg(test)]
 pub mod test_util;
 #[cfg(test)]

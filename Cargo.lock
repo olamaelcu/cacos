@@ -686,6 +686,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "argon2",
+ "async-trait",
  "base64-url",
  "base64ct",
  "bytes",
@@ -708,7 +709,9 @@ dependencies = [
  "rsky-blobstore",
  "rsky-common",
  "rsky-crypto",
+ "rsky-identity",
  "rsky-lexicon",
+ "rsky-oauth",
  "rsky-repo",
  "rsky-syntax",
  "sea-orm",
@@ -4052,6 +4055,25 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "thiserror 1.0.69",
+]
+
+[[package]]
+name = "rsky-oauth"
+version = "0.2.0"
+source = "git+https://github.com/olamaelcu/rsky?rev=aee5aec5ad9473d80232beab58ddba25a936298a#aee5aec5ad9473d80232beab58ddba25a936298a"
+dependencies = [
+ "async-trait",
+ "base64 0.22.1",
+ "hex",
+ "hmac 0.12.1",
+ "p256",
+ "rsky-crypto",
+ "secp256k1",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "thiserror 2.0.19",
+ "url",
 ]
 
 [[package]]

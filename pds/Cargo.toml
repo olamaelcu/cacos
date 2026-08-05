@@ -10,6 +10,8 @@ sea-orm = { workspace = true }
 tokio = { workspace = true }
 camino = { workspace = true }
 time = { workspace = true }
+serde_json = "1"
+async-trait = "0.1"
 
 # --- error handling ---
 anyhow = { workspace = true }
@@ -65,4 +67,5 @@ camino-tempfile = { workspace = true }
 poem = { workspace = true, features = ["test"] }
 metrics = { workspace = true }
 serde_ipld_dagcbor = { workspace = true }
-serde_json = "1"
+# --- encoding primitives used by blobstore ---
+bytes = "1"
