@@ -1,3 +1,0 @@
-[submodule "vendor/rsky"]
-	path = vendor/rsky
-	url = https://github.com/olamaelcu/rsky

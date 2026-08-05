@@ -4,14 +4,11 @@ resolver = "2"
 members = ["migration", "pds"]
 
 [workspace.dependencies]
-# --- rsky reference crates (git submodule at vendor/rsky) ---
-rsky-repo = { path = "vendor/rsky/rsky-repo" }
-rsky-oauth = { path = "vendor/rsky/rsky-oauth" }
-rsky-crypto = { path = "vendor/rsky/rsky-crypto" }
-rsky-identity = { path = "vendor/rsky/rsky-identity" }
-rsky-syntax = { path = "vendor/rsky/rsky-syntax" }
-rsky-common = { path = "vendor/rsky/rsky-common" }
-rsky-lexicon = { path = "vendor/rsky/rsky-lexicon" }
+# --- rsky reference crates (git, pinned to commit cbcf8ca) ---
+rsky-repo = { git = "https://github.com/olamaelcu/rsky", rev = "aee5aec5ad9473d80232beab58ddba25a936298a" }
+rsky-crypto = { git = "https://github.com/olamaelcu/rsky", rev = "aee5aec5ad9473d80232beab58ddba25a936298a" }
+rsky-syntax = { git = "https://github.com/olamaelcu/rsky", rev = "aee5aec5ad9473d80232beab58ddba25a936298a" }
+rsky-common = { git = "https://github.com/olamaelcu/rsky", rev = "aee5aec5ad9473d80232beab58ddba25a936298a" }
 
 # --- atproto ecosystem ---
 atrium-api = "0.24.6"
@@ -24,15 +21,27 @@ sea-orm-migration = "2.0"
 sqlx = "0.9"
 miette = { version = "7", features = ["derive"] }
 thiserror = "2"
+anyhow = "1.0.79"
 camino = { version = "1", features = ["serde1"] }
 camino-tempfile = "1"
 ulid = { version = "3", features = ["serde", "std"] }
 time = { version = "0.3", features = ["serde", "formatting", "parsing"] }
 serde = { version = "1", features = ["derive"] }
 
+# --- serde ecosystem (required by rsky-* crate manifests via workspace = true) ---
+serde_bytes = "0.11"
+serde_cbor = "0.11"
+serde_derive = "1"
+serde_json = "1"
+rand = "0.8"
+rand_core = "0.6"
+secp256k1 = { version = "0.28", features = ["global-context", "rand"] }
+sha2 = "0.10"
+ipld-core = "0.4"
+
 # --- http / runtime ---
 poem = { version = "3", features = ["tower-compat"] }
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync", "net"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync", "net", "fs"] }
 
 # --- observability (pins locked in Plan 02, verified against docs.rs) ---
 metrics = "0.24.4"

@@ -11,6 +11,25 @@ tokio = { workspace = true }
 camino = { workspace = true }
 time = { workspace = true }
 
+# --- error handling ---
+anyhow = { workspace = true }
+miette = { workspace = true }
+thiserror = { workspace = true }
+
+# --- atproto / rsky (Plan 03) ---
+lexicon_cid = { workspace = true }
+rsky-common = { workspace = true }
+rsky-repo = { workspace = true }
+rsky-syntax = { workspace = true }
+rsky-crypto = { workspace = true }
+
+# --- crypto / encoding (Plan 03) ---
+lru = "0.12"
+sha2 = "0.10"
+hex = "0.4"
+secp256k1 = { version = "0.28", features = ["global-context", "rand"] }
+rand = "0.8"
+
 # --- observability (Plan 02) ---
 metrics = { workspace = true }
 metrics-exporter-prometheus = { workspace = true }
@@ -24,3 +43,5 @@ tracing-timing = { workspace = true }
 camino-tempfile = { workspace = true }
 poem = { workspace = true, features = ["test"] }
 metrics = { workspace = true }
+serde_ipld_dagcbor = { workspace = true }
+serde_json = "1"

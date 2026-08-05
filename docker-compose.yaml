@@ -1,0 +1,30 @@
+x-minio-env: &minio-env
+  MINIO_ROOT_USER: ${MINIO_ROOT_USER:-cacos}
+  MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-cacos-secret}
+
+services:
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment: *minio-env
+    ports: ["9000:9000", "9001:9001"]
+    volumes: ["minio-data:/data"]
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  mc-init:
+    image: minio/mc:latest
+    environment: *minio-env
+    depends_on:
+      minio: { condition: service_healthy }
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 $MINIO_ROOT_USER $MINIO_ROOT_PASSWORD &&
+      mc mb --ignore-existing local/cacos
+      "
+    restart: "no"
+
+volumes:
+  minio-data: {}

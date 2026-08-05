@@ -3,6 +3,14 @@ rust = "1.97.0"
 "cargo:cargo-nextest" = "0.9.115"
 "github:corca-ai/nose" = "0.20.0"
 
+[env]
+MINIO_ROOT_USER = "cacos"
+MINIO_ROOT_PASSWORD = "cacos-secret"
+S3_ENDPOINT = "http://127.0.0.1:9000"
+S3_ACCESS_KEY_ID = "cacos"
+S3_SECRET_ACCESS_KEY = "cacos-secret"
+S3_BUCKET = "cacos"
+
 [tasks.check]
 description = "Type-check the whole workspace"
 run = "cargo check --workspace --all-targets"
@@ -26,3 +34,16 @@ run = "cargo nextest run --workspace"
 [tasks.dup]
 description = "Report code duplication (nose)"
 run = "nose query -r pds/src -r pds/tests -r migration/src"
+
+[tasks.infra-up]
+description = "Start MinIO headlessly and detached"
+run = "docker compose up -d --wait"
+
+[tasks.infra-down]
+description = "Stop MinIO containers"
+run = "docker compose down"
+
+[tasks.dev]
+description = "Run the PDS with MinIO up"
+depends = ["infra-up"]
+run = "cargo run -p cacos-pds"
