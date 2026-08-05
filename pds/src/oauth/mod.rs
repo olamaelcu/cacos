@@ -8,6 +8,9 @@
 //! ([`crate::account::oauth_store::PdsOAuthStore`]).
 
 pub mod fetcher;
+pub mod remote;
+pub mod remote_create_account;
+pub mod routes;
 
 use crate::account::oauth_store::PdsOAuthStore;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
