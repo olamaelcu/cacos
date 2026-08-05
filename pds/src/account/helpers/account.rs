@@ -186,13 +186,11 @@ pub async fn register_actor(
         Some(true) => Some(created_at.clone()),
         _ => None,
     };
-    let deactivate_after = match deactivated {
-        Some(true) => {
-            let exp = dt.add(chrono::Duration::days(3));
-            Some(format!("{}", exp.format(RFC3339_VARIANT)))
-        }
-        _ => None,
-    };
+    // `deleteAfter` is intentionally left null at registration: deactivated
+    // accounts created at signup are not scheduled for automatic deletion.
+    // An explicit `deleteAfter` is only stamped via the admin deactivate path
+    // (`AccountManager::deactivate_account(did, delete_after)`).
+    let delete_after: Option<String> = None;
 
     let registered: Option<QueryResult> = db
         .query_one_raw(sql(
@@ -205,7 +203,7 @@ pub async fn register_actor(
                 Value::from(handle),
                 Value::from(created_at),
                 Value::from(deactivate_at),
-                Value::from(deactivate_after),
+                Value::from(delete_after),
             ],
         ))
         .await?;
@@ -552,7 +550,7 @@ mod tests {
         .unwrap()
         .unwrap();
         assert!(got.deactivated_at.is_some());
-        assert!(got.delete_after.is_some());
+        assert!(got.delete_after.is_none());
     }
 
     #[tokio::test]

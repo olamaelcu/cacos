@@ -147,7 +147,7 @@ async fn creates_account_without_credentials_and_deactivated() {
         .unwrap()
         .unwrap();
     assert!(got.deactivated_at.is_some());
-    assert!(got.delete_after.is_some());
+    assert!(got.delete_after.is_none());
     assert_eq!(got.email, None);
     assert!(!am.is_account_activated("did:plc:ghost").await.unwrap());
     assert_eq!(
