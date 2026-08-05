@@ -36,6 +36,19 @@ async fn create_test_account(am: &AccountManager, did: &str, handle: &str) -> (S
         .unwrap()
 }
 
+/// Regression pin for `REFRESH_GRACE_MS`. Documents that the refresh-token
+/// grace period is 2 hours in milliseconds. This guards against the
+/// unit-ambiguity that previously misdiagnosed the grace as ~7.2 seconds
+/// (rsky-common's `HOUR` is 3_600_000 ms, not 3600 s).
+#[test]
+fn refresh_grace_period_is_two_hours() {
+    assert_eq!(REFRESH_GRACE_MS, 2 * 60 * 60 * 1000);
+    assert_eq!(REFRESH_GRACE_MS, 7_200_000);
+    // grace_expires_at = now + REFRESH_GRACE_MS * 1000 micros = 7.2e9 micros = 2 h
+    assert_eq!(REFRESH_GRACE_MS * 1000, 7_200_000_000);
+    assert_eq!(REFRESH_GRACE_MS * 1000 / 1_000_000, 7_200);
+}
+
 #[tokio::test]
 async fn creates_and_fetches_accounts() {
     let (_dir, am) = test_manager().await;

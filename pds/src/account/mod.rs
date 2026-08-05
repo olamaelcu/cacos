@@ -24,12 +24,19 @@ use chrono::DateTime;
 use chrono::offset::Utc as UtcOffset;
 use lexicon_cid::Cid;
 use rsky_common::RFC3339_VARIANT;
-use rsky_common::time::{HOUR, from_str_to_micros};
+use rsky_common::time::from_str_to_micros;
 use rsky_lexicon::com::atproto::admin::StatusAttr;
 use rsky_lexicon::com::atproto::server::CreateAppPasswordOutput;
 use sea_orm::DatabaseConnection;
 use std::env;
 use std::time::SystemTime;
+
+/// Refresh-token grace period in milliseconds. rsky-common's `HOUR` is in
+/// milliseconds (SECOND = 1000, MINUTE = 60_000, HOUR = 3_600_000), so this
+/// 2-hour window reproduces atproto's `2 * HOUR` reference behavior without
+/// the unit ambiguity that the previous `2 * HOUR as i64` inline expression
+/// invited. Regression-pinned by `refresh_grace_period_is_two_hours`.
+const REFRESH_GRACE_MS: i64 = 2 * 60 * 60 * 1000;
 
 #[allow(dead_code)] // used by AccountManager::rotate_refresh_token (Task 7)
 fn format_micros(micros: i64) -> Result<String> {
@@ -279,7 +286,6 @@ impl AccountManager {
             // original expiration time to its revocation grace period.
             let prev_expires_at = from_str_to_micros(&token.expires_at)?;
 
-            const REFRESH_GRACE_MS: i64 = 2 * HOUR as i64;
             let grace_expires_at = dt.timestamp_micros() + REFRESH_GRACE_MS * 1000;
 
             let expires_at = if grace_expires_at < prev_expires_at {
