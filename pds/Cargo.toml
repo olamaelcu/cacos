@@ -22,3 +22,5 @@ tracing-timing = { workspace = true }
 
 [dev-dependencies]
 camino-tempfile = { workspace = true }
+poem = { workspace = true, features = ["test"] }
+metrics = { workspace = true }
