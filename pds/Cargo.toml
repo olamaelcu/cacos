@@ -16,6 +16,10 @@ anyhow = { workspace = true }
 miette = { workspace = true }
 thiserror = { workspace = true }
 
+# --- encoding / dates / time ---
+serde = { workspace = true }
+chrono = "0.4"
+
 # --- atproto protocol crates ---
 lexicon_cid = { workspace = true }
 rsky-common = { workspace = true }
