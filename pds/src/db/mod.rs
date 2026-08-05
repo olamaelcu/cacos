@@ -62,7 +62,7 @@ impl DatabaseKind {
 
 #[cfg(test)]
 mod tests {
-    use sea_orm::{ConnectionTrait, DatabaseBackend, DatabaseConnection, EntityTrait, Set, Statement};
+    use sea_orm::{ConnectionTrait, DatabaseBackend, DatabaseConnection, Set, Statement};
 
     use super::*;
 
