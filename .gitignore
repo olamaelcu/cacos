@@ -1,2 +1,6 @@
 docs/superpowers/
 .worktrees/
+/target
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm

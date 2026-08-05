@@ -1,0 +1,12 @@
+# migration/Cargo.toml
+[package]
+name = "cacos-migration"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "migration"
+
+[dependencies]
+sea-orm = { workspace = true }
+sea-orm-migration = { workspace = true }

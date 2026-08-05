@@ -1,0 +1,14 @@
+# pds/Cargo.toml
+[package]
+name = "pds"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+migration = { path = "../migration", package = "cacos-migration" }
+anyhow = { workspace = true }
+sea-orm = { workspace = true }
+tokio = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

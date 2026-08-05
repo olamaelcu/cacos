@@ -1,0 +1,41 @@
+# Cargo.toml
+[workspace]
+resolver = "2"
+members = ["migration", "pds"]
+
+[workspace.dependencies]
+# --- rsky reference crates (git submodule at vendor/rsky) ---
+rsky-repo = { path = "vendor/rsky/rsky-repo" }
+rsky-oauth = { path = "vendor/rsky/rsky-oauth" }
+rsky-crypto = { path = "vendor/rsky/rsky-crypto" }
+rsky-identity = { path = "vendor/rsky/rsky-identity" }
+rsky-syntax = { path = "vendor/rsky/rsky-syntax" }
+rsky-common = { path = "vendor/rsky/rsky-common" }
+rsky-lexicon = { path = "vendor/rsky/rsky-lexicon" }
+
+# --- atproto ecosystem ---
+atrium-api = "0.24.6"
+lexicon_cid = { package = "cid", version = "0.11.1", features = ["serde-codec"] }
+serde_ipld_dagcbor = { version = "0.6.1", features = ["codec"] }
+
+# --- storage (this plan) ---
+sea-orm = { version = "1.1", features = ["sqlx-sqlite", "runtime-tokio-rustls", "macros"] }
+sea-orm-migration = "1.1"
+sqlx = "0.8"
+
+# --- http / runtime ---
+poem = { version = "3", features = ["tower-compat"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync", "net"] }
+
+# --- observability (pins locked in Plan 02, verified against docs.rs) ---
+metrics = "0.24.4"
+metrics-exporter-prometheus = { version = "0.17.2", default-features = false }
+metrics-tracing-context = "0.18"
+tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.19", features = ["env-filter", "fmt"] }
+tracing-timing = { version = "0.7", features = ["layer"] }
+tracing-unwrap = "1.0"
+
+# --- misc ---
+anyhow = "1"
+tempfile = "3"
