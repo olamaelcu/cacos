@@ -9,6 +9,10 @@ rsky-repo = { git = "https://github.com/olamaelcu/rsky", rev = "aee5aec5ad9473d8
 rsky-crypto = { git = "https://github.com/olamaelcu/rsky", rev = "aee5aec5ad9473d80232beab58ddba25a936298a" }
 rsky-syntax = { git = "https://github.com/olamaelcu/rsky", rev = "aee5aec5ad9473d80232beab58ddba25a936298a" }
 rsky-common = { git = "https://github.com/olamaelcu/rsky", rev = "aee5aec5ad9473d80232beab58ddba25a936298a" }
+rsky-blobstore = { git = "https://github.com/olamaelcu/rsky", rev = "aee5aec5ad9473d80232beab58ddba25a936298a" }
+rsky-lexicon = { git = "https://github.com/olamaelcu/rsky", rev = "aee5aec5ad9473d80232beab58ddba25a936298a" }
+futures = "0.3"
+opendal = { version = "0.53", default-features = false, features = ["services-fs", "services-s3"] }
 
 # --- atproto ecosystem ---
 atrium-api = "0.24.6"
