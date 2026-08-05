@@ -5,14 +5,12 @@
 //! on every remote API call, and deleted on accept/reject success.
 
 use crate::db::entities::consent_state;
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use base64ct::{Base64Url, Encoding};
 use rand::RngCore;
-use rsky_common::time::{from_micros_to_str, from_str_to_micros};
 use rsky_common::now as rfc3339_now;
-use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set,
-};
+use rsky_common::time::{from_micros_to_str, from_str_to_micros};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 
 /// The nonce row stays valid for this window (matches
 /// `rsky_oauth::request::AUTHORIZATION_INACTIVITY_TIMEOUT`, 300s). Sliding:

@@ -18,9 +18,7 @@ use crate::db::entities::did_doc;
 use anyhow::Result;
 use migration::types::did::Did;
 use rsky_identity::types::{CacheResult, DidCache, DidDocument, GetDocFn};
-use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set, TransactionTrait,
-};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set, TransactionTrait};
 use std::time::Duration;
 
 #[derive(Debug, Clone)]
@@ -128,7 +126,6 @@ impl DidCache for DidSqliteCache {
         }))
     }
 
-
     async fn clear_entry(&self, did: String) -> Result<()> {
         let did_typed: Did = Did::from(did);
         did_doc::Entity::delete_many()
@@ -180,11 +177,13 @@ mod tests {
     async fn caches_and_returns_fresh_docs() {
         let (_dir, cache) =
             cache_with_ttls(Duration::from_secs(3600), Duration::from_secs(86400)).await;
-        assert!(cache
-            .check_cache("did:example:alice".to_owned())
-            .await
-            .unwrap()
-            .is_none());
+        assert!(
+            cache
+                .check_cache("did:example:alice".to_owned())
+                .await
+                .unwrap()
+                .is_none()
+        );
         cache
             .cache_did("did:example:alice".to_owned(), doc("did:example:alice"))
             .await
@@ -244,11 +243,13 @@ mod tests {
             .await
             .unwrap();
         cache.process_all().await;
-        assert!(cache
-            .check_cache("did:example:carol".to_owned())
-            .await
-            .unwrap()
-            .is_some());
+        assert!(
+            cache
+                .check_cache("did:example:carol".to_owned())
+                .await
+                .unwrap()
+                .is_some()
+        );
 
         cache
             .refresh_cache(
@@ -258,11 +259,13 @@ mod tests {
             .await
             .unwrap();
         cache.process_all().await;
-        assert!(cache
-            .check_cache("did:example:carol".to_owned())
-            .await
-            .unwrap()
-            .is_none());
+        assert!(
+            cache
+                .check_cache("did:example:carol".to_owned())
+                .await
+                .unwrap()
+                .is_none()
+        );
 
         cache
             .refresh_cache(
@@ -272,11 +275,13 @@ mod tests {
             .await
             .unwrap();
         cache.process_all().await;
-        assert!(cache
-            .check_cache("did:example:carol".to_owned())
-            .await
-            .unwrap()
-            .is_none());
+        assert!(
+            cache
+                .check_cache("did:example:carol".to_owned())
+                .await
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[tokio::test]
@@ -292,22 +297,27 @@ mod tests {
             .await
             .unwrap();
         cache.clear_entry("did:example:a".to_owned()).await.unwrap();
-        assert!(cache
-            .check_cache("did:example:a".to_owned())
-            .await
-            .unwrap()
-            .is_none());
-        assert!(cache
-            .check_cache("did:example:b".to_owned())
-            .await
-            .unwrap()
-            .is_some());
+        assert!(
+            cache
+                .check_cache("did:example:a".to_owned())
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            cache
+                .check_cache("did:example:b".to_owned())
+                .await
+                .unwrap()
+                .is_some()
+        );
         cache.clear().await.unwrap();
-        assert!(cache
-            .check_cache("did:example:b".to_owned())
-            .await
-            .unwrap()
-            .is_none());
+        assert!(
+            cache
+                .check_cache("did:example:b".to_owned())
+                .await
+                .unwrap()
+                .is_none()
+        );
     }
 }
-

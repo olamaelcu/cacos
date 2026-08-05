@@ -29,7 +29,8 @@ pub enum CreateAccountError {
 
 #[async_trait]
 pub trait RemoteCreateAccount: Send + Sync + 'static {
-    async fn create_account(&self, input: CreateAccountInput) -> Result<String, CreateAccountError>;
+    async fn create_account(&self, input: CreateAccountInput)
+    -> Result<String, CreateAccountError>;
 }
 
 /// Test double: returns a canned result from its `next` slot.
@@ -47,7 +48,10 @@ impl Default for MockRemoteCreateAccount {
 
 #[async_trait]
 impl RemoteCreateAccount for MockRemoteCreateAccount {
-    async fn create_account(&self, _input: CreateAccountInput) -> Result<String, CreateAccountError> {
+    async fn create_account(
+        &self,
+        _input: CreateAccountInput,
+    ) -> Result<String, CreateAccountError> {
         self.next
             .lock()
             .await

@@ -342,10 +342,7 @@ impl MigrationTrait for Migration {
                     )
                     .col(ColumnDef::new(authorization_request::Column::Did).string())
                     .col(db_id_null(authorization_request::Column::DeviceId))
-                    .col(
-                        ColumnDef::new(authorization_request::Column::ExternalDeviceId)
-                            .string(),
-                    )
+                    .col(ColumnDef::new(authorization_request::Column::ExternalDeviceId).string())
                     .col(
                         ColumnDef::new(authorization_request::Column::ClientId)
                             .string()
@@ -405,11 +402,7 @@ impl MigrationTrait for Migration {
                     .table(device::Entity)
                     .if_not_exists()
                     .col(pk_db_id(device::Column::Id))
-                    .col(
-                        ColumnDef::new(device::Column::DeviceId)
-                            .string()
-                            .not_null(),
-                    )
+                    .col(ColumnDef::new(device::Column::DeviceId).string().not_null())
                     .col(
                         ColumnDef::new(device::Column::SessionId)
                             .string()

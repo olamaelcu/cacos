@@ -204,9 +204,11 @@ mod tests {
         // uppercase ASCII letters or one of {2,3,4,5,6,7}.
         assert_eq!(token.len(), 11);
         assert_eq!(token.chars().nth(5), Some('-'));
-        assert!(token
-            .chars()
-            .all(|c| c == '-' || c.is_ascii_uppercase() || "234567".contains(c)));
+        assert!(
+            token
+                .chars()
+                .all(|c| c == '-' || c.is_ascii_uppercase() || "234567".contains(c))
+        );
 
         assert_valid_token(
             "did:plc:henry",

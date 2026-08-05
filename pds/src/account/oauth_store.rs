@@ -17,15 +17,15 @@ use crate::db::entities::{
 use migration::types::db_id::DbId;
 
 use crate::account::helpers::account::{
-    get_account, get_account_by_email, ActorAccount, AvailabilityFlags,
+    ActorAccount, AvailabilityFlags, get_account, get_account_by_email,
 };
 use crate::account::helpers::password::verify_account_password;
 
+use rsky_oauth::OAuthError;
 use rsky_oauth::request::RequestData;
 use rsky_oauth::store::{AccountInfo, DeviceData, OAuthStore};
 use rsky_oauth::token::{TokenData, TokenInfo};
 use rsky_oauth::types::{AuthorizationRequestParameters, ClientAuth};
-use rsky_oauth::OAuthError;
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, PaginatorTrait, QueryFilter,
@@ -63,10 +63,7 @@ fn from_json<T: serde::de::DeserializeOwned>(json: &str) -> Result<T, OAuthError
     serde_json::from_str(json).map_err(server_error)
 }
 
-async fn device_id_from_external<C>(
-    db: &C,
-    device_id: &str,
-) -> Result<Option<DbId>, OAuthError>
+async fn device_id_from_external<C>(db: &C, device_id: &str) -> Result<Option<DbId>, OAuthError>
 where
     C: sea_orm::ConnectionTrait,
 {
@@ -402,7 +399,9 @@ impl OAuthStore for PdsOAuthStore {
             .await
             .map_err(server_error)?;
         if res.rows_affected == 0 {
-            return Err(OAuthError::ServerError(format!("unknown token: {token_id}")));
+            return Err(OAuthError::ServerError(format!(
+                "unknown token: {token_id}"
+            )));
         }
         Ok(())
     }
@@ -490,7 +489,9 @@ impl OAuthStore for PdsOAuthStore {
     async fn upsert_device_account(&self, device_id: &str, did: &str) -> Result<(), OAuthError> {
         let now = OffsetDateTime::now_utc();
         let Some(device_db_id) = device_id_from_external(&self.db, device_id).await? else {
-            return Err(OAuthError::ServerError(format!("unknown device: {device_id}")));
+            return Err(OAuthError::ServerError(format!(
+                "unknown device: {device_id}"
+            )));
         };
         let did_typed: migration::types::did::Did = did.to_owned().into();
         let model = account_device::ActiveModel {
@@ -840,11 +841,13 @@ mod oauth_store_tests {
         assert_eq!(id, "req-1");
         assert_eq!(data, updated);
         assert!(store.read_request("req-1").await.unwrap().is_none());
-        assert!(store
-            .consume_request_code("cod-abc")
-            .await
-            .unwrap()
-            .is_none());
+        assert!(
+            store
+                .consume_request_code("cod-abc")
+                .await
+                .unwrap()
+                .is_none()
+        );
 
         store
             .create_request("req-2", &request_data("req-2"))
@@ -896,35 +899,41 @@ mod oauth_store_tests {
         assert_eq!(replay.token_id, "tok-2");
         assert_eq!(replay.current_refresh_token.as_deref(), Some("ref-2"));
 
-        assert!(store
-            .create_token(
-                "tok-3",
-                &token_data("did:plc:reused"),
-                Some("ref-1")
-            )
-            .await
-            .is_err());
-        assert!(store
-            .rotate_token("tok-2", "tok-4", "ref-1", NOW + 200, NOW + 200 + 3600)
-            .await
-            .is_err());
-        assert!(store
-            .rotate_token("tok-missing", "tok-5", "ref-5", NOW, NOW)
-            .await
-            .is_err());
+        assert!(
+            store
+                .create_token("tok-3", &token_data("did:plc:reused"), Some("ref-1"))
+                .await
+                .is_err()
+        );
+        assert!(
+            store
+                .rotate_token("tok-2", "tok-4", "ref-1", NOW + 200, NOW + 200 + 3600)
+                .await
+                .is_err()
+        );
+        assert!(
+            store
+                .rotate_token("tok-missing", "tok-5", "ref-5", NOW, NOW)
+                .await
+                .is_err()
+        );
 
         store.delete_token("tok-2").await.unwrap();
         assert!(store.read_token("tok-2").await.unwrap().is_none());
-        assert!(store
-            .find_token_by_refresh_token("ref-1")
-            .await
-            .unwrap()
-            .is_none());
-        assert!(store
-            .find_token_by_refresh_token("ref-2")
-            .await
-            .unwrap()
-            .is_none());
+        assert!(
+            store
+                .find_token_by_refresh_token("ref-1")
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            store
+                .find_token_by_refresh_token("ref-2")
+                .await
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[tokio::test]
@@ -944,75 +953,92 @@ mod oauth_store_tests {
         store.update_device("dev-1", &updated).await.unwrap();
         assert_eq!(store.read_device("dev-1").await.unwrap(), Some(updated));
 
-        assert!(store
+        assert!(
+            store
+                .get_device_account("dev-1", &did)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        store.upsert_device_account("dev-1", &did).await.unwrap();
+        store.upsert_device_account("dev-1", &did).await.unwrap();
+        let account = store
             .get_device_account("dev-1", &did)
             .await
             .unwrap()
-            .is_none());
-        store.upsert_device_account("dev-1", &did).await.unwrap();
-        store.upsert_device_account("dev-1", &did).await.unwrap();
-        let account = store.get_device_account("dev-1", &did).await.unwrap().unwrap();
+            .unwrap();
         assert_eq!(account.did, did);
         assert!(account.handle.is_some());
         assert_eq!(store.list_device_accounts("dev-1").await.unwrap().len(), 1);
-        assert!(store
-            .list_device_accounts("dev-2")
-            .await
-            .unwrap()
-            .is_empty());
+        assert!(
+            store
+                .list_device_accounts("dev-2")
+                .await
+                .unwrap()
+                .is_empty()
+        );
         store.remove_device_account("dev-1", &did).await.unwrap();
-        assert!(store
-            .list_device_accounts("dev-1")
-            .await
-            .unwrap()
-            .is_empty());
+        assert!(
+            store
+                .list_device_accounts("dev-1")
+                .await
+                .unwrap()
+                .is_empty()
+        );
     }
 
     #[tokio::test]
     async fn authenticates_known_account() {
         let (_test_db, store, did, email) = test_store().await;
 
-        assert_eq!(
-            store.get_account(&did).await.unwrap().unwrap().did,
-            did
-        );
+        assert_eq!(store.get_account(&did).await.unwrap().unwrap().did, did);
         let auth = store
             .authenticate_account(&email, "password123")
             .await
             .unwrap()
             .expect("credentials valid");
         assert_eq!(auth.did, did);
-        assert!(store
-            .authenticate_account(&email, "wrong")
-            .await
-            .unwrap()
-            .is_none());
-        assert!(store
-            .authenticate_account("nobody.test", "password123")
-            .await
-            .unwrap()
-            .is_none());
-        assert!(store
-            .authenticate_account("nobody@example.com", "password123")
-            .await
-            .unwrap()
-            .is_none());
-        assert!(store
-            .get_account("did:plc:missing")
-            .await
-            .unwrap()
-            .is_none());
+        assert!(
+            store
+                .authenticate_account(&email, "wrong")
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            store
+                .authenticate_account("nobody.test", "password123")
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            store
+                .authenticate_account("nobody@example.com", "password123")
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            store
+                .get_account("did:plc:missing")
+                .await
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[tokio::test]
     async fn authorized_clients() {
         let (_test_db, store, did, _email) = test_store().await;
 
-        assert!(store
-            .get_authorized_client_scope(&did, "client-1")
-            .await
-            .unwrap()
-            .is_none());
+        assert!(
+            store
+                .get_authorized_client_scope(&did, "client-1")
+                .await
+                .unwrap()
+                .is_none()
+        );
         store
             .set_authorized_client(&did, "client-1", "atproto")
             .await

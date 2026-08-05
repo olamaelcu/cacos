@@ -4,10 +4,10 @@
 //! redirects, `application/json` content-type, and a 512 KiB response cap.
 
 use async_trait::async_trait;
+use rsky_oauth::OAuthError;
 use rsky_oauth::client::ClientMetadataFetcher;
 use rsky_oauth::jwk::JwkSet;
 use rsky_oauth::types::OAuthClientMetadata;
-use rsky_oauth::OAuthError;
 use std::time::Duration;
 
 const MAX_RESPONSE_SIZE: usize = 512 * 1024;
@@ -42,9 +42,8 @@ impl HttpClientMetadataFetcher {
 
     /// Pure scheme/format validation (unit-testable without network).
     fn validate_fetch_url(url: &str) -> Result<url::Url, OAuthError> {
-        let invalid = |reason: String| {
-            OAuthError::InvalidClient(format!("failed to fetch {url}: {reason}"))
-        };
+        let invalid =
+            |reason: String| OAuthError::InvalidClient(format!("failed to fetch {url}: {reason}"));
         let parsed = url::Url::parse(url).map_err(|e| invalid(e.to_string()))?;
         if parsed.scheme() != "https" {
             return Err(invalid("must be an https URL".to_string()));
@@ -89,7 +88,9 @@ impl HttpClientMetadataFetcher {
             .trim()
             .to_ascii_lowercase();
         if content_type != "application/json" {
-            return Err(invalid(format!("unexpected content-type \"{content_type}\"")));
+            return Err(invalid(format!(
+                "unexpected content-type \"{content_type}\""
+            )));
         }
         let body = response.bytes().await.map_err(|e| invalid(e.to_string()))?;
         if body.len() > MAX_RESPONSE_SIZE {
@@ -101,10 +102,7 @@ impl HttpClientMetadataFetcher {
 
 #[async_trait]
 impl ClientMetadataFetcher for HttpClientMetadataFetcher {
-    async fn fetch_client_metadata(
-        &self,
-        url: &str,
-    ) -> Result<OAuthClientMetadata, OAuthError> {
+    async fn fetch_client_metadata(&self, url: &str) -> Result<OAuthClientMetadata, OAuthError> {
         let body = self.fetch_json_capped(url).await?;
         serde_json::from_slice(&body).map_err(|e| {
             OAuthError::InvalidClient(format!("invalid client metadata document: {e}"))
