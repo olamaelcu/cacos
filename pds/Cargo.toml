@@ -12,6 +12,7 @@ camino = { workspace = true }
 time = { workspace = true }
 serde_json = "1"
 async-trait = "0.1"
+base64 = "0.22"
 
 # --- error handling ---
 anyhow = { workspace = true }
@@ -54,7 +55,7 @@ base64ct = "1.6.0"
 metrics = { workspace = true }
 metrics-exporter-prometheus = { workspace = true }
 metrics-tracing-context = { workspace = true }
-poem = { workspace = true }
+poem = { workspace = true, features = ["cookie"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 tracing-timing = { workspace = true }

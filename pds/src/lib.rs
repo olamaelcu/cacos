@@ -11,4 +11,5 @@ pub mod db;
 pub mod error;
 pub mod identity;
 pub mod observability;
+pub mod oauth;
 pub mod xrpc;
