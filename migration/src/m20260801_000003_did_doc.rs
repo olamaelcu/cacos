@@ -1,8 +1,5 @@
 // migration/src/m20260801_000003_did_doc.rs
 //! DID cache database schema.
-//!
-//! Port of the rsky did-cache migration "001"
-//! (`vendor/rsky/rsky-pds/src/did_cache.rs` lines 15-19).
 
 use sea_orm_migration::prelude::*;
 

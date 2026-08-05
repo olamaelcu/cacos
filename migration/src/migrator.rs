@@ -3,11 +3,10 @@
 //!
 //! Each migrator owns one SQLite database file, so each keeps its own applied
 //! migration history. The bookkeeping table is named `migrations` (overriding
-//! the sea-orm default `seaql_migrations`) so the table lists asserted by the
-//! `pds::db` tests match the reference rsky test expectations.
+//! the sea-orm default `seaql_migrations`) so the `pds::db` tests can assert
+//! the expected table list per database.
 //!
-//! `MigratorTrait::up` is called from `pds::db` as `AccountMigrator::up(&db, None)`
-//! (see verified note 1).
+//! `MigratorTrait::up` is called from `pds::db` as `AccountMigrator::up(&db, None)`.
 
 use sea_orm_migration::prelude::*;
 
@@ -17,7 +16,7 @@ use crate::m20260801_000003_did_doc;
 use crate::m20260801_000004_actor;
 use crate::m20260801_000005_actor_space;
 
-/// Account database: 15 tables (port of `account_manager/db.rs` in rsky).
+/// Account database: 15 tables.
 pub struct AccountMigrator;
 
 #[async_trait::async_trait]
@@ -31,7 +30,7 @@ impl MigratorTrait for AccountMigrator {
     }
 }
 
-/// Sequencer database: `repo_seq` (port of `sequencer/db.rs` in rsky).
+/// Sequencer database: `repo_seq`.
 pub struct SequencerMigrator;
 
 #[async_trait::async_trait]
@@ -45,7 +44,7 @@ impl MigratorTrait for SequencerMigrator {
     }
 }
 
-/// DID cache database: `did_doc` (port of `did_cache.rs` in rsky).
+/// DID cache database: `did_doc`.
 pub struct DidCacheMigrator;
 
 #[async_trait::async_trait]
@@ -59,8 +58,7 @@ impl MigratorTrait for DidCacheMigrator {
     }
 }
 
-/// Actor database: 17 tables across migrations 001 and 002
-/// (port of `actor_store/db/mod.rs` in rsky).
+/// Actor database: 17 tables across migrations 001 and 002.
 pub struct ActorMigrator;
 
 #[async_trait::async_trait]

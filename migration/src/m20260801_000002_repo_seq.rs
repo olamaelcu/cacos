@@ -1,8 +1,5 @@
 // migration/src/m20260801_000002_repo_seq.rs
 //! Sequencer database schema.
-//!
-//! Port of the rsky sequencer migration "001"
-//! (`vendor/rsky/rsky-pds/src/sequencer/db.rs` lines 13-23).
 
 use sea_orm_migration::prelude::*;
 

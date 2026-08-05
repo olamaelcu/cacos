@@ -1,14 +1,13 @@
-//! Per-actor storage: one SQLite database per DID plus the repo/record
-//! readers over it. Ported from `vendor/rsky/rsky-pds/src/actor_store/mod.rs`
-//! with the rusqlite `ActorDb` replaced by `sea_orm::DatabaseConnection`.
+//! Per-actor storage: one SQLite database per DID, plus the repo and record
+//! readers that sit over it. The schema is laid out as sea-orm entities and
+//! accessed through a `sea_orm::DatabaseConnection`.
 //!
-//! The `SpaceStore` field of the reference reader is not ported (the space
-//! feature is out of scope); `pref: PreferenceReader` is deferred to Plan 08
-//! and `blob: BlobReader` lands with Plan 04 (see cross-plan fact 2).
+//! `pref: PreferenceReader` is deferred to a later plan and `blob: BlobReader`
+//! lands with the blob-store plan.
 //!
 //! Errors: all app-level fallible APIs return `crate::error::Result<T>` so
-//! rsky-repo's anyhow-returning helpers get wrapped via `PdsError::From` (and
-//! explicit `PdsError::internal(...)` at site for context).
+//! anyhow-returning helpers from downstream crates get wrapped via
+//! `PdsError::From` (and explicit `PdsError::internal(...)` at site for context).
 
 use crate::actor_store::db::ActorDb;
 use crate::actor_store::record::RecordReader;

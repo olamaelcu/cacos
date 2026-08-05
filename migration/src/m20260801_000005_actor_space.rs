@@ -1,8 +1,5 @@
 // migration/src/m20260801_000005_actor_space.rs
 //! Actor database schema, migration 002 (space tables).
-//!
-//! Port of rsky actor-store migration "002"
-//! (`vendor/rsky/rsky-pds/src/actor_store/db/mod.rs` lines 69-146).
 
 use sea_orm_migration::prelude::*;
 

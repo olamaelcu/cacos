@@ -1,9 +1,8 @@
 //! Prometheus metrics recorder and `cacos_` metric registry.
 //!
-//! Pattern grounded in `vendor/rsky/rsky-relay/src/metrics.rs`:
-//! `describe_*!` registers names, `PrometheusBuilder::build_recorder()` builds the
-//! recorder, `set_global_recorder` installs it (its `Err` is dropped so repeated
-//! calls are tolerated).
+//! `describe_*!` registers names, `PrometheusBuilder::build_recorder()` builds
+//! the recorder, `set_global_recorder` installs it (its `Err` is dropped so
+//! repeated calls are tolerated).
 
 use std::sync::RwLock;
 

@@ -8,8 +8,8 @@ use tracing_timing::{Builder, Histogram, LayerDowncaster};
 
 /// Install the global tracing registry.
 ///
-/// Idempotent: a second call drops the `Err` from `set_global_default` instead of
-/// panicking (mirrors rsky-relay's tolerance for repeated `set_global_recorder`).
+/// Idempotent: a second call drops the `Err` from `set_global_default` instead
+/// of panicking.
 /// Returns the [`LayerDowncaster`] so the caller can hand it to
 /// [`TimingReporter`](crate::observability::timing::TimingReporter).
 pub fn init_tracing(env_filter: &str) -> LayerDowncaster<ByName, ByMessage> {

@@ -1,8 +1,5 @@
 // migration/src/m20260801_000004_actor.rs
 //! Actor database schema, migration 001 (core tables).
-//!
-//! Port of rsky actor-store migration "001"
-//! (`vendor/rsky/rsky-pds/src/actor_store/db/mod.rs` lines 14-66).
 
 use sea_orm_migration::prelude::*;
 

@@ -1,8 +1,5 @@
 // migration/src/m20260801_000001_account.rs
 //! Account database schema.
-//!
-//! Port of the rsky account_manager migration "001"
-//! (`vendor/rsky/rsky-pds/src/account_manager/db.rs` lines 13-158).
 
 use sea_orm_migration::prelude::*;
 

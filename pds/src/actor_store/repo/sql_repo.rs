@@ -1,8 +1,7 @@
-//! SQL-backed repository storage (sea-orm port).
+//! SQL-backed repository storage on top of sea-orm.
 //!
-//! Ported from `rsky-pds/src/actor_store/repo/sql_repo.rs`. Every rusqlite
-//! `db.run(|conn| ...)` becomes a sea-orm entity query (or raw statement where
-//! the entity API is awkward). The in-memory `BlockMap` cache
+//! Every rusqlite `db.run(|conn| ...)` becomes a sea-orm entity query (or raw
+//! statement where the entity API is awkward). The in-memory `BlockMap` cache
 //! (read/write-through) is preserved.
 //!
 //! Sync wrappers: the `ReadableBlockstore` trait requires future objects to be

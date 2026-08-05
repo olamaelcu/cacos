@@ -1,6 +1,4 @@
-//! Integration tests for the actor store. The two Task 2 path tests live
-//! here; the rest are ported (with our error conventions) from
-//! `vendor/rsky/rsky-pds/src/actor_store/tests.rs`.
+//! Integration tests for the actor store.
 
 use super::*;
 use rsky_crypto::utils::encode_did_key;

@@ -1,4 +1,4 @@
-//! Per-actor record storage — ported from rsky-pds/src/actor_store/record/mod.rs.
+//! Per-actor record storage.
 //!
 //! Uses sea-orm entities (`record`, `backlink`) for declarative queries.
 

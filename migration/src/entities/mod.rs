@@ -1,9 +1,8 @@
 // migration/src/entities/mod.rs
 //! sea-orm entities, one module per table.
 //!
-//! The account database (15 tables) is a port of
-//! `vendor/rsky/rsky-pds/src/account_manager/db.rs`. `repo_root` is shared
-//! with the actor database.
+//! The account database has 15 tables. `repo_root` is shared with the actor
+//! database.
 
 pub mod account;
 pub mod account_device;
