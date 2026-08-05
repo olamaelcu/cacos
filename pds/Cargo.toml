@@ -38,6 +38,10 @@ hex = "0.4"
 secp256k1 = { version = "0.28", features = ["global-context", "rand"] }
 rand = "0.8"
 
+# --- auth helper (Plan 05 task 5) ---
+base64-url = "2.0.2"
+jwt-simple = { version = "0.12.9", default-features = false, features = ["pure-rust"] }
+
 # --- passwords / app passwords (Plan 05 task 2) ---
 argon2 = "0.5.3"
 base64ct = "1.6.0"

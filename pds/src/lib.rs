@@ -5,6 +5,7 @@ pub mod account;
 pub mod actor_store;
 pub mod background;
 pub mod blobstore;
+pub mod context;
 pub mod db;
 pub mod error;
 pub mod observability;

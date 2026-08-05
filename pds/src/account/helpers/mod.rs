@@ -2,6 +2,7 @@
 //! via raw `Statement::from_sql_and_values` SQL.
 
 pub mod account;
+pub mod auth;
 pub mod email_token;
 pub mod invite;
 pub mod password;
