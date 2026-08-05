@@ -69,6 +69,40 @@ mod tests {
 
     use super::*;
 
+    /// Test-only wrapper: an open PDS database with its backing temp dir kept
+    /// alive for the lifetime of the value.
+    struct TestDb {
+        db: DatabaseConnection,
+        _dir: camino_tempfile::Utf8TempDir,
+    }
+
+    impl std::ops::Deref for TestDb {
+        type Target = DatabaseConnection;
+
+        fn deref(&self) -> &Self::Target {
+            &self.db
+        }
+    }
+
+    /// Test-only helper: open a `DatabaseKind` into a fresh temporary directory.
+    trait TestDatabaseKind {
+        async fn open_test_db(self) -> TestDb;
+    }
+
+    impl TestDatabaseKind for DatabaseKind {
+        async fn open_test_db(self) -> TestDb {
+            let dir = camino_tempfile::Utf8TempDir::new().unwrap();
+            let filename = match self {
+                Self::Account => "account.sqlite",
+                Self::Sequencer => "sequencer.sqlite",
+                Self::DidCache => "did_cache.sqlite",
+                Self::Actor => "store.sqlite",
+            };
+            let db = self.open(dir.path().join(filename)).await.unwrap();
+            TestDb { db, _dir: dir }
+        }
+    }
+
     async fn table_names(db: &DatabaseConnection) -> Vec<String> {
         let stmt = Statement::from_string(
             DatabaseBackend::Sqlite,
@@ -95,13 +129,9 @@ mod tests {
 
     #[tokio::test]
     async fn migrates_account_db_schema() {
-        let dir = camino_tempfile::Utf8TempDir::new().unwrap();
-        let db = DatabaseKind::Account
-            .open(dir.path().join("account.sqlite"))
-            .await
-            .unwrap();
+        let db = DatabaseKind::Account.open_test_db().await;
         // migrating again is a no-op
-        AccountMigrator::up(&db, None).await.unwrap();
+        AccountMigrator::up(&*db, None).await.unwrap();
         assert_eq!(
             table_names(&db).await,
             [
@@ -127,34 +157,22 @@ mod tests {
 
     #[tokio::test]
     async fn migrates_sequencer_db_schema() {
-        let dir = camino_tempfile::Utf8TempDir::new().unwrap();
-        let db = DatabaseKind::Sequencer
-            .open(dir.path().join("sequencer.sqlite"))
-            .await
-            .unwrap();
-        SequencerMigrator::up(&db, None).await.unwrap();
+        let db = DatabaseKind::Sequencer.open_test_db().await;
+        SequencerMigrator::up(&*db, None).await.unwrap();
         assert_eq!(table_names(&db).await, ["repo_seq", "sequencer_migrations"]);
     }
 
     #[tokio::test]
     async fn migrates_did_cache_db_schema() {
-        let dir = camino_tempfile::Utf8TempDir::new().unwrap();
-        let db = DatabaseKind::DidCache
-            .open(dir.path().join("did_cache.sqlite"))
-            .await
-            .unwrap();
-        DidCacheMigrator::up(&db, None).await.unwrap();
+        let db = DatabaseKind::DidCache.open_test_db().await;
+        DidCacheMigrator::up(&*db, None).await.unwrap();
         assert_eq!(table_names(&db).await, ["did_cache_migrations", "did_doc"]);
     }
 
     #[tokio::test]
     async fn migrates_actor_db_schema() {
-        let dir = camino_tempfile::Utf8TempDir::new().unwrap();
-        let db = DatabaseKind::Actor
-            .open(dir.path().join("store.sqlite"))
-            .await
-            .unwrap();
-        ActorMigrator::up(&db, None).await.unwrap();
+        let db = DatabaseKind::Actor.open_test_db().await;
+        ActorMigrator::up(&*db, None).await.unwrap();
         assert_eq!(
             table_names(&db).await,
             [
@@ -182,11 +200,7 @@ mod tests {
 
     #[tokio::test]
     async fn account_db_has_lower_case_unique_indexes() {
-        let dir = camino_tempfile::Utf8TempDir::new().unwrap();
-        let db = DatabaseKind::Account
-            .open(dir.path().join("account.sqlite"))
-            .await
-            .unwrap();
+        let db = DatabaseKind::Account.open_test_db().await;
         assert_eq!(
             index_names(&db, "actor_handle_lower_idx").await,
             ["actor_handle_lower_idx"]
@@ -199,11 +213,7 @@ mod tests {
 
     #[tokio::test]
     async fn sqlite_journal_mode_is_wal() {
-        let dir = camino_tempfile::Utf8TempDir::new().unwrap();
-        let db = DatabaseKind::Account
-            .open(dir.path().join("account.sqlite"))
-            .await
-            .unwrap();
+        let db = DatabaseKind::Account.open_test_db().await;
         let stmt =
             Statement::from_string(DatabaseBackend::Sqlite, "PRAGMA journal_mode".to_owned());
         let row = db.query_one_raw(stmt).await.unwrap().unwrap();
@@ -215,11 +225,7 @@ mod tests {
     async fn custom_types_roundtrip() {
         use sea_orm::{ActiveModelTrait, EntityTrait, Set};
 
-        let dir = camino_tempfile::Utf8TempDir::new().unwrap();
-        let db = DatabaseKind::Sequencer
-            .open(dir.path().join("sequencer.sqlite"))
-            .await
-            .unwrap();
+        let db = DatabaseKind::Sequencer.open_test_db().await;
 
         let test_did: migration::types::did::Did = "did:plc:test123".parse().unwrap();
         let test_seq = migration::types::db_id::DbId::new();
@@ -234,14 +240,14 @@ mod tests {
             invalidated: Set(Some(0)),
             sequenced_at: Set(now),
         };
-        let res = model.insert(&db).await.unwrap();
+        let res = model.insert(&*db).await.unwrap();
         assert_eq!(res.seq, test_seq);
         assert_eq!(res.did, test_did);
         assert_eq!(res.event, b"test event");
 
         // Read it back
         let fetched = entities::repo_seq::Entity::find_by_id(test_seq)
-            .one(&db)
+            .one(&*db)
             .await
             .unwrap()
             .expect("should find inserted row");
