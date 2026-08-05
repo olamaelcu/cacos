@@ -304,7 +304,7 @@ impl SqlRepoReader {
                     )
                 })?;
         }
-        // Reference: put_many does NOT populate the cache. Match that.
+        // Note: put_many does NOT populate the cache. Match that.
         Ok(())
     }
 
