@@ -63,10 +63,13 @@ tracing-timing = { workspace = true }
 # --- encoding primitives used by blobstore ---
 bytes = "1"
 
+# --- client metadata fetcher (Task 6) ---
+reqwest = { version = "0.12", features = ["json"] }
+url = "2"
+
 [dev-dependencies]
 camino-tempfile = { workspace = true }
 poem = { workspace = true, features = ["test"] }
 metrics = { workspace = true }
 serde_ipld_dagcbor = { workspace = true }
-# --- encoding primitives used by blobstore ---
-bytes = "1"
+wiremock = "0.6"
