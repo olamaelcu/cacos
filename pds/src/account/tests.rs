@@ -3,13 +3,13 @@
 use super::helpers::account::{
     self, AccountHelperError, AccountStatus, AvailabilityFlags, format_account_status,
 };
-use super::helpers::{account as account_helper, email_token};
+use super::helpers::{account as account_helper, auth, email_token, invite, password};
 use super::*;
 use crate::account::helpers::sql;
 use crate::account::test_util::{TEST_CID, test_db};
 use lexicon_cid::Cid;
 use rsky_lexicon::com::atproto::admin::StatusAttr;
-use sea_orm::ConnectionTrait;
+use sea_orm::{ConnectionTrait, Value};
 use std::str::FromStr;
 
 pub(crate) async fn test_manager() -> (camino_tempfile::Utf8TempDir, AccountManager) {
@@ -399,4 +399,548 @@ async fn email_token_row_mapping_rejects_unknown_purpose() {
         .unwrap();
     let row = row.unwrap();
     assert!(email_token::email_token_from_row(&row).is_err());
+}
+
+#[tokio::test]
+async fn manages_sessions_and_refresh_tokens() {
+    let (_dir, am) = test_manager().await;
+    let (_, refresh_jwt) = create_test_account(&am, "did:plc:frank", "frank.test").await;
+
+    // rotating the original refresh token grants a new one
+    let refresh_payload = auth::decode_refresh_token(refresh_jwt).unwrap();
+    let rotated = am
+        .rotate_refresh_token(&refresh_payload.jti)
+        .await
+        .unwrap()
+        .unwrap();
+    let rotated_payload = auth::decode_refresh_token(rotated.1.clone()).unwrap();
+    assert_ne!(rotated_payload.jti, refresh_payload.jti);
+
+    // reuse within the grace period re-issues the same next token id
+    let reused = am
+        .rotate_refresh_token(&refresh_payload.jti)
+        .await
+        .unwrap()
+        .unwrap();
+    let reused_payload = auth::decode_refresh_token(reused.1).unwrap();
+    assert_eq!(reused_payload.jti, rotated_payload.jti);
+
+    // rotating an unknown token yields None
+    assert!(
+        am.rotate_refresh_token(&"unknown-token-id".to_string())
+            .await
+            .unwrap()
+            .is_none()
+    );
+
+    // an expired token cannot be rotated and gets tidied up
+    let expired_at = rsky_common::time::from_micros_to_str(1_000_000);
+    am.db
+        .execute_raw(sql(
+            "UPDATE refresh_token SET \"expiresAt\" = ?1 WHERE id = ?2",
+            vec![
+                Value::from(expired_at),
+                Value::from(rotated_payload.jti.clone()),
+            ],
+        ))
+        .await
+        .unwrap();
+    assert!(
+        am.rotate_refresh_token(&rotated_payload.jti)
+            .await
+            .unwrap()
+            .is_none()
+    );
+
+    // create_session with and without an app password
+    let (_, session_refresh) = am
+        .create_session("did:plc:frank".to_owned(), None)
+        .await
+        .unwrap();
+    let session_payload = auth::decode_refresh_token(session_refresh).unwrap();
+    let stored = auth::get_refresh_token(&session_payload.jti, &am.db)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(stored.app_password_name, None);
+    let (_, app_refresh) = am
+        .create_session("did:plc:frank".to_owned(), Some("test app".to_owned()))
+        .await
+        .unwrap();
+    let app_payload = auth::decode_refresh_token(app_refresh).unwrap();
+    let stored = auth::get_refresh_token(&app_payload.jti, &am.db)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(stored.app_password_name, Some("test app".to_owned()));
+
+    // revocation
+    assert!(
+        am.revoke_refresh_token(session_payload.jti.clone())
+            .await
+            .unwrap()
+    );
+    assert!(!am.revoke_refresh_token(session_payload.jti).await.unwrap());
+    assert!(
+        auth::revoke_refresh_tokens_by_did("did:plc:frank", &am.db)
+            .await
+            .unwrap()
+    );
+    assert!(
+        !auth::revoke_refresh_tokens_by_did("did:plc:frank", &am.db)
+            .await
+            .unwrap()
+    );
+}
+
+#[tokio::test]
+async fn auth_helper_edge_cases() {
+    let (_dir, am) = test_manager().await;
+    assert!(!auth::get_refresh_token_id().is_empty());
+
+    // a grace period cannot be added when another refresh has already won
+    let payload = auth::RefreshToken {
+        scope: crate::account::AuthScope::Refresh,
+        sub: "did:plc:x".to_owned(),
+        exp: jwt_simple::prelude::Duration::from_days(90),
+        jti: "token-1".to_owned(),
+    };
+    auth::store_refresh_token(payload, None, &am.db)
+        .await
+        .unwrap();
+    auth::add_refresh_grace_period(
+        auth::RefreshGracePeriodOpts {
+            id: "token-1".to_owned(),
+            expires_at: rsky_common::now(),
+            next_id: "next-a".to_owned(),
+        },
+        &am.db,
+    )
+    .await
+    .unwrap();
+    let err = auth::add_refresh_grace_period(
+        auth::RefreshGracePeriodOpts {
+            id: "token-1".to_owned(),
+            expires_at: rsky_common::now(),
+            next_id: "next-b".to_owned(),
+        },
+        &am.db,
+    )
+    .await
+    .unwrap_err();
+    assert!(matches!(
+        err.downcast_ref::<auth::AuthHelperError>(),
+        Some(auth::AuthHelperError::ConcurrentRefresh)
+    ));
+
+    // expired token cleanup only removes stale rows
+    auth::delete_expired_refresh_tokens("did:plc:x", rsky_common::now(), &am.db)
+        .await
+        .unwrap();
+    assert!(
+        auth::get_refresh_token("token-1", &am.db)
+            .await
+            .unwrap()
+            .is_none()
+    );
+
+    // service jwts look like three dot-separated segments
+    let service_jwt = auth::create_service_jwt(auth::ServiceJwtParams {
+        iss: "did:web:pds.test".to_owned(),
+        aud: "did:web:appview.test".to_owned(),
+        exp: None,
+        lxm: Some("com.atproto.repo.uploadBlob".to_owned()),
+        jti: None,
+    })
+    .await
+    .unwrap();
+    assert_eq!(service_jwt.split('.').count(), 3);
+}
+
+#[tokio::test]
+async fn manages_invites() {
+    let (_dir, am) = test_manager().await;
+    create_test_account(&am, "did:plc:inviter", "inviter.test").await;
+
+    // admin-created codes
+    am.create_invite_codes(
+        vec![rsky_lexicon::com::atproto::server::AccountCodes {
+            account: "did:plc:inviter".to_owned(),
+            codes: vec!["admin-code-1".to_owned(), "admin-code-2".to_owned()],
+        }],
+        1,
+    )
+    .await
+    .unwrap();
+
+    // account-created codes
+    let created = am
+        .create_account_invite_codes("did:plc:inviter", vec!["self-code-1".to_owned()], 1, false)
+        .await
+        .unwrap();
+    assert_eq!(created.len(), 1);
+    assert!(!created[0].disabled);
+    // creating more than expected fails
+    let err = am
+        .create_account_invite_codes("did:plc:inviter", vec!["self-code-2".to_owned()], 1, true)
+        .await
+        .unwrap_err();
+    assert!(err.to_string().contains("DuplicateCreate"));
+
+    // the failed create rolled back, leaving the two admin codes and one self code
+    let codes = am
+        .get_account_invite_codes("did:plc:inviter")
+        .await
+        .unwrap();
+    assert_eq!(codes.len(), 3);
+
+    // an account created with an invite records the use
+    am.create_account(create_opts(
+        "did:plc:invited",
+        "invited.test",
+        Some("admin-code-1".to_owned()),
+    ))
+    .await
+    .unwrap();
+    let invited_by = am
+        .get_invited_by_for_accounts(vec!["did:plc:invited".to_owned()])
+        .await
+        .unwrap();
+    assert_eq!(
+        invited_by.get("did:plc:invited").unwrap().code,
+        "admin-code-1"
+    );
+    assert!(
+        am.get_invited_by_for_accounts(vec![])
+            .await
+            .unwrap()
+            .is_empty()
+    );
+
+    // exhausted codes are rejected
+    let err = am
+        .create_account(create_opts(
+            "did:plc:invited2",
+            "invited2.test",
+            Some("admin-code-1".to_owned()),
+        ))
+        .await
+        .unwrap_err();
+    assert!(err.to_string().contains("Not enough uses"));
+
+    // unknown codes are rejected
+    let err = am
+        .create_account(create_opts(
+            "did:plc:invited3",
+            "invited3.test",
+            Some("no-such-code".to_owned()),
+        ))
+        .await
+        .unwrap_err();
+    assert!(err.to_string().contains("None or disabled"));
+
+    // disabled codes are rejected
+    am.disable_invite_codes(DisableInviteCodesOpts {
+        codes: vec!["admin-code-2".to_owned()],
+        accounts: vec![],
+    })
+    .await
+    .unwrap();
+    let err = am
+        .create_account(create_opts(
+            "did:plc:invited4",
+            "invited4.test",
+            Some("admin-code-2".to_owned()),
+        ))
+        .await
+        .unwrap_err();
+    assert!(err.to_string().contains("None or disabled"));
+
+    // disabling by account disables the rest
+    am.disable_invite_codes(DisableInviteCodesOpts {
+        codes: vec![],
+        accounts: vec!["did:plc:inviter".to_owned()],
+    })
+    .await
+    .unwrap();
+    let codes = am
+        .get_account_invite_codes("did:plc:inviter")
+        .await
+        .unwrap();
+    assert!(codes.iter().all(|code| code.disabled));
+
+    am.set_account_invites_disabled("did:plc:inviter", true)
+        .await
+        .unwrap();
+    let got = am
+        .get_account("did:plc:inviter", None)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(got.invites_disabled, Some(1));
+    am.set_account_invites_disabled("did:plc:inviter", false)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn manages_passwords() {
+    let (_dir, am) = test_manager().await;
+    create_test_account(&am, "did:plc:grace", "grace.test").await;
+
+    assert!(
+        am.verify_account_password("did:plc:grace", &"password123".to_owned())
+            .await
+            .unwrap()
+    );
+    assert!(
+        !am.verify_account_password("did:plc:grace", &"wrong".to_owned())
+            .await
+            .unwrap()
+    );
+    assert!(
+        !am.verify_account_password("did:plc:missing", &"password123".to_owned())
+            .await
+            .unwrap()
+    );
+
+    // app passwords
+    let created = am
+        .create_app_password("did:plc:grace".to_owned(), "My App".to_owned())
+        .await
+        .unwrap();
+    assert_eq!(created.password.len(), 19);
+    let err = am
+        .create_app_password("did:plc:grace".to_owned(), "My App".to_owned())
+        .await
+        .unwrap_err();
+    assert!(
+        err.to_string()
+            .contains("could not create app-specific password")
+    );
+
+    let listed = am.list_app_passwords("did:plc:grace").await.unwrap();
+    assert_eq!(listed.len(), 1);
+    assert_eq!(listed[0].0, "My App");
+
+    assert_eq!(
+        am.verify_app_password("did:plc:grace", &created.password)
+            .await
+            .unwrap(),
+        Some("My App".to_owned())
+    );
+    assert_eq!(
+        am.verify_app_password("did:plc:grace", "1111-2222-3333-4444")
+            .await
+            .unwrap(),
+        None
+    );
+
+    // an app password session gets revoked along with the password
+    am.create_session("did:plc:grace".to_owned(), Some("My App".to_owned()))
+        .await
+        .unwrap();
+    am.revoke_app_password("did:plc:grace".to_owned(), "My App".to_owned())
+        .await
+        .unwrap();
+    assert!(
+        am.list_app_passwords("did:plc:grace")
+            .await
+            .unwrap()
+            .is_empty()
+    );
+    assert_eq!(
+        am.verify_app_password("did:plc:grace", &created.password)
+            .await
+            .unwrap(),
+        None
+    );
+
+    // account password reset via email token
+    let reset_token = am
+        .create_email_token("did:plc:grace", EmailTokenPurpose::ResetPassword)
+        .await
+        .unwrap();
+    am.reset_password(ResetPasswordOpts {
+        password: "newpassword456".to_owned(),
+        token: reset_token,
+    })
+    .await
+    .unwrap();
+    assert!(
+        am.verify_account_password("did:plc:grace", &"newpassword456".to_owned())
+            .await
+            .unwrap()
+    );
+    assert!(
+        !am.verify_account_password("did:plc:grace", &"password123".to_owned())
+            .await
+            .unwrap()
+    );
+}
+
+#[tokio::test]
+async fn password_hash_helpers() {
+    let hash = password::gen_salt_and_hash("secret".to_owned()).unwrap();
+    assert!(password::verify(&"secret".to_owned(), &hash).unwrap());
+    assert!(!password::verify(&"other".to_owned(), &hash).unwrap());
+    assert!(password::verify(&"secret".to_owned(), "not-a-phc-hash").is_err());
+    assert!(password::hash_with_salt(&"secret".to_owned(), "!invalid salt!").is_err());
+}
+
+#[tokio::test]
+async fn manages_email_tokens() {
+    let (_dir, am) = test_manager().await;
+    create_test_account(&am, "did:plc:henry", "henry.test").await;
+
+    // confirm email flow
+    let token = am
+        .create_email_token("did:plc:henry", EmailTokenPurpose::ConfirmEmail)
+        .await
+        .unwrap();
+    am.assert_valid_email_token("did:plc:henry", EmailTokenPurpose::ConfirmEmail, &token)
+        .await
+        .unwrap();
+    am.confirm_email(ConfirmEmailOpts {
+        did: &"did:plc:henry".to_owned(),
+        token: &token,
+    })
+    .await
+    .unwrap();
+    let got = am
+        .get_account("did:plc:henry", None)
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(got.email_confirmed_at.is_some());
+    // token was consumed
+    assert!(
+        am.assert_valid_email_token("did:plc:henry", EmailTokenPurpose::ConfirmEmail, &token)
+            .await
+            .is_err()
+    );
+
+    // updating email clears tokens and the confirmation timestamp
+    let token = am
+        .create_email_token("did:plc:henry", EmailTokenPurpose::UpdateEmail)
+        .await
+        .unwrap();
+    am.assert_valid_email_token_and_cleanup(
+        "did:plc:henry",
+        EmailTokenPurpose::UpdateEmail,
+        &token,
+    )
+    .await
+    .unwrap();
+    am.update_email(UpdateEmailOpts {
+        did: "did:plc:henry".to_owned(),
+        email: "henry2@example.com".to_owned(),
+    })
+    .await
+    .unwrap();
+    let got = am
+        .get_account("did:plc:henry", None)
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(got.email_confirmed_at.is_none());
+
+    // invalid and expired tokens
+    assert!(
+        am.assert_valid_email_token("did:plc:henry", EmailTokenPurpose::ConfirmEmail, "BOGUS")
+            .await
+            .unwrap_err()
+            .to_string()
+            .contains("Token is invalid")
+    );
+    let token = am
+        .create_email_token("did:plc:henry", EmailTokenPurpose::ConfirmEmail)
+        .await
+        .unwrap();
+    // creating a second token replaces the first
+    let replacement = am
+        .create_email_token("did:plc:henry", EmailTokenPurpose::ConfirmEmail)
+        .await
+        .unwrap();
+    assert_ne!(token, replacement);
+    assert!(
+        am.assert_valid_email_token("did:plc:henry", EmailTokenPurpose::ConfirmEmail, &token)
+            .await
+            .is_err()
+    );
+
+    let old = rsky_common::time::from_micros_to_str(1_000_000);
+    am.db
+        .execute_raw(sql(
+            "UPDATE email_token SET \"requestedAt\" = ?1 WHERE did = ?2",
+            vec![Value::from(old), Value::from("did:plc:henry")],
+        ))
+        .await
+        .unwrap();
+    assert!(
+        am.assert_valid_email_token(
+            "did:plc:henry",
+            EmailTokenPurpose::ConfirmEmail,
+            &replacement
+        )
+        .await
+        .unwrap_err()
+        .to_string()
+        .contains("Token is expired")
+    );
+    let err = email_token::assert_valid_token_and_find_did(
+        EmailTokenPurpose::ConfirmEmail,
+        &replacement,
+        None,
+        &am.db,
+    )
+    .await
+    .unwrap_err();
+    assert!(err.to_string().contains("Token is expired"));
+    let err = email_token::assert_valid_token_and_find_did(
+        EmailTokenPurpose::ConfirmEmail,
+        "BOGUS",
+        None,
+        &am.db,
+    )
+    .await
+    .unwrap_err();
+    assert!(err.to_string().contains("Token is invalid"));
+}
+
+#[tokio::test]
+async fn rotates_app_password_refresh_tokens() {
+    let (_dir, am) = test_manager().await;
+    create_test_account(&am, "did:plc:apppw", "apppw.test").await;
+    am.create_app_password("did:plc:apppw".to_owned(), "rotator".to_owned())
+        .await
+        .unwrap();
+    let (_, refresh_jwt) = am
+        .create_session("did:plc:apppw".to_owned(), Some("rotator".to_owned()))
+        .await
+        .unwrap();
+    let payload = auth::decode_refresh_token(refresh_jwt).unwrap();
+    let rotated = am
+        .rotate_refresh_token(&payload.jti)
+        .await
+        .unwrap()
+        .unwrap();
+    let rotated_payload = auth::decode_refresh_token(rotated.1).unwrap();
+    let stored = auth::get_refresh_token(&rotated_payload.jti, &am.db)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(stored.app_password_name, Some("rotator".to_owned()));
+}
+
+#[tokio::test]
+async fn invite_helper_direct_queries() {
+    let (_dir, am) = test_manager().await;
+    // uses map is empty when no codes are given
+    assert!(
+        invite::get_invite_codes_uses_v2(vec![], &am.db)
+            .await
+            .unwrap()
+            .is_empty()
+    );
 }
