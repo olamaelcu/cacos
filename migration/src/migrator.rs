@@ -27,7 +27,7 @@ impl MigratorTrait for AccountMigrator {
     }
 
     fn migration_table_name() -> DynIden {
-        Alias::new("migrations").into_iden()
+        Alias::new("account_migrations").into_iden()
     }
 }
 
@@ -41,7 +41,7 @@ impl MigratorTrait for SequencerMigrator {
     }
 
     fn migration_table_name() -> DynIden {
-        Alias::new("migrations").into_iden()
+        Alias::new("sequencer_migrations").into_iden()
     }
 }
 
@@ -55,7 +55,7 @@ impl MigratorTrait for DidCacheMigrator {
     }
 
     fn migration_table_name() -> DynIden {
-        Alias::new("migrations").into_iden()
+        Alias::new("did_cache_migrations").into_iden()
     }
 }
 

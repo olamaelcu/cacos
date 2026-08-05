@@ -1,39 +1,36 @@
-// pds/src/db/mod.rs
 //! SQLite connection helpers: open each PDS database and migrate it to the
 //! latest schema.
 //!
-//! Entities and migrators live in the `migration` crate. `open_*_db` mirrors
-//! rsky's `get_migrated_db` for each database (`account_manager/db.rs`,
-//! `sequencer/db.rs`, `did_cache.rs`, `actor_store/db/mod.rs`), applying the
-//! same pragmas rsky sets: WAL journal, `synchronous=NORMAL`, foreign keys on,
-//! and a 5-second busy timeout.
-
+//! Entities and migrators live in the `migration` crate.
 use std::path::Path;
 use std::time::Duration;
 
 use anyhow::Result;
-use migration::migrator::{AccountMigrator, ActorMigrator, DidCacheMigrator, SequencerMigrator};
-use migration::MigratorTrait;
-use sea_orm::sqlx::sqlite::{SqliteJournalMode, SqliteSynchronous};
-use sea_orm::{ConnectOptions, Database, DatabaseConnection};
+use migration::{
+    MigratorTrait,
+    migrator::{AccountMigrator, ActorMigrator, DidCacheMigrator, SequencerMigrator},
+};
+use sea_orm::{
+    ConnectOptions, Database, DatabaseConnection,
+    sqlx::sqlite::{SqliteJournalMode, SqliteSynchronous},
+};
 
 /// Re-export the entity modules so `crate::db::entities::<name>` resolves
 /// (entities physically live in the `migration` crate; Plans 03-09 import them
 /// through this alias, e.g. `crate::db::entities::repo_seq`).
 pub use migration::entities;
 
-/// Shared SQLite connection options: WAL journal, normal sync, FK enforcement,
-/// and a 5s busy timeout.
+/// Shared SQLite connection options
 fn base_options(url: String) -> ConnectOptions {
     let mut options = ConnectOptions::new(url);
     options
         .map_sqlx_sqlite_opts(|opts| {
             opts.journal_mode(SqliteJournalMode::Wal)
-                .synchronous(SqliteSynchronous::Normal)
+                .synchronous(SqliteSynchronous::Full)
                 .foreign_keys(true)
-                .busy_timeout(Duration::from_secs(5))
+                .busy_timeout(Duration::from_secs(3))
         })
-        .max_connections(5);
+        .max_connections(20);
     options
 }
 
@@ -42,32 +39,26 @@ fn sqlite_url(path: impl AsRef<Path>) -> String {
     format!("sqlite://{}?mode=rwc", path.as_ref().display())
 }
 
-/// Open and migrate the account database (account manager in rsky).
-pub async fn open_account_db(path: impl AsRef<Path>) -> Result<DatabaseConnection> {
-    let db = Database::connect(base_options(sqlite_url(path))).await?;
-    AccountMigrator::up(&db, None).await?;
-    Ok(db)
+#[derive(Debug)]
+pub enum DatabaseKind {
+    Account,
+    Sequencer,
+    DidCache,
+    Actor,
 }
 
-/// Open and migrate the sequencer database.
-pub async fn open_sequencer_db(path: impl AsRef<Path>) -> Result<DatabaseConnection> {
-    let db = Database::connect(base_options(sqlite_url(path))).await?;
-    SequencerMigrator::up(&db, None).await?;
-    Ok(db)
-}
+impl DatabaseKind {
+    pub async fn open(self, path: impl AsRef<Path>) -> Result<DatabaseConnection> {
+        let db = Database::connect(base_options(sqlite_url(path))).await?;
+        match self {
+            Self::Account => AccountMigrator::up(&db, None).await?,
+            Self::Actor => ActorMigrator::up(&db, None).await?,
+            Self::Sequencer => SequencerMigrator::up(&db, None).await?,
+            Self::DidCache => DidCacheMigrator::up(&db, None).await?,
+        }
 
-/// Open and migrate the did-cache database.
-pub async fn open_did_cache_db(path: impl AsRef<Path>) -> Result<DatabaseConnection> {
-    let db = Database::connect(base_options(sqlite_url(path))).await?;
-    DidCacheMigrator::up(&db, None).await?;
-    Ok(db)
-}
-
-/// Open and migrate an actor database (per-did `store.sqlite`).
-pub async fn open_actor_db(path: impl AsRef<Path>) -> Result<DatabaseConnection> {
-    let db = Database::connect(base_options(sqlite_url(path))).await?;
-    ActorMigrator::up(&db, None).await?;
-    Ok(db)
+        Ok(db)
+    }
 }
 
 #[cfg(test)]
@@ -92,9 +83,7 @@ mod tests {
     async fn index_names(db: &DatabaseConnection, name: &str) -> Vec<String> {
         let stmt = Statement::from_string(
             DatabaseBackend::Sqlite,
-            format!(
-                "SELECT name FROM sqlite_master WHERE type = 'index' AND name = '{name}'"
-            ),
+            format!("SELECT name FROM sqlite_master WHERE type = 'index' AND name = '{name}'"),
         );
         let rows = db.query_all(stmt).await.unwrap();
         rows.iter()
@@ -105,7 +94,10 @@ mod tests {
     #[tokio::test]
     async fn migrates_account_db_schema() {
         let dir = tempfile::tempdir().unwrap();
-        let db = open_account_db(dir.path().join("account.sqlite")).await.unwrap();
+        let db = DatabaseKind::Account
+            .open(dir.path().join("account.sqlite"))
+            .await
+            .unwrap();
         // migrating again is a no-op
         AccountMigrator::up(&db, None).await.unwrap();
         assert_eq!(
@@ -134,7 +126,10 @@ mod tests {
     #[tokio::test]
     async fn migrates_sequencer_db_schema() {
         let dir = tempfile::tempdir().unwrap();
-        let db = open_sequencer_db(dir.path().join("sequencer.sqlite")).await.unwrap();
+        let db = DatabaseKind::Sequencer
+            .open(dir.path().join("sequencer.sqlite"))
+            .await
+            .unwrap();
         SequencerMigrator::up(&db, None).await.unwrap();
         assert_eq!(table_names(&db).await, ["migrations", "repo_seq"]);
     }
@@ -142,7 +137,10 @@ mod tests {
     #[tokio::test]
     async fn migrates_did_cache_db_schema() {
         let dir = tempfile::tempdir().unwrap();
-        let db = open_did_cache_db(dir.path().join("did_cache.sqlite")).await.unwrap();
+        let db = DatabaseKind::DidCache
+            .open(dir.path().join("did_cache.sqlite"))
+            .await
+            .unwrap();
         DidCacheMigrator::up(&db, None).await.unwrap();
         assert_eq!(table_names(&db).await, ["did_doc", "migrations"]);
     }
@@ -150,7 +148,10 @@ mod tests {
     #[tokio::test]
     async fn migrates_actor_db_schema() {
         let dir = tempfile::tempdir().unwrap();
-        let db = open_actor_db(dir.path().join("store.sqlite")).await.unwrap();
+        let db = DatabaseKind::Actor
+            .open(dir.path().join("store.sqlite"))
+            .await
+            .unwrap();
         ActorMigrator::up(&db, None).await.unwrap();
         assert_eq!(
             table_names(&db).await,
@@ -180,7 +181,10 @@ mod tests {
     #[tokio::test]
     async fn account_db_has_lower_case_unique_indexes() {
         let dir = tempfile::tempdir().unwrap();
-        let db = open_account_db(dir.path().join("account.sqlite")).await.unwrap();
+        let db = DatabaseKind::Account
+            .open(dir.path().join("account.sqlite"))
+            .await
+            .unwrap();
         assert_eq!(
             index_names(&db, "actor_handle_lower_idx").await,
             ["actor_handle_lower_idx"]
@@ -194,7 +198,10 @@ mod tests {
     #[tokio::test]
     async fn sqlite_journal_mode_is_wal() {
         let dir = tempfile::tempdir().unwrap();
-        let db = open_account_db(dir.path().join("account.sqlite")).await.unwrap();
+        let db = DatabaseKind::Account
+            .open(dir.path().join("account.sqlite"))
+            .await
+            .unwrap();
         let stmt =
             Statement::from_string(DatabaseBackend::Sqlite, "PRAGMA journal_mode".to_owned());
         let row = db.query_one(stmt).await.unwrap().unwrap();
