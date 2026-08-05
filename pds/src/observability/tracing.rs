@@ -1,19 +1,28 @@
-//! Global tracing registry: `EnvFilter` + `MetricsLayer` + `fmt`.
+//! Global tracing registry: `EnvFilter` + `MetricsLayer` + `fmt` + `TimingLayer`.
 
 use metrics_tracing_context::MetricsLayer;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::{EnvFilter, Registry, fmt};
+use tracing_timing::group::{ByMessage, ByName};
+use tracing_timing::{Builder, Histogram, LayerDowncaster};
 
 /// Install the global tracing registry.
 ///
 /// Idempotent: a second call drops the `Err` from `set_global_default` instead of
 /// panicking (mirrors rsky-relay's tolerance for repeated `set_global_recorder`).
-pub fn init_tracing(env_filter: &str) {
+/// Returns the [`LayerDowncaster`] so the caller can hand it to
+/// [`TimingReporter`](crate::observability::timing::TimingReporter).
+pub fn init_tracing(env_filter: &str) -> LayerDowncaster<ByName, ByMessage> {
+    let timing_layer = Builder::default()
+        .layer(|| Histogram::new_with_max(1_000_000_000, 2).expect("valid histogram config"));
+    let downcaster = timing_layer.downcaster();
     let subscriber = Registry::default()
         .with(EnvFilter::new(env_filter))
         .with(MetricsLayer::new())
-        .with(fmt::Layer::new().with_target(false));
+        .with(fmt::Layer::new().with_target(false))
+        .with(timing_layer);
     let _ = tracing::subscriber::set_global_default(subscriber);
+    downcaster
 }
 
 #[cfg(test)]
