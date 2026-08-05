@@ -13,13 +13,11 @@ use crate::oauth::remote_create_account::{
     CreateAccountError, CreateAccountInput, RemoteCreateAccount,
 };
 use crate::oauth::{SharedOAuthProvider, now_secs};
-use poem::web::{Data, Json, Query};
 use poem::Response;
-use rsky_oauth::request::{
-    request_uri_from_id, AUTHORIZATION_INACTIVITY_TIMEOUT,
-};
-use rsky_oauth::types::AuthorizationRequestParameters;
+use poem::web::{Data, Json, Query};
 use rsky_oauth::OAuthError;
+use rsky_oauth::request::{AUTHORIZATION_INACTIVITY_TIMEOUT, request_uri_from_id};
+use rsky_oauth::types::AuthorizationRequestParameters;
 use sea_orm::DatabaseConnection;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -124,26 +122,26 @@ pub struct RejectBody {
 pub struct TokenGuard;
 
 impl<'a> poem::FromRequest<'a> for TokenGuard {
-    fn from_request(
+    async fn from_request(
         req: &'a poem::Request,
         _body: &mut poem::RequestBody,
-    ) -> impl std::future::Future<Output = Result<Self, poem::Error>> + Send {
-        async move {
-            let auth = req
-                .header("Authorization")
-                .and_then(|v| v.strip_prefix("Bearer "));
-            let expected = req.data::<OAuthRemoteConfig>().and_then(|c| c.token.as_deref());
-            match (auth, expected) {
-                (Some(supplied), Some(expected))
-                    if constant_time_eq(supplied.as_bytes(), expected.as_bytes()) =>
-                {
-                    Ok(TokenGuard)
-                }
-                _ => Err(poem::Error::from_string(
-                    "invalid token",
-                    poem::http::StatusCode::UNAUTHORIZED,
-                )),
+    ) -> Result<Self, poem::Error> {
+        let auth = req
+            .header("Authorization")
+            .and_then(|v| v.strip_prefix("Bearer "));
+        let expected = req
+            .data::<OAuthRemoteConfig>()
+            .and_then(|c| c.token.as_deref());
+        match (auth, expected) {
+            (Some(supplied), Some(expected))
+                if constant_time_eq(supplied.as_bytes(), expected.as_bytes()) =>
+            {
+                Ok(TokenGuard)
             }
+            _ => Err(poem::Error::from_string(
+                "invalid token",
+                poem::http::StatusCode::UNAUTHORIZED,
+            )),
         }
     }
 }
@@ -166,8 +164,10 @@ fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
 fn oauth_error_to_poem(error: OAuthError) -> poem::Error {
     poem::Error::from_response(
         Response::builder()
-            .status(poem::http::StatusCode::from_u16(error.status())
-                .unwrap_or(poem::http::StatusCode::BAD_REQUEST))
+            .status(
+                poem::http::StatusCode::from_u16(error.status())
+                    .unwrap_or(poem::http::StatusCode::BAD_REQUEST),
+            )
             .content_type("application/json")
             .body(error.to_json().to_string()),
     )
@@ -198,7 +198,7 @@ async fn read_request_data(
     match &data.device_id {
         None => data.device_id = Some(device_id.to_owned()),
         Some(bound) if bound != device_id => {
-            return Err(OAuthError::InvalidGrant("another device".into()))
+            return Err(OAuthError::InvalidGrant("another device".into()));
         }
         _ => {}
     }
@@ -365,13 +365,26 @@ pub async fn sign_in(
     let request_uri = request_uri_from_id(&b.rqid);
     let sign_result = shared
         .provider
-        .sign_in(&client_id, &request_uri, &b.device_id, &b.identifier, &b.password, now)
+        .sign_in(
+            &client_id,
+            &request_uri,
+            &b.device_id,
+            &b.identifier,
+            &b.password,
+            now,
+        )
         .await;
     let (page, sessions) = fetch_page(&shared, &client_id, &request_uri, &b.device_id, now)
         .await
         .map_err(oauth_error_to_poem)?;
     if let Err(err) = sign_result {
-        return Ok(Json(error_page("sign-in", &page, &sessions, Some(fresh), err)));
+        return Ok(Json(error_page(
+            "sign-in",
+            &page,
+            &sessions,
+            Some(fresh),
+            err,
+        )));
     }
     Ok(Json(consent_page(&page, &sessions, Some(fresh))))
 }
@@ -517,14 +530,13 @@ pub async fn create_account(
 mod tests {
     use super::*;
     use crate::db::DatabaseKind;
-    use poem::test::TestClient;
     use poem::EndpointExt;
+    use poem::test::TestClient;
     use rsky_oauth::store::MemoryOAuthStore;
     use rsky_oauth::{OAuthProvider, OAuthProviderConfig};
     use std::sync::Arc;
 
-    const TEST_KEY_HEX: &str =
-        "4242424242424242424242424242424242424242424242424242424242424242";
+    const TEST_KEY_HEX: &str = "4242424242424242424242424242424242424242424242424242424242424242";
     const ISSUER: &str = "https://pds.test";
     const AUDIENCE: &str = "did:web:pds.test";
 
@@ -568,7 +580,9 @@ mod tests {
             .open(dir.path().join("account.sqlite"))
             .await
             .unwrap();
-        let shared = SharedOAuthProvider { provider: provider() };
+        let shared = SharedOAuthProvider {
+            provider: provider(),
+        };
         let config = OAuthRemoteConfig {
             url: Some("https://remote.example.com".into()),
             token: Some("secret-token".into()),

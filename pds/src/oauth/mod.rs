@@ -13,11 +13,12 @@ pub mod remote_create_account;
 pub mod routes;
 
 use crate::account::oauth_store::PdsOAuthStore;
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine as _;
-use poem::web::cookie::{Cookie, CookieJar, SameSite};
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+#[allow(unused_imports)] // clippy false-positive: used by build_oauth_app's `.data()`
 use poem::EndpointExt;
-use rsky_oauth::dpop::{DpopManager, DpopNonce, InMemoryReplayStore, DEFAULT_ROTATION_INTERVAL};
+use poem::web::cookie::{Cookie, CookieJar, SameSite};
+use rsky_oauth::dpop::{DEFAULT_ROTATION_INTERVAL, DpopManager, DpopNonce, InMemoryReplayStore};
 use rsky_oauth::jwk::{EcCurve, Jwk};
 use rsky_oauth::store::DeviceData;
 use rsky_oauth::{OAuthError, OAuthProvider, OAuthProviderConfig};
@@ -203,15 +204,14 @@ pub async fn ensure_device_session(
 ) -> Result<DeviceSession, OAuthError> {
     if let Some(cookie) = jar.get(DEVICE_COOKIE) {
         let value = cookie.value_str().to_string();
-        if let Some((device_id, session_id)) = value.split_once('.') {
-            if let Some(device) = store.read_device(device_id).await? {
-                if device.session_id == session_id {
-                    return Ok(DeviceSession {
-                        device_id: device_id.to_string(),
-                        csrf: csrf_token(&value),
-                    });
-                }
-            }
+        if let Some((device_id, session_id)) = value.split_once('.')
+            && let Some(device) = store.read_device(device_id).await?
+            && device.session_id == session_id
+        {
+            return Ok(DeviceSession {
+                device_id: device_id.to_string(),
+                csrf: csrf_token(&value),
+            });
         }
     }
     let device_id = random_prefixed_id("dev-");
@@ -243,8 +243,7 @@ mod tests {
     use rsky_oauth::store::{AccountInfo, MemoryOAuthStore};
     use rsky_oauth::{OAuthProvider, OAuthProviderConfig};
 
-    const TEST_KEY_HEX: &str =
-        "4242424242424242424242424242424242424242424242424242424242424242";
+    const TEST_KEY_HEX: &str = "4242424242424242424242424242424242424242424242424242424242424242";
     const ISSUER: &str = "https://pds.test";
     const AUDIENCE: &str = "did:web:pds.test";
 
@@ -322,9 +321,15 @@ mod tests {
         let provider = memory_provider();
         let now = now_secs();
         let jar = CookieJar::default();
-        let session = ensure_device_session(provider.store().as_ref(), &jar, Some("agent"), "127.0.0.1", now)
-            .await
-            .unwrap();
+        let session = ensure_device_session(
+            provider.store().as_ref(),
+            &jar,
+            Some("agent"),
+            "127.0.0.1",
+            now,
+        )
+        .await
+        .unwrap();
         assert!(session.device_id.starts_with("dev-"));
         let cookie = jar
             .get(DEVICE_COOKIE)
@@ -334,9 +339,15 @@ mod tests {
         assert!(cookie.starts_with("dev-"));
         assert_eq!(session.csrf, csrf_token(&cookie));
 
-        let session2 = ensure_device_session(provider.store().as_ref(), &jar, Some("agent"), "127.0.0.1", now)
-            .await
-            .unwrap();
+        let session2 = ensure_device_session(
+            provider.store().as_ref(),
+            &jar,
+            Some("agent"),
+            "127.0.0.1",
+            now,
+        )
+        .await
+        .unwrap();
         assert_eq!(session2.device_id, session.device_id);
         assert_eq!(session2.csrf, session.csrf);
 
@@ -346,9 +357,10 @@ mod tests {
         tampered.set_same_site(SameSite::Lax);
         tampered.set_path("/oauth".to_string());
         jar2.add(tampered);
-        let session3 = ensure_device_session(provider.store().as_ref(), &jar2, None, "127.0.0.1", now)
-            .await
-            .unwrap();
+        let session3 =
+            ensure_device_session(provider.store().as_ref(), &jar2, None, "127.0.0.1", now)
+                .await
+                .unwrap();
         assert_ne!(session3.device_id, session.device_id);
     }
 }

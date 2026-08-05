@@ -17,16 +17,16 @@
 //! Plus `is_user_or_admin` matches on `r#type == "admin_token"`, not on
 //!    `did`, so the admin guard works as documented.
 
+use crate::account::AccountManager;
 use crate::account::helpers::account::{ActorAccount, AvailabilityFlags};
 use crate::account::helpers::auth::CustomClaimObj;
-use crate::account::AccountManager;
-use anyhow::{bail, Result};
-use base64ct::{Base64, Base64UrlUnpadded, Encoding};
+use anyhow::{Result, bail};
+use base64ct::{Base64UrlUnpadded, Encoding};
 use jwt_simple::prelude::*;
 use rsky_crypto::verify::verify_signature_digest;
 use rsky_oauth::dpop::DpopRequest;
 use rsky_oauth::{OAuthProvider, VerifiedAccess};
-use secp256k1::{Keypair, Message, Secp256k1, SecretKey};
+use secp256k1::{Keypair, Secp256k1, SecretKey};
 use sha2::{Digest, Sha256};
 use std::cell::RefCell;
 use std::env;
@@ -37,10 +37,13 @@ use thiserror::Error;
 
 const INFINITY: u64 = u64::MAX;
 
+/// Resolves a `did` (issuer) to its signing key (a did:key string). Wired by
+/// the identity plan; returns `InternalServerError` until then.
+pub type SigningKeyResolver = Box<dyn Fn(String, bool) -> Result<String> + Send + Sync>;
+
 static OAUTH_PROVIDER: OnceLock<Arc<OAuthProvider>> = OnceLock::new();
 static ACCOUNT_MANAGER: OnceLock<Arc<AccountManager>> = OnceLock::new();
-static SIGNING_KEY_RESOLVER: OnceLock<Box<dyn Fn(String, bool) -> Result<String> + Send + Sync>> =
-    OnceLock::new();
+static SIGNING_KEY_RESOLVER: OnceLock<SigningKeyResolver> = OnceLock::new();
 
 /// Register the shared OAuth provider (for DPoP-bound access-token
 /// validation) and the `AccountManager` (for account-status checks). Called
@@ -60,8 +63,8 @@ pub fn register_auth_dependencies(
 /// and `verify_service_jwt` (wired by the identity plan once IdResolver
 /// exists; until then `verify_user_did_token` returns InternalServerError).
 pub fn register_signing_key_resolver(
-    resolver: Box<dyn Fn(String, bool) -> Result<String> + Send + Sync>,
-) -> Result<(), Box<dyn Fn(String, bool) -> Result<String> + Send + Sync>> {
+    resolver: SigningKeyResolver,
+) -> Result<(), SigningKeyResolver> {
     SIGNING_KEY_RESOLVER.set(resolver)
 }
 
@@ -119,8 +122,7 @@ pub(crate) fn is_expired_jwt(err: &anyhow::Error) -> bool {
 pub static PDS_JWT_KEYPAIR: LazyLock<ES256kKeyPair> = LazyLock::new(|| {
     let secp = Secp256k1::new();
     let private_key = env::var("PDS_JWT_KEY_K256_PRIVATE_KEY_HEX").unwrap();
-    let secret_key =
-        SecretKey::from_slice(&hex::decode(private_key.as_bytes()).unwrap()).unwrap();
+    let secret_key = SecretKey::from_slice(&hex::decode(private_key.as_bytes()).unwrap()).unwrap();
     let jwt_key = Keypair::from_secret_key(&secp, &secret_key);
     ES256kKeyPair::from_bytes(jwt_key.secret_bytes().as_slice()).unwrap()
 });
@@ -541,8 +543,7 @@ pub async fn validate_dpop_access_token(
         ));
     };
     let now = now_secs();
-    let dpop_headers: Vec<&str> =
-        ctx.dpop_headers.iter().map(String::as_str).collect();
+    let dpop_headers: Vec<&str> = ctx.dpop_headers.iter().map(String::as_str).collect();
     let dpop_input = DpopRequestInput {
         method: &ctx.method,
         uri: &ctx.uri,
@@ -808,10 +809,10 @@ fn verify_service_jwt_token(
             if now > payload.exp {
                 bail!("JwtExpired: jwt expired")
             }
-            if let Some(ref own_did) = own_did {
-                if payload.aud != *own_did {
-                    bail!("BadJwtAudience: jwt audience does not match service did")
-                }
+            if let Some(own_did) = &own_did
+                && payload.aud != *own_did
+            {
+                bail!("BadJwtAudience: jwt audience does not match service did")
             }
             // Quirk 3 fix: hash the JWS signing input with SHA-256, decode
             // the signature segment, verify with digest semantics.
@@ -820,12 +821,7 @@ fn verify_service_jwt_token(
 
             let sig_bytes = Base64UrlUnpadded::decode_vec(sig)?;
             let verify_signature_with_key = |key: String| -> Result<bool> {
-                verify_signature_digest(
-                    &key,
-                    digest.as_ref(),
-                    &sig_bytes,
-                    None,
-                )
+                verify_signature_digest(&key, digest.as_ref(), &sig_bytes, None)
             };
 
             let signing_key = get_signing_key(payload.iss.clone(), false)?;
@@ -875,7 +871,7 @@ pub use crate::account::helpers::auth::create_service_jwt;
 mod tests {
     use super::*;
     use crate::account::helpers::auth::CustomClaimObj;
-    use crate::account::helpers::auth::{create_service_jwt, ServiceJwtParams};
+    use crate::account::helpers::auth::{ServiceJwtParams, create_service_jwt};
     use jwt_simple::algorithms::ES256kKeyPair;
     use rsky_crypto::constants::SECP256K1_JWT_ALG;
     use rsky_crypto::did::format_did_key;
@@ -927,12 +923,17 @@ mod tests {
     #[test]
     fn verify_access_token_roundtrip() {
         setup_env();
-        let token = sign_token(AuthScope::Access, StdDuration::from_secs(7200), "did:plc:alice");
+        let token = sign_token(
+            AuthScope::Access,
+            StdDuration::from_secs(7200),
+            "did:plc:alice",
+        );
         let payload = verify_jwt(&token, Some(verify_options())).unwrap();
         assert_eq!(payload.scope, AuthScope::Access);
         assert_eq!(payload.sub.as_deref(), Some("did:plc:alice"));
         assert!(payload.jti.is_none());
-        let bearer = validate_bearer_token(&token, vec![AuthScope::Access], Some(verify_options())).unwrap();
+        let bearer =
+            validate_bearer_token(&token, vec![AuthScope::Access], Some(verify_options())).unwrap();
         assert_eq!(bearer.did, "did:plc:alice");
         assert_eq!(bearer.scope, AuthScope::Access);
         assert_eq!(bearer.audience.as_deref(), Some("did:web:localho.st"));
@@ -942,19 +943,29 @@ mod tests {
     async fn expired_token_surfaces_as_expired() {
         setup_env();
         // Issue a token with a 1-second expiry and wait for it to pass.
-        let token = sign_token(AuthScope::Access, StdDuration::from_secs(1), "did:plc:alice");
+        let token = sign_token(
+            AuthScope::Access,
+            StdDuration::from_secs(1),
+            "did:plc:alice",
+        );
         tokio::time::sleep(StdDuration::from_secs(2)).await;
         let err = verify_jwt(&token, Some(verify_options())).unwrap_err();
         assert!(is_expired_jwt(&err));
-        let err = validate_bearer_token(&token, vec![AuthScope::Access], Some(verify_options())).unwrap_err();
+        let err = validate_bearer_token(&token, vec![AuthScope::Access], Some(verify_options()))
+            .unwrap_err();
         assert!(is_expired_jwt(&err));
     }
 
     #[test]
     fn wrong_scope_rejected() {
         setup_env();
-        let token = sign_token(AuthScope::Refresh, StdDuration::from_secs(7200), "did:plc:alice");
-        let err = validate_bearer_token(&token, vec![AuthScope::Access], Some(verify_options())).unwrap_err();
+        let token = sign_token(
+            AuthScope::Refresh,
+            StdDuration::from_secs(7200),
+            "did:plc:alice",
+        );
+        let err = validate_bearer_token(&token, vec![AuthScope::Access], Some(verify_options()))
+            .unwrap_err();
         assert_eq!(err.to_string(), "Bad token scope");
     }
 
@@ -1078,11 +1089,9 @@ mod tests {
             aud: None,
             iss: Some(vec!["did:web:issuer.test".to_string()]),
         };
-        let err = verify_service_jwt(
-            "x.y.z",
-            opts,
-            |_iss, _force| bail!("resolver should not be called: payload parse fails first"),
-        )
+        let err = verify_service_jwt("x.y.z", opts, |_iss, _force| {
+            bail!("resolver should not be called: payload parse fails first")
+        })
         .unwrap_err();
         // The error is a payload parsing failure (BadJwt-shaped), proving
         // the trust check did not short-circuit with UntrustedIss.
@@ -1118,11 +1127,9 @@ mod tests {
             aud: None,
             iss: Some(vec!["did:web:trusted.test".to_string()]),
         };
-        let err = verify_service_jwt(
-            &jwt,
-            opts,
-            |_iss, _force| bail!("resolver should not be called for unlisted issuer"),
-        )
+        let err = verify_service_jwt(&jwt, opts, |_iss, _force| {
+            bail!("resolver should not be called for unlisted issuer")
+        })
         .unwrap_err();
         assert!(
             err.to_string().contains("UntrustedIss"),
@@ -1134,7 +1141,10 @@ mod tests {
     fn verify_service_jwt_rejects_malformed_token() {
         let err = verify_service_jwt(
             "not-a-jwt",
-            ServiceJwtOpts { aud: None, iss: None },
+            ServiceJwtOpts {
+                aud: None,
+                iss: None,
+            },
             |_iss, _force| bail!("unexpected resolution"),
         )
         .unwrap_err();
@@ -1159,7 +1169,10 @@ mod tests {
         .unwrap();
         let err = verify_service_jwt(
             &jwt,
-            ServiceJwtOpts { aud: None, iss: None },
+            ServiceJwtOpts {
+                aud: None,
+                iss: None,
+            },
             |requested_iss, _force| {
                 assert_eq!(requested_iss, iss);
                 anyhow::bail!("could not resolve iss did")
@@ -1197,7 +1210,10 @@ mod tests {
 
         let result = verify_service_jwt(
             &jwt,
-            ServiceJwtOpts { aud: None, iss: None },
+            ServiceJwtOpts {
+                aud: None,
+                iss: None,
+            },
             |requested_iss, _force| {
                 assert_eq!(requested_iss, iss);
                 Ok(did_key.clone())
@@ -1217,7 +1233,11 @@ mod tests {
     #[allow(non_snake_case)]
     async fn validate_access_token_bearer_roundtrip() {
         setup_env();
-        let token = sign_token(AuthScope::Access, StdDuration::from_secs(7200), "did:plc:alice");
+        let token = sign_token(
+            AuthScope::Access,
+            StdDuration::from_secs(7200),
+            "did:plc:alice",
+        );
         let access = validate_access_token(
             Some(&format!("Bearer {token}")),
             vec![AuthScope::Access],
@@ -1239,14 +1259,14 @@ mod tests {
         // validator with a tight time tolerance; `validate_access_token`
         // uses the production 15-minute tolerance so a 2-second sleep is
         // insufficient there.
-        let token = sign_token(AuthScope::Access, StdDuration::from_secs(1), "did:plc:alice");
+        let token = sign_token(
+            AuthScope::Access,
+            StdDuration::from_secs(1),
+            "did:plc:alice",
+        );
         tokio::time::sleep(StdDuration::from_secs(2)).await;
-        let err = validate_bearer_token(
-            &token,
-            vec![AuthScope::Access],
-            Some(verify_options()),
-        )
-        .unwrap_err();
+        let err = validate_bearer_token(&token, vec![AuthScope::Access], Some(verify_options()))
+            .unwrap_err();
         assert!(is_expired_jwt(&err));
     }
 
@@ -1274,7 +1294,9 @@ mod tests {
         .with_subject("did:plc:alice")
         .with_jwt_id("refresh-tok-1");
         let token = PDS_JWT_KEYPAIR.sign(claims).unwrap();
-        let validated = validate_refresh_token(Some(&format!("Bearer {token}"))).await.unwrap();
+        let validated = validate_refresh_token(Some(&format!("Bearer {token}")))
+            .await
+            .unwrap();
         assert_eq!(validated.did, "did:plc:alice");
         assert_eq!(validated.scope, AuthScope::Refresh);
         assert_eq!(validated.payload.jti.as_deref(), Some("refresh-tok-1"));
@@ -1284,8 +1306,14 @@ mod tests {
     #[allow(non_snake_case)]
     async fn validate_refresh_token_rejects_access_token() {
         setup_env();
-        let token = sign_token(AuthScope::Access, StdDuration::from_secs(7200), "did:plc:alice");
-        let err = validate_refresh_token(Some(&format!("Bearer {token}"))).await.unwrap_err();
+        let token = sign_token(
+            AuthScope::Access,
+            StdDuration::from_secs(7200),
+            "did:plc:alice",
+        );
+        let err = validate_refresh_token(Some(&format!("Bearer {token}")))
+            .await
+            .unwrap_err();
         assert!(matches!(err, AuthError::BadJwt(_)));
     }
 
@@ -1297,9 +1325,15 @@ mod tests {
         unsafe {
             std::env::set_var("PDS_ADMIN_PASSWORD", "password");
         }
-        let access = verify_admin_token(Some("Basic YWRtaW46cGFzc3dvcmQ=")).await.unwrap();
+        let access = verify_admin_token(Some("Basic YWRtaW46cGFzc3dvcmQ="))
+            .await
+            .unwrap();
         assert_eq!(access.credentials.unwrap().r#type, "admin_token");
-        assert!(verify_admin_token(Some("Basic YWRtaW46d3Jvbmc=")).await.is_err());
+        assert!(
+            verify_admin_token(Some("Basic YWRtaW46d3Jvbmc="))
+                .await
+                .is_err()
+        );
         assert!(verify_admin_token(None).await.is_err());
         // SAFETY: see above.
         unsafe {

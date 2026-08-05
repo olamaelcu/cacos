@@ -12,7 +12,7 @@ use crate::db;
 use poem::web::{Data, Form};
 use poem::{Request, Response};
 use rsky_oauth::client::ParRequest;
-use rsky_oauth::request::{request_id_from_uri, REQUEST_URI_PREFIX};
+use rsky_oauth::request::{REQUEST_URI_PREFIX, request_id_from_uri};
 use rsky_oauth::{ClientCredentials, OAuthError, TokenRequest};
 use serde::Deserialize;
 use serde_json::Value;
@@ -30,7 +30,13 @@ pub struct OAuthRequestInfo {
 
 impl OAuthRequestInfo {
     fn from_request(req: &Request, public_url: &str) -> Self {
-        let uri = format!("{public_url}{}", req.uri().path_and_query().map(|q| q.as_str()).unwrap_or("/"));
+        let uri = format!(
+            "{public_url}{}",
+            req.uri()
+                .path_and_query()
+                .map(|q| q.as_str())
+                .unwrap_or("/")
+        );
         OAuthRequestInfo {
             method: req.method().as_str().to_string(),
             uri,
@@ -71,9 +77,12 @@ fn api_response(status: poem::http::StatusCode, body: Value, nonce: Option<Strin
         .header("Pragma", "no-cache")
         .body(body.to_string());
     if let Some(nonce) = nonce {
-        resp.headers_mut().insert("DPoP-Nonce", nonce.parse().unwrap());
         resp.headers_mut()
-            .insert("Access-Control-Expose-Headers", "DPoP-Nonce, WWW-Authenticate".parse().unwrap());
+            .insert("DPoP-Nonce", nonce.parse().unwrap());
+        resp.headers_mut().insert(
+            "Access-Control-Expose-Headers",
+            "DPoP-Nonce, WWW-Authenticate".parse().unwrap(),
+        );
     }
     resp
 }
@@ -87,7 +96,12 @@ fn api_created(body: Value, nonce: Option<String>) -> Response {
 }
 
 fn api_error(error: OAuthError, nonce: Option<String>) -> Response {
-    api_response(poem::http::StatusCode::from_u16(error.status()).unwrap_or(poem::http::StatusCode::BAD_REQUEST), error.to_json(), nonce)
+    api_response(
+        poem::http::StatusCode::from_u16(error.status())
+            .unwrap_or(poem::http::StatusCode::BAD_REQUEST),
+        error.to_json(),
+        nonce,
+    )
 }
 
 // ---------------------------------------------------------------------------
@@ -137,6 +151,7 @@ impl ParFormData {
 /// `prompt_values_supported` set {none, consent, create} with 400
 /// `invalid_request`, per the OIDC spec. The reference silently defaulted
 /// unknown prompts to consent — we surface the spec error instead.
+#[allow(clippy::result_large_err)]
 fn validate_prompt(prompt: Option<&str>) -> Result<(), Response> {
     match prompt {
         None | Some("none") | Some("consent") | Some("create") => Ok(()),
@@ -222,7 +237,12 @@ pub async fn oauth_token(
         refresh_token: form.refresh_token.clone(),
     };
     match provider
-        .token(&credentials, &request, &info.dpop_request(&headers, None), now)
+        .token(
+            &credentials,
+            &request,
+            &info.dpop_request(&headers, None),
+            now,
+        )
         .await
     {
         Ok(response) => api_ok(
@@ -272,32 +292,25 @@ pub async fn oauth_revoke(
 
 #[poem::handler]
 pub async fn oauth_jwks(shared: Data<&SharedOAuthProvider>) -> Response {
-    Response::builder()
-        .content_type("application/json")
-        .body(
-            serde_json::to_string(&shared.provider.jwks())
-                .expect("jwks serialization cannot fail"),
-        )
+    Response::builder().content_type("application/json").body(
+        serde_json::to_string(&shared.provider.jwks()).expect("jwks serialization cannot fail"),
+    )
 }
 
 #[poem::handler]
 pub async fn oauth_authorization_server_metadata(shared: Data<&SharedOAuthProvider>) -> Response {
-    Response::builder()
-        .content_type("application/json")
-        .body(
-            serde_json::to_string(&shared.provider.authorization_server_metadata())
-                .expect("metadata serialization cannot fail"),
-        )
+    Response::builder().content_type("application/json").body(
+        serde_json::to_string(&shared.provider.authorization_server_metadata())
+            .expect("metadata serialization cannot fail"),
+    )
 }
 
 #[poem::handler]
 pub async fn oauth_protected_resource_metadata(shared: Data<&SharedOAuthProvider>) -> Response {
-    Response::builder()
-        .content_type("application/json")
-        .body(
-            serde_json::to_string(&shared.provider.protected_resource_metadata())
-                .expect("metadata serialization cannot fail"),
-        )
+    Response::builder().content_type("application/json").body(
+        serde_json::to_string(&shared.provider.protected_resource_metadata())
+            .expect("metadata serialization cannot fail"),
+    )
 }
 
 // ---------------------------------------------------------------------------
@@ -333,7 +346,7 @@ pub async fn oauth_authorize(
             return Response::builder()
                 .status(poem::http::StatusCode::BAD_REQUEST)
                 .content_type("text/plain; charset=utf-8")
-                .body("invalid request_uri")
+                .body("invalid request_uri");
         }
     };
     let nonce = match db::consent_state::create(&db, request_id).await {
@@ -342,7 +355,7 @@ pub async fn oauth_authorize(
             return Response::builder()
                 .status(poem::http::StatusCode::INTERNAL_SERVER_ERROR)
                 .content_type("text/plain; charset=utf-8")
-                .body("nonce creation failed")
+                .body("nonce creation failed");
         }
     };
     let redirect = format!("{url}?rqid={request_id}&state={nonce}");
@@ -365,9 +378,18 @@ pub fn oauth_routes() -> poem::Route {
         .at("/oauth/token", post(oauth_token))
         .at("/oauth/revoke", post(oauth_revoke))
         .at("/oauth/jwks", get(oauth_jwks))
-        .at("/.well-known/oauth-authorization-server", get(oauth_authorization_server_metadata))
-        .at("/.well-known/oauth-protected-resource", get(oauth_protected_resource_metadata))
-        .at("/oauth/authorize/:client_id/:request_uri", get(oauth_authorize))
+        .at(
+            "/.well-known/oauth-authorization-server",
+            get(oauth_authorization_server_metadata),
+        )
+        .at(
+            "/.well-known/oauth-protected-resource",
+            get(oauth_protected_resource_metadata),
+        )
+        .at(
+            "/oauth/authorize/:client_id/:request_uri",
+            get(oauth_authorize),
+        )
 }
 
 #[cfg(test)]
