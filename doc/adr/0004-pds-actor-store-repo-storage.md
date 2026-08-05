@@ -8,7 +8,7 @@ Accepted
 
 ## Context
 
-The cacos PDS is a port of the rsky reference PDS. We needed per-actor block and root storage that plugs into `rsky-repo`'s `ReadableBlockstore` and `RepoStorage` traits while replacing the reference's rusqlite wrapper with sea-orm, keeping the trait surface so downstream code (`Repo::format_init_commit`, `Repo::load`, `Repo::format_commit`, MST handling, CAR export) works unchanged. The cacos workspace is on Rust edition 2024, which forbids naming transitive-only dependencies in code. Object storage (MinIO/S3) is the home of the *blob store* (Plan 04, OpenDAL), not the repo store — this ADR is scoped to the SQLite-backed repo/record side.
+We needed per-actor block and root storage that plugs into the atproto `ReadableBlockstore` and `RepoStorage` traits (`rsky-repo`'s concrete shape) while replacing the rusqlite wrapper with sea-orm, keeping the trait surface so downstream code (`Repo::format_init_commit`, `Repo::load`, `Repo::format_commit`, MST handling, CAR export) works unchanged. The cacos workspace is on Rust edition 2024, which forbids naming transitive-only dependencies in code. Object storage (MinIO/S3) is the home of the *blob store* (Plan 04, OpenDAL), not the repo store — this ADR is scoped to the SQLite-backed repo/record side.
 
 ## Decision
 
@@ -24,7 +24,7 @@ The cacos PDS is a port of the rsky reference PDS. We needed per-actor block and
 
 6. **`Send + Sync` futures via `tokio::spawn`.** sea-orm's async functions return `Send` but not `Sync` futures; the rsky `ReadableBlockstore` and `RepoStorage` traits require `Pin<Box<dyn Future<Output = anyhow::Result<…>> + Send + Sync>>`. Trait methods clone `self` and dispatch the work via `tokio::spawn`, then `await` the `JoinHandle` (which is `Send + Sync`). State stays consistent across the spawn boundary through the shared `Arc<RwLock<BlockMap>>` and the cloned `DatabaseConnection` (both `Clone`).
 
-7. **`apply_commit` is transactional.** The reference makes three untransacted calls; cacos wraps `update_root` + `put_many` + `delete_many` in one sea-orm transaction so a mid-commit failure rolls back the whole commit. Sea-orm 2.0's AFIT `transaction_async` form is used because the older boxed-dyn closure shape misbehaves with our closure; `TransactionError<PdsError>` is mapped back to `PdsError` explicitly.
+7. **`apply_commit` is transactional.** `update_root` + `put_many` + `delete_many` are wrapped in one sea-orm transaction so a mid-commit failure rolls back the whole commit. Sea-orm 2.0's AFIT `transaction_async` form is used because the older boxed-dyn closure shape misbehaves with our closure; `TransactionError<PdsError>` is mapped back to `PdsError` explicitly.
 
 8. **camino + camino-tempfile everywhere, not `tempfile`.** `DatabaseKind::Actor.open` takes `impl AsRef<Utf8Path>`. `camino_tempfile::Utf8TempDir` yields `Utf8Path` directly, avoiding UTF-8 conversion errors at the boundary.
 

@@ -531,8 +531,7 @@ async fn process_import_repo_applies_commit_and_writes() {
         .has_record("app.bsky.feed.post".into(), "3jt5vlkoraa2a".into(), None)
         .await
         .unwrap());
-    // the row exists but `get_record` returns it (no value field populated —
-    // our port returns value: None; the reference populates it from blocks).
+    // the row exists but `get_record` returns it with no value field populated.
     let got = txn
         .record
         .get_record(&write_uri, None, None)

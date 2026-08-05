@@ -1,11 +1,10 @@
-//! Per-actor SQLite database access (sea-orm port).
+//! Per-actor SQLite database access.
 //!
-//! The reference wraps a rusqlite connection in `ActorDb` and runs every
-//! query through `db.run(|conn| ...)`. Here the per-actor database is a plain
-//! `sea_orm::DatabaseConnection` (sqlx-sqlite pool); queries go through
-//! sea-orm entities where declarative and `Statement::from_sql_and_values`
-//! otherwise. Opening runs the actor migrations (a no-op on an
-//! already-migrated file) via `DatabaseKind::Actor.open`.
+//! The per-actor database is a plain `sea_orm::DatabaseConnection`
+//! (sqlx-sqlite pool); queries go through sea-orm entities where declarative
+//! and `Statement::from_sql_and_values` otherwise. Opening runs the actor
+//! migrations (a no-op on an already-migrated file) via
+//! `DatabaseKind::Actor.open`.
 
 use sea_orm::DatabaseConnection;
 
@@ -13,8 +12,8 @@ use sea_orm::DatabaseConnection;
 /// `crate::actor_store::db::DatabaseKind::Actor.open(path)`.
 pub use crate::db::DatabaseKind;
 
-/// The per-actor database handle. Kept as a named alias so the port reads the
-/// same as the reference's `ActorDb = Db` (rusqlite).
+/// The per-actor database handle. A named alias over
+/// `sea_orm::DatabaseConnection` for readability.
 pub type ActorDb = DatabaseConnection;
 
 // Re-export the migration entities this module's consumers need. Entity

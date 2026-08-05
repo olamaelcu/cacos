@@ -8,10 +8,10 @@
 //! (`Repo::format_commit`, `blocks_to_car_file`, `BlockMap::get_many`).
 //!
 //! `anyhow` is contained here in exactly one place. The intent is to remove
-//! this dependency entirely once the upstream protocol crates return a proper
-//! error type; that removal should be done in a SEPARATE BRANCH. The upstream
-//! crates themselves carry `@TODO: Remove anyhow in lib` comments — this is a
-//! known migration target.
+//! this dependency once atproto's trait interfaces return proper errors
+//! instead of `anyhow::Result`; that removal should be done in a SEPARATE
+//! BRANCH. The atproto crate sources themselves carry `@TODO: Remove anyhow
+//! in lib` comments — this is a known migration target.
 
 use miette::Diagnostic;
 use thiserror::Error;

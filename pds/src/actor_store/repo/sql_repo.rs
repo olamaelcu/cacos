@@ -242,9 +242,8 @@ impl SqlRepoReader {
                 })?;
         }
         // Evict from the in-memory cache so subsequent reads reflect the
-        // deletion. The reference doesn't do this (its tests check
-        // `count_blocks`, which doesn't see the cache), but our cache is the
-        // single source of truth for `has()`/`get_bytes()`.
+        // deletion. Our cache is the single source of truth for
+        // `has()`/`get_bytes()`.
         let mut cache_guard = self.cache.write().await;
         for cid in &cids {
             cache_guard.map.remove(&cid.to_string());
@@ -357,10 +356,9 @@ impl SqlRepoReader {
         Ok(())
     }
 
-    /// Improvement over the reference: root + put_many + delete_many run inside
-    /// one sea-orm transaction. A mid-commit failure rolls back the whole
-    /// commit. The in-memory BlockMap cache is not populated here (matching
-    /// the reference's `put_many` behavior).
+    /// `root + put_many + delete_many` run inside one sea-orm transaction. A
+    /// mid-commit failure rolls back the whole commit. The in-memory BlockMap
+    /// cache is not populated here.
     async fn apply_commit_impl(
         &self,
         commit: rsky_repo::types::CommitData,
@@ -464,9 +462,7 @@ impl SqlRepoReader {
             })?;
 
         // Cache eviction only happens AFTER the commit succeeds, so a rolled-back
-        // commit leaves the cache intact. (The reference relies on
-        // `count_blocks` for the deletion invariant; we keep a stricter local
-        // one so `has()`/`get_bytes()` reflect the deletion immediately.)
+        // commit leaves the cache intact.
         let cid_keys: Vec<String> = commit
             .removed_cids
             .to_list()
@@ -728,8 +724,8 @@ mod tests {
         (dir, reader)
     }
 
-    /// Seeds a block row directly (put_block lands with RepoStorage in Task 4),
-    /// mirroring put_block's ON CONFLICT DO NOTHING idempotency.
+    /// Seeds a block row directly (the RepoStorage `put_block` lands with
+    /// Plan 03's repo-storage work). Idempotent via ON CONFLICT DO NOTHING.
     async fn seed_block(reader: &SqlRepoReader, bytes: &[u8], rev: &str) -> Cid {
         use sea_orm::Set;
         let cid = cid_for(bytes);
@@ -895,9 +891,8 @@ mod tests {
 
         // A create-commit whose root INSERT conflicts with the existing
         // (did, PRIMARY KEY) row must fail AND leave no partial state behind.
-        // In the reference (three untransacted calls) a reordering of the
-        // steps could leak writes; the transactional apply_commit guarantees
-        // rollback, and this test pins that guarantee.
+        // The transactional apply_commit guarantees rollback, and this test
+        // pins that guarantee.
         let new_root = cid_for(b"new-root");
         let mut new_blocks = BlockMap::new();
         new_blocks.set(new_root, b"new-block".to_vec());
@@ -931,8 +926,7 @@ mod tests {
         bm.set(b_cid, b.clone());
         reader.put_many(bm, "rev-1".to_owned()).await.unwrap();
 
-        // After put_many the DB has both blocks but the cache is unchanged
-        // (matching the reference's behavior).
+        // After put_many the DB has both blocks but the cache is unchanged.
         assert!(reader.has(a_cid).await.unwrap());
         assert!(reader.has(b_cid).await.unwrap());
 

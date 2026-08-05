@@ -4,7 +4,7 @@ resolver = "2"
 members = ["migration", "pds"]
 
 [workspace.dependencies]
-# --- rsky reference crates (git, pinned to commit cbcf8ca) ---
+# --- atproto protocol crates (git-pinned rsky fork) ---
 rsky-repo = { git = "https://github.com/olamaelcu/rsky", rev = "aee5aec5ad9473d80232beab58ddba25a936298a" }
 rsky-crypto = { git = "https://github.com/olamaelcu/rsky", rev = "aee5aec5ad9473d80232beab58ddba25a936298a" }
 rsky-syntax = { git = "https://github.com/olamaelcu/rsky", rev = "aee5aec5ad9473d80232beab58ddba25a936298a" }

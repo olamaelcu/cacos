@@ -122,7 +122,7 @@ async fn load_key(location: &Path) -> Result<Option<Keypair>> {
     }
 }
 
-/// Per-actor storage configuration (port of `config::ActorStoreConfig`).
+/// Per-actor storage configuration.
 #[derive(Debug, Clone)]
 pub struct ActorStoreConfig {
     pub directory: String,

@@ -314,8 +314,8 @@ impl MigrationTrait for Migration {
                     .to_owned(),
             )
             .await?;
-        // `UNIQUE (purpose, token)` from the reference DDL, as a named unique
-        // index (functionally identical on SQLite).
+        // `UNIQUE (purpose, token)`, as a named unique index (functionally
+        // identical on SQLite).
         manager
             .create_index(
                 Index::create()
@@ -402,7 +402,7 @@ impl MigrationTrait for Migration {
                     .to_owned(),
             )
             .await?;
-        // `UNIQUE ("sessionId")` from the reference DDL, as a named unique index.
+        // `UNIQUE ("sessionId")`, as a named unique index.
         manager
             .create_index(
                 Index::create()
@@ -577,7 +577,7 @@ impl MigrationTrait for Migration {
             "CREATE UNIQUE INDEX token_code_idx ON token (code DESC) WHERE code IS NOT NULL",
         )
         .await?;
-        // The two `UNIQUE (...)` constraints from the reference DDL.
+        // The two `UNIQUE (...)` constraints.
         manager
             .create_index(
                 Index::create()
