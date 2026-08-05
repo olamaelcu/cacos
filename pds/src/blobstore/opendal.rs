@@ -39,7 +39,8 @@ use futures::future::BoxFuture;
 use futures::io::AsyncRead;
 use futures::stream::{StreamExt, TryStreamExt};
 use lexicon_cid::Cid;
-use opendal::{services, ErrorKind, Operator};
+use opendal::{services, ErrorKind};
+pub use opendal::Operator;
 use rand::RngCore;
 
 use crate::blobstore::{BlobNotFoundError, BlobStore, BoxedBlobStream};

@@ -9,6 +9,11 @@ async fn main() {
         downcaster,
     );
 
+    // Build the shared OpenDAL operator (S3 if S3_ENDPOINT is set, else
+    // disk) once for the process. Per-DID handles come from this via
+    // `blobstore_for_did(did)` at the call site.
+    cacos_pds::blobstore::init_operator().expect("blobstore init failed");
+
     let listener = poem::listener::TcpListener::bind("127.0.0.1:8080");
     tracing::info!("pds listening on http://127.0.0.1:8080");
     poem::Server::new(listener)
