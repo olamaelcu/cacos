@@ -19,6 +19,9 @@ use sea_orm::{
 /// through this alias, e.g. `crate::db::entities::repo_seq`).
 pub use migration::entities;
 
+/// Consent-state nonce helpers for the headless-consent remote API.
+pub mod consent_state;
+
 /// Shared SQLite connection options
 fn base_options(url: String) -> ConnectOptions {
     let mut options = ConnectOptions::new(url);
@@ -142,6 +145,7 @@ mod tests {
                 "app_password",
                 "authorization_request",
                 "authorized_client",
+                "consent_state",
                 "device",
                 "email_token",
                 "invite_code",

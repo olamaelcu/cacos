@@ -4,9 +4,9 @@
 use sea_orm_migration::prelude::*;
 
 use crate::entities::{
-    account, account_device, actor, app_password, authorization_request, authorized_client, device,
-    email_token, invite_code, invite_code_use, lexicon, refresh_token, repo_root, token,
-    used_refresh_token,
+    account, account_device, actor, app_password, authorization_request, authorized_client,
+    consent_state, device, email_token, invite_code, invite_code_use, lexicon, refresh_token,
+    repo_root, token, used_refresh_token,
 };
 use crate::schema::{db_id, db_id_null, pk_db_id};
 
@@ -710,6 +710,44 @@ impl MigrationTrait for Migration {
             "CREATE INDEX lexicon_failures_idx ON lexicon (\"updatedAt\" DESC) WHERE lexicon IS NULL",
         )
         .await?;
+
+        // ---- consent_state -----------------------------------------------
+        // Headless-consent nonce store: one rotating one-time nonce per
+        // authorization request (spec: headless-oauth-consent-design).
+        manager
+            .create_table(
+                Table::create()
+                    .table(consent_state::Entity)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(consent_state::Column::RequestId)
+                            .string()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(
+                        ColumnDef::new(consent_state::Column::State)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(consent_state::Column::ExpiresAt)
+                            .string()
+                            .not_null(),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .create_index(
+                Index::create()
+                    .name("consent_state_state_idx")
+                    .unique()
+                    .table(consent_state::Entity)
+                    .col(consent_state::Column::State)
+                    .to_owned(),
+            )
+            .await?;
 
         Ok(())
     }

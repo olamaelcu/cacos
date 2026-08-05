@@ -13,6 +13,7 @@ pub mod authorization_request;
 pub mod authorized_client;
 pub mod backlink;
 pub mod blob;
+pub mod consent_state;
 pub mod device;
 pub mod did_doc;
 pub mod email_token;
