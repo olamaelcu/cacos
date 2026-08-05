@@ -7,6 +7,7 @@
 use sea_orm_migration::prelude::*;
 
 use crate::entities::repo_seq;
+use crate::schema::pk_db_id;
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -19,12 +20,7 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(repo_seq::Entity)
                     .if_not_exists()
-                    .col(
-                        ColumnDef::new(repo_seq::Column::Seq)
-                            .integer()
-                            .not_null()
-                            .primary_key(),
-                    )
+                    .col(pk_db_id(repo_seq::Column::Seq))
                     .col(ColumnDef::new(repo_seq::Column::Did).string().not_null())
                     .col(ColumnDef::new(repo_seq::Column::EventType).string().not_null())
                     .col(ColumnDef::new(repo_seq::Column::Event).blob().not_null())

@@ -1,4 +1,5 @@
 use sea_orm::entity::prelude::*;
+use crate::types::db_id::DbId;
 use crate::types::did::Did;
 use time::OffsetDateTime;
 
@@ -6,7 +7,7 @@ use time::OffsetDateTime;
 #[sea_orm(table_name = "repo_seq")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
-    pub seq: i64,
+    pub seq: DbId,
     pub did: Did,
     #[sea_orm(column_name = "eventType")]
     pub event_type: String,

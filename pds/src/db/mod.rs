@@ -219,11 +219,12 @@ mod tests {
             .unwrap();
 
         let test_did: migration::types::did::Did = "did:plc:test123".parse().unwrap();
+        let test_seq = migration::types::db_id::DbId::new();
         let now = time::OffsetDateTime::now_utc();
 
-        // Insert into repo_seq — exercises i64 PK, Did, OffsetDateTime, Vec<u8>
+        // Insert into repo_seq — exercises DbId PK, Did, OffsetDateTime, Vec<u8>
         let model = entities::repo_seq::ActiveModel {
-            seq: Set(1_i64),
+            seq: Set(test_seq),
             did: Set(test_did.clone()),
             event_type: Set("test".to_owned()),
             event: Set(b"test event".to_vec()),
@@ -231,12 +232,12 @@ mod tests {
             sequenced_at: Set(now),
         };
         let res = model.insert(&db).await.unwrap();
-        assert_eq!(res.seq, 1_i64);
+        assert_eq!(res.seq, test_seq);
         assert_eq!(res.did, test_did);
         assert_eq!(res.event, b"test event");
 
         // Read it back
-        let fetched = entities::repo_seq::Entity::find_by_id(1_i64)
+        let fetched = entities::repo_seq::Entity::find_by_id(test_seq)
             .one(&db)
             .await
             .unwrap()
