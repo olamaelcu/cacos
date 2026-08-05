@@ -30,6 +30,8 @@ pub const BLOB_OPS_TOTAL: &str = "cacos_blob_ops_total";
 pub const ACTOR_CACHE_HITS_TOTAL: &str = "cacos_actor_cache_hits_total";
 pub const ACTOR_CACHE_MISSES_TOTAL: &str = "cacos_actor_cache_misses_total";
 pub const COMMITS_TOTAL: &str = "cacos_commits_total";
+pub const AUTH_REQUESTS_TOTAL: &str = "cacos_auth_requests_total";
+pub const AUTH_FAILURES_TOTAL: &str = "cacos_auth_failures_total";
 
 /// Register a description (HELP line) for every cacos metric. Idempotent.
 pub fn describe() {
@@ -96,6 +98,16 @@ pub fn describe() {
         "BlockMap cache misses"
     );
     describe_counter!(COMMITS_TOTAL, Unit::Count, "Repo commits applied");
+    describe_counter!(
+        AUTH_REQUESTS_TOTAL,
+        Unit::Count,
+        "Auth verification requests, labeled by kind"
+    );
+    describe_counter!(
+        AUTH_FAILURES_TOTAL,
+        Unit::Count,
+        "Auth verification failures, labeled by kind"
+    );
 }
 
 /// Handle kept in sync with the global recorder so `/metrics` can render it.
