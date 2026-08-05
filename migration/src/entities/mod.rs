@@ -7,17 +7,23 @@
 
 pub mod account;
 pub mod account_device;
+pub mod account_pref;
 pub mod actor;
 pub mod app_password;
 pub mod authorization_request;
 pub mod authorized_client;
+pub mod backlink;
+pub mod blob;
 pub mod device;
 pub mod did_doc;
 pub mod email_token;
 pub mod invite_code;
 pub mod invite_code_use;
 pub mod lexicon;
+pub mod record;
+pub mod record_blob;
 pub mod refresh_token;
+pub mod repo_block;
 pub mod repo_root;
 pub mod repo_seq;
 pub mod token;
