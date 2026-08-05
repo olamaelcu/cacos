@@ -11,6 +11,8 @@ rsky-syntax = { git = "https://github.com/olamaelcu/rsky", rev = "aee5aec5ad9473
 rsky-common = { git = "https://github.com/olamaelcu/rsky", rev = "aee5aec5ad9473d80232beab58ddba25a936298a" }
 rsky-blobstore = { git = "https://github.com/olamaelcu/rsky", rev = "aee5aec5ad9473d80232beab58ddba25a936298a" }
 rsky-lexicon = { git = "https://github.com/olamaelcu/rsky", rev = "aee5aec5ad9473d80232beab58ddba25a936298a" }
+rsky-oauth = { git = "https://github.com/olamaelcu/rsky", rev = "aee5aec5ad9473d80232beab58ddba25a936298a" }
+rsky-identity = { git = "https://github.com/olamaelcu/rsky", rev = "aee5aec5ad9473d80232beab58ddba25a936298a" }
 futures = "0.3"
 opendal = { version = "0.53", default-features = false, features = ["services-fs", "services-s3", "services-memory"] }
 
@@ -20,7 +22,7 @@ lexicon_cid = { package = "cid", version = "0.11.1", features = ["serde-codec"] 
 serde_ipld_dagcbor = { version = "0.6.1", features = ["codec"] }
 
 # --- storage (this plan) ---
-sea-orm = { version = "2.0", features = ["sqlx-sqlite", "runtime-tokio-rustls", "macros", "with-time"] }
+sea-orm = { version = "2.0", features = ["sqlx-sqlite", "runtime-tokio-rustls", "macros", "with-time", "sqlite-use-returning-for-3_35"] }
 sea-orm-migration = "2.0"
 sqlx = "0.9"
 miette = { version = "7", features = ["derive"] }

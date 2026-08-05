@@ -28,6 +28,8 @@ rsky-syntax = { workspace = true }
 rsky-crypto = { workspace = true }
 rsky-blobstore = { workspace = true }
 rsky-lexicon = { workspace = true }
+rsky-oauth = { workspace = true }
+rsky-identity = { workspace = true }
 futures = { workspace = true }
 opendal = { workspace = true }
 
