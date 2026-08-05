@@ -3,6 +3,7 @@
 
 pub mod account;
 pub mod email_token;
+pub mod invite;
 pub mod password;
 
 use sea_orm::{DatabaseBackend, Statement, Value};
