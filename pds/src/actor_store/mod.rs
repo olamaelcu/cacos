@@ -9,10 +9,13 @@
 //! anyhow-returning helpers from downstream crates get wrapped via
 //! `PdsError::From` (and explicit `PdsError::internal(...)` at site for context).
 
+use crate::actor_store::blob::BlobReader;
 use crate::actor_store::db::ActorDb;
 use crate::actor_store::record::RecordReader;
 use crate::actor_store::repo::sql_repo::SqlRepoReader;
 use crate::actor_store::repo::types::SyncEvtData;
+use crate::background::BackgroundQueue;
+use crate::blobstore::{BlobStore, BoxedBlobStream};
 use crate::db::DatabaseKind;
 use crate::error::{PdsError, Result};
 use lexicon_cid::Cid;
@@ -40,6 +43,7 @@ use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 use tokio::sync::{OwnedMutexGuard, RwLock};
 
+pub mod blob;
 pub mod db;
 pub mod record;
 pub mod repo;
@@ -261,17 +265,37 @@ impl ActorStore {
         Ok(root.and_then(|model| Cid::try_from(model.cid.as_str()).ok()))
     }
 
-    pub async fn read(&self, did: String) -> Result<ActorStoreReader> {
+    pub async fn read(
+        &self,
+        did: String,
+        blobstore: Arc<dyn BlobStore<Stream = BoxedBlobStream>>,
+    ) -> Result<ActorStoreReader> {
         let db = self.open_db(&did).await?;
         let key_location = self.get_location(&did)?.key_location;
-        Ok(ActorStoreReader::new(did, db, key_location))
+        Ok(ActorStoreReader::new(
+            did,
+            db,
+            key_location,
+            blobstore,
+            BackgroundQueue::default(),
+        ))
     }
 
-    pub async fn transact(&self, did: String) -> Result<ActorStoreTransactor> {
+    pub async fn transact(
+        &self,
+        did: String,
+        blobstore: Arc<dyn BlobStore<Stream = BoxedBlobStream>>,
+    ) -> Result<ActorStoreTransactor> {
         let guard = self.did_lock(&did).lock_owned().await;
         let db = self.open_db(&did).await?;
         let key_location = self.get_location(&did)?.key_location;
-        let reader = ActorStoreReader::new(did, db, key_location);
+        let reader = ActorStoreReader::new(
+            did,
+            db,
+            key_location,
+            blobstore,
+            BackgroundQueue::default(),
+        );
         let keypair = reader.keypair().await?;
         Ok(ActorStoreTransactor {
             reader,
@@ -323,9 +347,11 @@ impl ActorStore {
         Ok(())
     }
 
-    pub async fn destroy(&self, did: &str) -> Result<()> {
-        // Plan 04 adds blobstore cleanup here (loop get_blob_cids + delete_many)
-        // before the directory is removed.
+    pub async fn destroy(
+        &self,
+        did: &str,
+        blobstore: Arc<dyn BlobStore<Stream = BoxedBlobStream>>,
+    ) -> Result<()> {
         {
             let mut cache = self.cache.lock().expect("actor store cache poisoned");
             cache.pop(did);
@@ -333,6 +359,12 @@ impl ActorStore {
         {
             let mut locks = self.locks.lock().expect("actor store locks poisoned");
             locks.remove(did);
+        }
+        // Per-DID blobstore wholesale wipe (overrides the `BlobStore`
+        // default `None`). The handle's `delete_all` walks
+        // `blocks/{did}/`, `tmp/{did}/`, `quarantine/{did}/` in one operation.
+        if let Some(fut) = blobstore.delete_all() {
+            fut.await?;
         }
         let location = self.get_location(did)?;
         if tokio::fs::try_exists(&location.directory).await.map_err(|e| {
@@ -433,18 +465,26 @@ pub struct ActorStoreReader {
     pub did: String,
     pub storage: Arc<RwLock<SqlRepoReader>>,
     pub record: RecordReader,
+    pub blob: BlobReader,
     key_location: PathBuf,
 }
 
 impl ActorStoreReader {
-    fn new(did: String, db: ActorDb, key_location: PathBuf) -> Self {
+    fn new(
+        did: String,
+        db: ActorDb,
+        key_location: PathBuf,
+        blobstore: Arc<dyn BlobStore<Stream = BoxedBlobStream>>,
+        background_queue: BackgroundQueue,
+    ) -> Self {
         ActorStoreReader {
             storage: Arc::new(RwLock::new(SqlRepoReader::new(
                 did.clone(),
                 None,
                 db.clone(),
             ))),
-            record: RecordReader::new(did.clone(), db),
+            record: RecordReader::new(did.clone(), db.clone()),
+            blob: BlobReader::new(blobstore, db, background_queue),
             did,
             key_location,
         }
@@ -565,6 +605,17 @@ impl ActorStoreTransactor {
             },
         )?;
         // Plan 04 restores: self.blob.process_write_blobs(writes).await?;
+        // Restore the deferred blob GC + dereference pass.
+        self.reader
+            .blob
+            .process_write_blobs(
+                writes
+                    .clone()
+                    .into_iter()
+                    .map(PreparedWrite::Create)
+                    .collect(),
+            )
+            .await?;
         Ok(CommitDataWithOps {
             commit_data: commit,
             ops: write_commit_ops,
@@ -584,7 +635,8 @@ impl ActorStoreTransactor {
             let storage_guard = self.storage.read().await;
             storage_guard.apply_commit(commit.clone(), None).await?;
         }
-        // Plan 04 restores: self.blob.process_write_blobs(writes).await?;
+        // Restore the deferred blob GC + dereference pass.
+        self.reader.blob.process_write_blobs(writes.clone()).await?;
         Ok(())
     }
 
@@ -604,7 +656,8 @@ impl ActorStoreTransactor {
                 .apply_commit(commit.commit_data.clone(), None)
                 .await?;
         }
-        // Plan 04 restores: self.blob.process_write_blobs(writes).await?;
+        // Restore the deferred blob GC + dereference pass.
+        self.reader.blob.process_write_blobs(writes.clone()).await?;
         Ok(commit)
     }
 

@@ -1,6 +1,7 @@
 //! Integration tests for the actor store.
 
 use super::*;
+use crate::blobstore::opendal::OpenDALBlobStore;
 use rsky_crypto::utils::encode_did_key;
 use rsky_repo::block_map::BlockMap;
 use rsky_repo::cid_set::CidSet;
@@ -12,6 +13,12 @@ use std::str::FromStr;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 const TEST_DID: &str = "did:example:alice";
+
+/// Per-test in-memory OpenDAL blobstore. The shared `OpenDALBlobStore`
+/// constructed per-test keeps each test isolated (no `OnceLock`).
+fn test_blobstore(did: &str) -> Arc<dyn BlobStore<Stream = BoxedBlobStream>> {
+    Arc::new(OpenDALBlobStore::new_memory(did).unwrap())
+}
 // A well-known secp256k1 secret (deterministic test key).
 const TEST_SECRET_HEX: &str = "1d2f8064213bd212453fa93943c084dbbf42104d02f1f02b23a638f9a48f925a";
 
@@ -147,8 +154,8 @@ async fn create_open_keypair_destroy_roundtrip() {
 
     assert!(!store.exists(TEST_DID).await.unwrap());
     assert!(store.keypair(TEST_DID).await.is_err());
-    assert!(store.read(TEST_DID.to_owned()).await.is_err());
-    assert!(store.transact(TEST_DID.to_owned()).await.is_err());
+    assert!(store.read(TEST_DID.to_owned(), test_blobstore(TEST_DID)).await.is_err());
+    assert!(store.transact(TEST_DID.to_owned(), test_blobstore(TEST_DID)).await.is_err());
 
     store.create(TEST_DID, &keypair).await.unwrap();
     assert!(store.exists(TEST_DID).await.unwrap());
@@ -158,7 +165,7 @@ async fn create_open_keypair_destroy_roundtrip() {
     let loaded = store.keypair(TEST_DID).await.unwrap();
     assert_eq!(loaded.secret_bytes(), keypair.secret_bytes());
 
-    let reader = store.read(TEST_DID.to_owned()).await.unwrap();
+    let reader = store.read(TEST_DID.to_owned(), test_blobstore(TEST_DID)).await.unwrap();
     assert_eq!(reader.did, TEST_DID);
     assert_eq!(
         reader.keypair().await.unwrap().secret_bytes(),
@@ -166,10 +173,10 @@ async fn create_open_keypair_destroy_roundtrip() {
     );
     assert!(reader.get_repo_root().await.unwrap().is_none());
 
-    store.destroy(TEST_DID).await.unwrap();
+    store.destroy(TEST_DID, test_blobstore(TEST_DID)).await.unwrap();
     assert!(!store.exists(TEST_DID).await.unwrap());
     // destroying a missing actor is a no-op
-    store.destroy(TEST_DID).await.unwrap();
+    store.destroy(TEST_DID, test_blobstore(TEST_DID)).await.unwrap();
 }
 
 #[tokio::test]
@@ -187,7 +194,7 @@ async fn concurrent_transactions_serialize_per_did() {
         let running = running.clone();
         let max_running = max_running.clone();
         handles.push(tokio::spawn(async move {
-            let txn = store.transact(TEST_DID.to_owned()).await.unwrap();
+            let txn = store.transact(TEST_DID.to_owned(), test_blobstore(TEST_DID)).await.unwrap();
             let now = running.fetch_add(1, Ordering::SeqCst) + 1;
             max_running.fetch_max(now, Ordering::SeqCst);
             tokio::time::sleep(std::time::Duration::from_millis(10)).await;
@@ -214,13 +221,13 @@ async fn lru_evicts_least_recently_used_db() {
     tokio::fs::remove_file(&alice_location.db_location)
         .await
         .unwrap();
-    assert!(store.read(TEST_DID.to_owned()).await.is_err());
+    assert!(store.read(TEST_DID.to_owned(), test_blobstore(TEST_DID)).await.is_err());
     // bob is still served from the cache even with the file gone
     let bob_location = store.get_location(did_bob).unwrap();
     tokio::fs::remove_file(&bob_location.db_location)
         .await
         .unwrap();
-    assert!(store.read(did_bob.to_owned()).await.is_ok());
+    assert!(store.read(did_bob.to_owned(), test_blobstore(&did_bob)).await.is_ok());
 }
 
 #[tokio::test]
@@ -231,7 +238,7 @@ async fn reopens_evicted_db_from_disk() {
     // bob evicts alice from the single-entry cache
     store.create("did:example:bob", &keypair).await.unwrap();
     // alice re-opens from disk
-    let reader = store.read(TEST_DID.to_owned()).await.unwrap();
+    let reader = store.read(TEST_DID.to_owned(), test_blobstore(TEST_DID)).await.unwrap();
     assert!(reader.get_repo_root().await.unwrap().is_none());
 }
 
@@ -243,9 +250,9 @@ async fn reader_keypair_errors_when_key_missing() {
     tokio::fs::remove_file(&location.key_location)
         .await
         .unwrap();
-    let reader = store.read(TEST_DID.to_owned()).await.unwrap();
+    let reader = store.read(TEST_DID.to_owned(), test_blobstore(TEST_DID)).await.unwrap();
     assert!(reader.keypair().await.is_err());
-    assert!(store.transact(TEST_DID.to_owned()).await.is_err());
+    assert!(store.transact(TEST_DID.to_owned(), test_blobstore(TEST_DID)).await.is_err());
 }
 
 #[tokio::test]
@@ -305,7 +312,7 @@ async fn reserved_key_load_errors_on_unreadable_file() {
 async fn create_repo_with_initial_writes() {
     let (_dir, store) = test_store(10);
     store.create(TEST_DID, &test_keypair()).await.unwrap();
-    let mut txn = store.transact(TEST_DID.to_owned()).await.unwrap();
+    let mut txn = store.transact(TEST_DID.to_owned(), test_blobstore(TEST_DID)).await.unwrap();
     let write = post_write("3jt5vlkoraa2a", "first post");
     let commit = txn.create_repo(vec![write.clone()]).await.unwrap();
     assert_eq!(commit.ops.len(), 1);
@@ -343,7 +350,7 @@ async fn create_account_write_and_read_back_records() {
     store.create(TEST_DID, &keypair).await.unwrap();
 
     // initialize the repo
-    let mut txn = store.transact(TEST_DID.to_owned()).await.unwrap();
+    let mut txn = store.transact(TEST_DID.to_owned(), test_blobstore(TEST_DID)).await.unwrap();
     let init_commit = txn.create_repo(vec![]).await.unwrap();
     assert!(init_commit.ops.is_empty());
     assert!(init_commit.prev_data.is_none());
@@ -402,7 +409,7 @@ async fn create_account_write_and_read_back_records() {
     assert_eq!(sync_data.cid, update_commit.commit_data.cid);
     drop(txn);
 
-    let reader = store.read(TEST_DID.to_owned()).await.unwrap();
+    let reader = store.read(TEST_DID.to_owned(), test_blobstore(TEST_DID)).await.unwrap();
     {
         let storage_guard = reader.storage.read().await;
         let car = storage_guard.get_car_stream(None).await.unwrap();
@@ -410,7 +417,7 @@ async fn create_account_write_and_read_back_records() {
     }
 
     // delete the record
-    let mut txn = store.transact(TEST_DID.to_owned()).await.unwrap();
+    let mut txn = store.transact(TEST_DID.to_owned(), test_blobstore(TEST_DID)).await.unwrap();
     let delete = PreparedWrite::Delete(PreparedDelete {
         action: WriteOpAction::Delete,
         uri: create.uri.clone(),
@@ -434,7 +441,7 @@ async fn create_account_write_and_read_back_records() {
         .is_empty());
     drop(txn);
 
-    store.destroy(TEST_DID).await.unwrap();
+    store.destroy(TEST_DID, test_blobstore(TEST_DID)).await.unwrap();
     assert!(!store.exists(TEST_DID).await.unwrap());
 }
 
@@ -442,7 +449,7 @@ async fn create_account_write_and_read_back_records() {
 async fn process_writes_requires_repo_root() {
     let (_dir, store) = test_store(10);
     store.create(TEST_DID, &test_keypair()).await.unwrap();
-    let mut txn = store.transact(TEST_DID.to_owned()).await.unwrap();
+    let mut txn = store.transact(TEST_DID.to_owned(), test_blobstore(TEST_DID)).await.unwrap();
     let res = txn
         .process_writes(
             vec![PreparedWrite::Create(post_write(
@@ -459,7 +466,7 @@ async fn process_writes_requires_repo_root() {
 async fn duplicate_record_cids_are_detected() {
     let (_dir, store) = test_store(10);
     store.create(TEST_DID, &test_keypair()).await.unwrap();
-    let mut txn = store.transact(TEST_DID.to_owned()).await.unwrap();
+    let mut txn = store.transact(TEST_DID.to_owned(), test_blobstore(TEST_DID)).await.unwrap();
     txn.create_repo(vec![]).await.unwrap();
 
     // two records with identical content share a cid
@@ -506,7 +513,7 @@ async fn duplicate_record_cids_are_detected() {
 async fn process_import_repo_applies_commit_and_writes() {
     let (_dir, store) = test_store(10);
     store.create(TEST_DID, &test_keypair()).await.unwrap();
-    let mut txn = store.transact(TEST_DID.to_owned()).await.unwrap();
+    let mut txn = store.transact(TEST_DID.to_owned(), test_blobstore(TEST_DID)).await.unwrap();
     let init = txn.create_repo(vec![]).await.unwrap();
 
     let write = post_write("3jt5vlkoraa2a", "imported");
@@ -544,7 +551,7 @@ async fn process_import_repo_applies_commit_and_writes() {
 async fn moved_record_keeps_shared_blocks() {
     let (_dir, store) = test_store(10);
     store.create(TEST_DID, &test_keypair()).await.unwrap();
-    let mut txn = store.transact(TEST_DID.to_owned()).await.unwrap();
+    let mut txn = store.transact(TEST_DID.to_owned(), test_blobstore(TEST_DID)).await.unwrap();
     txn.create_repo(vec![]).await.unwrap();
 
     let original = post_write("3jt5vlkoraa2a", "same content");
