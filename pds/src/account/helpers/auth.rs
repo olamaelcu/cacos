@@ -7,9 +7,10 @@
 
 use crate::account::helpers::sql;
 use crate::context::PDS_REPO_SIGNING_KEYPAIR;
-use anyhow::{Result, bail};
+use anyhow::{Error, Result, bail};
 use chrono::DateTime;
 use jwt_simple::prelude::*;
+use miette::Diagnostic;
 use rsky_common::time::MINUTE;
 use rsky_common::{RFC3339_VARIANT, get_random_str, json_to_b64url};
 use sea_orm::{ConnectionTrait, DatabaseConnection, QueryResult, Value};
@@ -121,10 +122,19 @@ pub struct CustomClaimObj {
     pub scope: String,
 }
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Diagnostic)]
 pub enum AuthHelperError {
     #[error("ConcurrentRefreshError")]
+    #[diagnostic(code(cacos::pds::auth::concurrent_refresh))]
     ConcurrentRefresh,
+
+    #[error("not a refresh token")]
+    #[diagnostic(code(cacos::pds::auth::not_a_refresh_token))]
+    NotARefreshToken,
+
+    #[error("refresh token missing {0} claim")]
+    #[diagnostic(code(cacos::pds::auth::missing_refresh_claim))]
+    MissingRefreshClaim(&'static str),
 }
 
 pub fn create_tokens(opts: CreateTokensOpts) -> Result<(String, String)> {
@@ -241,21 +251,26 @@ pub async fn create_service_jwt(params: ServiceJwtParams) -> Result<String> {
     ))
 }
 
-// @NOTE unsafe for verification, should only be used w/ direct output from createRefreshToken() or createTokens()
+// @NOTE should only be used w/ direct output from createRefreshToken() or createTokens();
+// returns Err (not panic) on wrong-scope tokens or missing claims.
 pub fn decode_refresh_token(jwt: String) -> Result<RefreshToken> {
     let claims = PDS_JWT_KEYPAIR
         .public_key()
         .verify_token::<CustomClaimObj>(&jwt, None)?;
-    assert_eq!(
-        claims.custom.scope,
-        AuthScope::Refresh.as_str().to_owned(),
-        "not a refresh token"
-    );
+    if claims.custom.scope != AuthScope::Refresh.as_str() {
+        return Err(Error::new(AuthHelperError::NotARefreshToken));
+    }
     Ok(RefreshToken {
         scope: AuthScope::from_str(&claims.custom.scope)?,
-        sub: claims.subject.unwrap(),
-        exp: claims.expires_at.unwrap(),
-        jti: claims.jwt_id.unwrap(),
+        sub: claims
+            .subject
+            .ok_or_else(|| Error::new(AuthHelperError::MissingRefreshClaim("subject")))?,
+        exp: claims
+            .expires_at
+            .ok_or_else(|| Error::new(AuthHelperError::MissingRefreshClaim("expiration")))?,
+        jti: claims
+            .jwt_id
+            .ok_or_else(|| Error::new(AuthHelperError::MissingRefreshClaim("jti")))?,
     })
 }
 
@@ -671,5 +686,37 @@ mod tests {
         let header_b64 = service_jwt.split('.').next().unwrap();
         let header_json = base64_url::decode(header_b64).unwrap();
         assert!(String::from_utf8_lossy(&header_json).contains("\"alg\":\"ES256K\""));
+    }
+
+    #[tokio::test]
+    async fn decode_refresh_token_rejects_non_refresh_token() {
+        init_env();
+        // An access token has scope "com.atproto.access", not "com.atproto.refresh".
+        // decode_refresh_token must surface that as Err, not panic.
+        let access_jwt = create_access_token(CreateTokensOpts {
+            did: "did:plc:alice".to_owned(),
+            service_did: "did:web:localho.st".to_owned(),
+            scope: Some(AuthScope::Access),
+            jti: None,
+            expires_in: None,
+        })
+        .unwrap();
+        let result = decode_refresh_token(access_jwt);
+        let err = match result {
+            Ok(_) => panic!("expected scope-rejection error"),
+            Err(e) => e,
+        };
+        assert!(
+            err.to_string().contains("not a refresh token"),
+            "expected scope-rejection error, got: {err}"
+        );
+    }
+
+    #[tokio::test]
+    async fn decode_refresh_token_rejects_garbage() {
+        init_env();
+        // A string that isn't a JWT at all must produce Err, not panic.
+        let result = decode_refresh_token("not-a-jwt".to_owned());
+        assert!(result.is_err(), "expected Err for non-JWT input");
     }
 }
