@@ -16,6 +16,7 @@ use crate::account::oauth_store::PdsOAuthStore;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine as _;
 use poem::web::cookie::{Cookie, CookieJar, SameSite};
+use poem::EndpointExt;
 use rsky_oauth::dpop::{DpopManager, DpopNonce, InMemoryReplayStore, DEFAULT_ROTATION_INTERVAL};
 use rsky_oauth::jwk::{EcCurve, Jwk};
 use rsky_oauth::store::DeviceData;
@@ -84,6 +85,85 @@ impl SharedOAuthProvider {
 #[derive(Debug, Clone)]
 pub struct OAuthConfig {
     pub public_url: String,
+}
+
+/// Environment-driven bootstrap for the OAuth route set, given an
+/// already-opened (and migrated) account DB. Returns `None` when
+/// `PDS_JWT_KEY_K256_PRIVATE_KEY_HEX` is unset (the server still runs with
+/// `/metrics` only).
+///
+/// Env:
+/// - `PDS_PUBLIC_URL` (default `http://localhost:8080`): absolute base URL
+///   used to build DPoP `htu` values and OAuth metadata.
+/// - `PDS_OAUTH_REMOTE_CLIENT_URL` / `PDS_OAUTH_REMOTE_CLIENT_TOKEN`:
+///   headless-consent RemoteClient config (see [`crate::config`]).
+pub fn bootstrap_oauth_app(
+    account_db: sea_orm::DatabaseConnection,
+) -> Option<impl poem::Endpoint<Output = poem::Response>> {
+    use std::sync::Arc;
+
+    if std::env::var("PDS_JWT_KEY_K256_PRIVATE_KEY_HEX").is_err() {
+        return None;
+    }
+    let public_url =
+        std::env::var("PDS_PUBLIC_URL").unwrap_or_else(|_| "http://localhost:8080".to_string());
+    let issuer = public_url.clone();
+    let audience =
+        std::env::var("PDS_SERVICE_DID").unwrap_or_else(|_| "did:web:localhost".to_string());
+
+    let shared = SharedOAuthProvider::new(account_db.clone(), issuer, audience);
+    let remote_config = crate::config::OAuthRemoteConfig::from_env();
+    let remote_create_account: Arc<dyn remote_create_account::RemoteCreateAccount> =
+        Arc::new(remote_create_account::MockRemoteCreateAccount::default());
+    Some(build_oauth_app(
+        shared,
+        account_db,
+        remote_config,
+        public_url,
+        remote_create_account,
+    ))
+}
+
+/// Builds the full OAuth route set (provider routes + authorize redirect +
+/// headless-consent remote API), registering the shared provider, account
+/// DB, remote config, public-URL config, and the `RemoteCreateAccount` impl
+/// as poem data. Plan 08 swaps in the real `RemoteCreateAccount`.
+pub fn build_oauth_app(
+    shared: SharedOAuthProvider,
+    account_db: sea_orm::DatabaseConnection,
+    remote_config: crate::config::OAuthRemoteConfig,
+    public_url: String,
+    remote_create_account: Arc<dyn remote_create_account::RemoteCreateAccount>,
+) -> impl poem::Endpoint<Output = poem::Response> {
+    use poem::{get, post};
+    poem::Route::new()
+        .at("/oauth/par", post(routes::oauth_par))
+        .at("/oauth/token", post(routes::oauth_token))
+        .at("/oauth/revoke", post(routes::oauth_revoke))
+        .at("/oauth/jwks", get(routes::oauth_jwks))
+        .at(
+            "/.well-known/oauth-authorization-server",
+            get(routes::oauth_authorization_server_metadata),
+        )
+        .at(
+            "/.well-known/oauth-protected-resource",
+            get(routes::oauth_protected_resource_metadata),
+        )
+        .at(
+            "/oauth/authorize/:client_id/:request_uri",
+            get(routes::oauth_authorize),
+        )
+        .at("/oauth/remote/request", get(remote::request))
+        .at("/oauth/remote/sign-in", post(remote::sign_in))
+        .at("/oauth/remote/select", post(remote::select_account))
+        .at("/oauth/remote/create-account", post(remote::create_account))
+        .at("/oauth/remote/accept", post(remote::accept))
+        .at("/oauth/remote/reject", post(remote::reject))
+        .data(shared)
+        .data(account_db)
+        .data(remote_config)
+        .data(OAuthConfig { public_url })
+        .data(remote_create_account)
 }
 
 pub fn now_secs() -> u64 {

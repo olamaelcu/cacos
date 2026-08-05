@@ -14,10 +14,11 @@ async fn main() {
     // `blobstore_for_did(did)` at the call site.
     cacos_pds::blobstore::init_operator().expect("blobstore init failed");
 
+    let app = cacos_pds::xrpc::build_app().await;
     let listener = poem::listener::TcpListener::bind("127.0.0.1:8080");
     tracing::info!("pds listening on http://127.0.0.1:8080");
     poem::Server::new(listener)
-        .run(cacos_pds::xrpc::build_app())
+        .run(app)
         .await
         .expect("poem server failed");
 }
