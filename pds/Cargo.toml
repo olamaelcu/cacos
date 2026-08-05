@@ -11,5 +11,14 @@ tokio = { workspace = true }
 camino = { workspace = true }
 time = { workspace = true }
 
+# --- observability (Plan 02) ---
+metrics = { workspace = true }
+metrics-exporter-prometheus = { workspace = true }
+metrics-tracing-context = { workspace = true }
+poem = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+tracing-timing = { workspace = true }
+
 [dev-dependencies]
 camino-tempfile = { workspace = true }
