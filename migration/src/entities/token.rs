@@ -1,0 +1,34 @@
+use sea_orm::entity::prelude::*;
+
+#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
+#[sea_orm(table_name = "token")]
+pub struct Model {
+    #[sea_orm(primary_key)]
+    pub id: i64,
+    pub did: String,
+    #[sea_orm(column_name = "tokenId")]
+    pub token_id: String,
+    #[sea_orm(column_name = "createdAt")]
+    pub created_at: String,
+    #[sea_orm(column_name = "updatedAt")]
+    pub updated_at: String,
+    #[sea_orm(column_name = "expiresAt")]
+    pub expires_at: String,
+    #[sea_orm(column_name = "clientId")]
+    pub client_id: String,
+    #[sea_orm(column_name = "clientAuth")]
+    pub client_auth: String,
+    #[sea_orm(column_name = "deviceId")]
+    pub device_id: Option<String>,
+    pub parameters: String,
+    pub details: Option<String>,
+    pub code: Option<String>,
+    #[sea_orm(column_name = "currentRefreshToken")]
+    pub current_refresh_token: Option<String>,
+    pub scope: Option<String>,
+}
+
+#[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+pub enum Relation {}
+
+impl ActiveModelBehavior for ActiveModel {}
