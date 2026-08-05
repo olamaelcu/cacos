@@ -29,7 +29,7 @@
 use crate::actor_store::db::ActorDb;
 use crate::background::BackgroundQueue;
 use crate::blobstore::{BlobStore, BoxedBlobStream};
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use futures::TryStreamExt;
 use lexicon_cid::Cid;
 use rsky_common::ipld::sha256_to_cid;
@@ -103,8 +103,7 @@ struct BlobRow {
 }
 
 /// Columns in the exact order `row_to_blob` expects.
-const BLOB_SELECT: &str =
-    "SELECT cid, \"mimeType\", size, \"tempKey\", width, height, \"createdAt\", \"takedownRef\" FROM blob";
+const BLOB_SELECT: &str = "SELECT cid, \"mimeType\", size, \"tempKey\", width, height, \"createdAt\", \"takedownRef\" FROM blob";
 
 fn row_to_blob(row: &QueryResult) -> Result<BlobRow> {
     Ok(BlobRow {
@@ -121,10 +120,7 @@ fn row_to_blob(row: &QueryResult) -> Result<BlobRow> {
 
 /// `?,?,...` for an `IN (...)` clause.
 fn in_placeholders(n: usize) -> String {
-    std::iter::repeat("?")
-        .take(n)
-        .collect::<Vec<_>>()
-        .join(",")
+    std::iter::repeat("?").take(n).collect::<Vec<_>>().join(",")
 }
 
 pub async fn accepted_mime(mime: String, accepted: Vec<String>) -> bool {
@@ -343,8 +339,11 @@ impl BlobReader {
     }
 
     pub async fn blob_count(&self) -> Result<i64> {
-        let stmt =
-            Statement::from_sql_and_values(DatabaseBackend::Sqlite, "SELECT count(*) FROM blob", vec![]);
+        let stmt = Statement::from_sql_and_values(
+            DatabaseBackend::Sqlite,
+            "SELECT count(*) FROM blob",
+            vec![],
+        );
         let row = self
             .db
             .query_one_raw(stmt)
@@ -584,7 +583,11 @@ impl BlobReader {
             .map(|c| Value::from(c.clone()))
             .collect::<Vec<Value>>();
         self.db
-            .execute_raw(Statement::from_sql_and_values(DatabaseBackend::Sqlite, sql, values))
+            .execute_raw(Statement::from_sql_and_values(
+                DatabaseBackend::Sqlite,
+                sql,
+                values,
+            ))
             .await?;
 
         let blobstore = self.blobstore.clone();
@@ -633,10 +636,7 @@ mod tests {
     async fn test_reader() -> TestBlobReader {
         let dir = camino_tempfile::tempdir().unwrap();
         let db_path = dir.path().join("store.sqlite");
-        let db = crate::db::DatabaseKind::Actor
-            .open(&db_path)
-            .await
-            .unwrap();
+        let db = crate::db::DatabaseKind::Actor.open(&db_path).await.unwrap();
         let store = Arc::new(crate::blobstore::MemoryBlobStore::default());
         let reader = BlobReader::new(store.clone(), db, BackgroundQueue::default());
         TestBlobReader {
@@ -651,10 +651,9 @@ mod tests {
     /// same operator stay isolated by DID.
     fn per_did_opendal_handle(
         did: &str,
-    ) -> std::sync::Arc<dyn crate::blobstore::BlobStore<Stream = crate::blobstore::BoxedBlobStream>> {
-        std::sync::Arc::new(
-            crate::blobstore::opendal::OpenDALBlobStore::new_memory(did).unwrap(),
-        )
+    ) -> std::sync::Arc<dyn crate::blobstore::BlobStore<Stream = crate::blobstore::BoxedBlobStream>>
+    {
+        std::sync::Arc::new(crate::blobstore::opendal::OpenDALBlobStore::new_memory(did).unwrap())
     }
 
     async fn upload(t: &TestBlobReader, bytes: &[u8]) -> BlobRef {
@@ -761,27 +760,30 @@ mod tests {
         let blob = upload(&t, b"constrained").await;
         let mut wrong_mime = prepared_ref(&blob);
         wrong_mime.mime_type = "image/png".to_owned();
-        assert!(t
-            .reader
-            .verify_blob_and_make_permanent(wrong_mime)
-            .await
-            .is_err());
+        assert!(
+            t.reader
+                .verify_blob_and_make_permanent(wrong_mime)
+                .await
+                .is_err()
+        );
 
         let mut too_large = prepared_ref(&blob);
         too_large.constraints.max_size = Some(1);
-        assert!(t
-            .reader
-            .verify_blob_and_make_permanent(too_large)
-            .await
-            .is_err());
+        assert!(
+            t.reader
+                .verify_blob_and_make_permanent(too_large)
+                .await
+                .is_err()
+        );
 
         let mut wrong_accept = prepared_ref(&blob);
         wrong_accept.constraints.accept = Some(vec!["image/*".to_owned()]);
-        assert!(t
-            .reader
-            .verify_blob_and_make_permanent(wrong_accept)
-            .await
-            .is_err());
+        assert!(
+            t.reader
+                .verify_blob_and_make_permanent(wrong_accept)
+                .await
+                .is_err()
+        );
 
         let mut accept_any = prepared_ref(&blob);
         accept_any.constraints.accept = Some(vec!["*/*".to_owned()]);
@@ -798,11 +800,12 @@ mod tests {
                 accept: None,
             },
         };
-        assert!(t
-            .reader
-            .verify_blob_and_make_permanent(missing)
-            .await
-            .is_err());
+        assert!(
+            t.reader
+                .verify_blob_and_make_permanent(missing)
+                .await
+                .is_err()
+        );
     }
 
     #[tokio::test]
@@ -895,12 +898,13 @@ mod tests {
         assert!(status.applied && status.r#ref.is_some());
         // unknown blob has no status
         let unknown = cid_for(b"unknown");
-        assert!(t
-            .reader
-            .get_blob_takedown_status(unknown)
-            .await
-            .unwrap()
-            .is_none());
+        assert!(
+            t.reader
+                .get_blob_takedown_status(unknown)
+                .await
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[tokio::test]
@@ -1022,14 +1026,15 @@ mod tests {
             .await
             .unwrap();
         assert!(missing_cursored.is_empty());
-        assert!(t
-            .reader
-            .list_missing_blobs(ListMissingBlobsOpts {
-                cursor: None,
-                limit: 1001,
-            })
-            .await
-            .is_err());
+        assert!(
+            t.reader
+                .list_missing_blobs(ListMissingBlobsOpts {
+                    cursor: None,
+                    limit: 1001,
+                })
+                .await
+                .is_err()
+        );
     }
 
     #[tokio::test]

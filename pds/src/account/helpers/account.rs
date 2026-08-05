@@ -1,5 +1,5 @@
-//! Port of `vendor/rsky/rsky-pds/src/account_manager/helpers/account.rs`.
-//! SQL is kept verbatim; rusqlite is replaced by sea-orm raw statements.
+//! Account helper: actors, accounts, handle/email/takedown/deactivation lifecycle.
+//! All SQL goes through sea-orm's raw `Statement` builder.
 
 use crate::account::helpers::sql;
 use anyhow::Result;
@@ -104,12 +104,10 @@ fn actor_account_from_row(row: &QueryResult) -> Result<ActorAccount, sea_orm::Db
     })
 }
 
-/// True when `err` (anyhow-wrapped) is a SQLite constraint violation, mirroring
-/// the reference's `rusqlite::ErrorCode::ConstraintViolation` check. sea-orm
+/// True when `err` (anyhow-wrapped) is a SQLite constraint violation. sea-orm
 /// wraps sqlx's `DatabaseError`; sqlx reports the SQLite *extended* error code,
 /// and every constraint-violation extended code has primary code 19 (0x13).
-/// Verify at implementation time that `DbErr::Exec`/`DbErr::Query` wrapping
-/// `RuntimeErr::SqlxError` matches the installed sea-orm version.
+/// Matches the constraint-violation semantics in the rest of the PDS.
 pub fn is_unique_violation(err: &anyhow::Error) -> bool {
     err.chain()
         .any(|cause| match cause.downcast_ref::<sea_orm::DbErr>() {

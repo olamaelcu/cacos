@@ -39,8 +39,8 @@ use futures::future::BoxFuture;
 use futures::io::AsyncRead;
 use futures::stream::{StreamExt, TryStreamExt};
 use lexicon_cid::Cid;
-use opendal::{services, ErrorKind};
 pub use opendal::Operator;
+use opendal::{ErrorKind, services};
 use rand::RngCore;
 
 use crate::blobstore::{BlobNotFoundError, BlobStore, BoxedBlobStream};
@@ -126,8 +126,8 @@ impl OpenDALBlobStore {
     /// via `Arc`/`OnceLock` instead of re-reading the environment per actor.
     pub fn from_env_operator() -> Result<Operator> {
         let op = if let Ok(endpoint) = std::env::var("S3_ENDPOINT") {
-            let bucket = std::env::var("S3_BUCKET")
-                .context("S3_ENDPOINT is set but S3_BUCKET is not")?;
+            let bucket =
+                std::env::var("S3_BUCKET").context("S3_ENDPOINT is set but S3_BUCKET is not")?;
             let access_key_id = std::env::var("S3_ACCESS_KEY_ID")
                 .context("S3_ENDPOINT is set but S3_ACCESS_KEY_ID is not")?;
             let secret_access_key = std::env::var("S3_SECRET_ACCESS_KEY")
@@ -295,9 +295,7 @@ impl BlobStore for OpenDALBlobStore {
                 let pinned = Pin::new(&mut async_reader);
                 match AsyncRead::poll_read(pinned, cx, &mut buf) {
                     Poll::Ready(Ok(0)) => Poll::Ready(None),
-                    Poll::Ready(Ok(n)) => {
-                        Poll::Ready(Some(Ok(Bytes::copy_from_slice(&buf[..n]))))
-                    }
+                    Poll::Ready(Ok(n)) => Poll::Ready(Some(Ok(Bytes::copy_from_slice(&buf[..n])))),
                     Poll::Ready(Err(err)) => Poll::Ready(Some(Err(anyhow::Error::from(err)))),
                     Poll::Pending => Poll::Pending,
                 }
@@ -407,7 +405,10 @@ mod tests {
         OpenDALBlobStore,
     ) {
         let dir = camino_tempfile::tempdir().unwrap();
-        let op = OpenDALBlobStore::new_disk(dir.path(), DID_A).unwrap().op.clone();
+        let op = OpenDALBlobStore::new_disk(dir.path(), DID_A)
+            .unwrap()
+            .op
+            .clone();
         let a = OpenDALBlobStore::new(op.clone(), DID_A.to_owned());
         let b = OpenDALBlobStore::new(op.clone(), DID_B.to_owned());
         (dir, op, a, b)
@@ -520,10 +521,11 @@ mod tests {
         // exists() walks the operator's metadata; reading by the exact path
         // shape is the strongest check that our prefixes are right.
         assert!(op.exists(&format!("tmp/{DID_A}/{key}")).await.unwrap());
-        assert!(op
-            .exists(&format!("quarantine/{DID_A}/{cid}"))
-            .await
-            .unwrap());
+        assert!(
+            op.exists(&format!("quarantine/{DID_A}/{cid}"))
+                .await
+                .unwrap()
+        );
         // After quarantine, the blocks entry is gone.
         assert!(!op.exists(&format!("blocks/{DID_A}/{cid}")).await.unwrap());
     }

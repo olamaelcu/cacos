@@ -26,8 +26,8 @@ use rsky_repo::repo::Repo;
 use rsky_repo::storage::readable_blockstore::ReadableBlockstore;
 use rsky_repo::storage::types::RepoStorage;
 use rsky_repo::types::{
-    write_to_op, CommitAction, CommitData, CommitDataWithOps, CommitOp, PreparedCreateOrUpdate,
-    PreparedWrite, RecordCreateOrUpdateOp, RecordWriteEnum, RecordWriteOp, WriteOpAction,
+    CommitAction, CommitData, CommitDataWithOps, CommitOp, PreparedCreateOrUpdate, PreparedWrite,
+    RecordCreateOrUpdateOp, RecordWriteEnum, RecordWriteOp, WriteOpAction, write_to_op,
 };
 use rsky_repo::util::format_data_key;
 use rsky_syntax::aturi::AtUri;
@@ -289,13 +289,8 @@ impl ActorStore {
         let guard = self.did_lock(&did).lock_owned().await;
         let db = self.open_db(&did).await?;
         let key_location = self.get_location(&did)?.key_location;
-        let reader = ActorStoreReader::new(
-            did,
-            db,
-            key_location,
-            blobstore,
-            BackgroundQueue::default(),
-        );
+        let reader =
+            ActorStoreReader::new(did, db, key_location, blobstore, BackgroundQueue::default());
         let keypair = reader.keypair().await?;
         Ok(ActorStoreTransactor {
             reader,
@@ -314,12 +309,15 @@ impl ActorStore {
                     anyhow::Error::from(e),
                 )
             })?;
-        if tokio::fs::try_exists(&location.db_location).await.map_err(|e| {
-            PdsError::internal(
-                "ActorStore::create: try_exists failed",
-                anyhow::Error::from(e),
-            )
-        })? {
+        if tokio::fs::try_exists(&location.db_location)
+            .await
+            .map_err(|e| {
+                PdsError::internal(
+                    "ActorStore::create: try_exists failed",
+                    anyhow::Error::from(e),
+                )
+            })?
+        {
             return Err(PdsError::InvalidInput(format!(
                 "Repo already exists: {did}"
             )));
@@ -367,12 +365,15 @@ impl ActorStore {
             fut.await?;
         }
         let location = self.get_location(did)?;
-        if tokio::fs::try_exists(&location.directory).await.map_err(|e| {
-            PdsError::internal(
-                "ActorStore::destroy: try_exists failed",
-                anyhow::Error::from(e),
-            )
-        })? {
+        if tokio::fs::try_exists(&location.directory)
+            .await
+            .map_err(|e| {
+                PdsError::internal(
+                    "ActorStore::destroy: try_exists failed",
+                    anyhow::Error::from(e),
+                )
+            })?
+        {
             tokio::fs::remove_dir_all(&location.directory)
                 .await
                 .map_err(|e| {
@@ -493,10 +494,7 @@ impl ActorStoreReader {
     pub async fn keypair(&self) -> Result<Keypair> {
         match load_key(&self.key_location).await? {
             Some(keypair) => Ok(keypair),
-            None => Err(PdsError::NotFound(format!(
-                "keypair for {}",
-                self.did
-            ))),
+            None => Err(PdsError::NotFound(format!("keypair for {}", self.did))),
         }
     }
 
@@ -680,10 +678,7 @@ impl ActorStoreTransactor {
             if !current_root.cid.eq(&swap_commit) {
                 return Err(PdsError::internal(
                     "ActorStoreTransactor::format_commit: swap commit mismatch",
-                    anyhow::anyhow!(
-                        "BadCommitSwapError: current root is `{}`",
-                        current_root.cid
-                    ),
+                    anyhow::anyhow!("BadCommitSwapError: current root is `{}`", current_root.cid),
                 ));
             }
         }
@@ -737,10 +732,11 @@ impl ActorStoreTransactor {
         let storage_dyn: Arc<RwLock<dyn RepoStorage>> = self.storage.clone();
         let mut repo = Repo::load(storage_dyn, Some(current_root.cid)).await?;
         let previous_data = repo.commit.data;
-        let write_ops: Vec<RecordWriteOp> = writes
-            .into_iter()
-            .map(write_to_op)
-            .collect::<std::result::Result<Vec<RecordWriteOp>, anyhow::Error>>()?;
+        let write_ops: Vec<RecordWriteOp> =
+            writes
+                .into_iter()
+                .map(write_to_op)
+                .collect::<std::result::Result<Vec<RecordWriteOp>, anyhow::Error>>()?;
 
         let mut commit = repo
             .format_commit(RecordWriteEnum::List(write_ops), &self.keypair)

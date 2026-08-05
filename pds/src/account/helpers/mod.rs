@@ -1,11 +1,12 @@
-//! Sea-orm ports of `rsky-pds/src/account_manager/helpers/*`.
+//! Account helpers, each one operating on the shared sea-orm `DatabaseConnection`
+//! via raw `Statement::from_sql_and_values` SQL.
 
 pub mod account;
 
 use sea_orm::{DatabaseBackend, Statement, Value};
 
 /// Builds a raw SQLite statement. `?1..?N` placeholders bind positionally to
-/// `values`, mirroring the reference's `params![]` ordering exactly.
+/// `values`.
 pub(crate) fn sql(sql: &str, values: Vec<Value>) -> Statement {
     Statement::from_sql_and_values(DatabaseBackend::Sqlite, sql, values)
 }

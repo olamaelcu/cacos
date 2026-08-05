@@ -1,5 +1,4 @@
 //! Shared test fixtures for the account module: env + migrated temp DB.
-//! Mirrors `vendor/rsky/rsky-pds/src/account_manager/tests.rs` `init_env`.
 
 use sea_orm::DatabaseConnection;
 use std::sync::Once;
@@ -23,8 +22,7 @@ pub(crate) fn init_env() {
         ];
         for (key, value) in defaults {
             if std::env::var(key).is_err() {
-                // SAFETY: tests run sequentially within a process, no concurrent
-                // env reads; matches the rsky-pds reference fixture.
+                // SAFETY: tests run sequentially within a process, no concurrent env reads.
                 unsafe {
                     std::env::set_var(key, value);
                 }
@@ -33,8 +31,8 @@ pub(crate) fn init_env() {
     });
 }
 
-/// Opens a migrated, temp-file account DB via Plan 01's bootstrap.
-/// Returns the TempDir so it stays alive for the test's duration.
+/// Opens a migrated, temp-file account DB. Returns the temp dir so it stays
+/// alive for the test's duration.
 pub(crate) async fn test_db() -> (camino_tempfile::Utf8TempDir, DatabaseConnection) {
     init_env();
     let dir = camino_tempfile::Utf8TempDir::new().unwrap();

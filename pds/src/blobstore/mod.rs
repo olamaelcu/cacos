@@ -19,9 +19,7 @@
 //! The canonical factory is [`from_env`]: reads S3 / disk env vars and
 //! returns the per-DID handle for the given DID.
 
-pub use rsky_blobstore::{
-    BlobNotFoundError, BlobStore, BoxedBlobStream, MemoryBlobStore,
-};
+pub use rsky_blobstore::{BlobNotFoundError, BlobStore, BoxedBlobStream, MemoryBlobStore};
 
 pub mod opendal;
 
@@ -43,9 +41,7 @@ static OPERATOR: OnceLock<Operator> = OnceLock::new();
 /// `did` is baked into every key by the per-DID wrapper, so the same
 /// shared `Operator` instance can be handed out to every actor without
 /// leakage between tenants.
-pub fn from_env(
-    did: &str,
-) -> anyhow::Result<Arc<dyn BlobStore<Stream = BoxedBlobStream>>> {
+pub fn from_env(did: &str) -> anyhow::Result<Arc<dyn BlobStore<Stream = BoxedBlobStream>>> {
     OpenDALBlobStore::from_env(did)
 }
 
@@ -152,7 +148,9 @@ mod tests {
         let store = MemoryBlobStore::default();
         let bytes = b"stream bytes".to_vec();
         let cid = cid_for(&bytes);
-        BlobStore::put_permanent(&store, cid, bytes.clone()).await.unwrap();
+        BlobStore::put_permanent(&store, cid, bytes.clone())
+            .await
+            .unwrap();
         let stream = BlobStore::get_stream(&store, cid).await.unwrap();
         use futures::TryStreamExt;
         let chunks: Vec<bytes::Bytes> = stream.try_collect().await.unwrap();

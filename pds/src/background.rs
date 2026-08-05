@@ -13,8 +13,8 @@
 
 use anyhow::Result;
 use std::future::Future;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use tokio::sync::{Notify, Semaphore};
 
 const DEFAULT_CONCURRENCY: usize = 5;

@@ -6,8 +6,8 @@ use crate::actor_store::db::{backlink, record};
 use crate::error::{PdsError, Result};
 use lexicon_cid::Cid;
 use sea_orm::{
-    sea_query::OnConflict, ColumnTrait, ConnectionTrait, DatabaseBackend, EntityTrait,
-    PaginatorTrait, QueryFilter, Set, Statement,
+    ColumnTrait, ConnectionTrait, DatabaseBackend, EntityTrait, PaginatorTrait, QueryFilter, Set,
+    Statement, sea_query::OnConflict,
 };
 use std::collections::BTreeSet;
 
@@ -110,7 +110,11 @@ impl RecordReader {
         Ok(count > 0)
     }
 
-    pub async fn get_current_record_cid(&self, collection: String, rkey: String) -> Result<Option<Cid>> {
+    pub async fn get_current_record_cid(
+        &self,
+        collection: String,
+        rkey: String,
+    ) -> Result<Option<Cid>> {
         let row = record::Entity::find()
             .filter(record::Column::Collection.eq(collection))
             .filter(record::Column::Rkey.eq(rkey))
@@ -178,11 +182,9 @@ impl RecordReader {
         _prev: Option<String>,
     ) -> Result<()> {
         let now = rsky_common::now();
-        let now_dt = time::OffsetDateTime::parse(
-            &now,
-            &time::format_description::well_known::Rfc3339,
-        )
-        .unwrap_or_else(|_| time::OffsetDateTime::now_utc());
+        let now_dt =
+            time::OffsetDateTime::parse(&now, &time::format_description::well_known::Rfc3339)
+                .unwrap_or_else(|_| time::OffsetDateTime::now_utc());
         let collection = uri.get_collection().to_string();
         let rkey = uri.get_rkey().to_string();
         let am = record::ActiveModel {
@@ -297,11 +299,8 @@ mod tests {
     }
 
     fn make_uri(did: &str, collection: &str, rkey: &str) -> rsky_syntax::aturi::AtUri {
-        rsky_syntax::aturi::AtUri::new(
-            format!("{did}/{collection}/{rkey}"),
-            None,
-        )
-        .expect("valid AtUri")
+        rsky_syntax::aturi::AtUri::new(format!("{did}/{collection}/{rkey}"), None)
+            .expect("valid AtUri")
     }
 
     fn cid_for(value: &[u8]) -> Cid {
@@ -323,14 +322,7 @@ mod tests {
         let cid = cid_for(b"{\"text\":\"hello\"}");
 
         reader
-            .index_record(
-                uri.clone(),
-                cid,
-                None,
-                None,
-                "rev-1".to_string(),
-                None,
-            )
+            .index_record(uri.clone(), cid, None, None, "rev-1".to_string(), None)
             .await
             .unwrap();
 
@@ -344,10 +336,12 @@ mod tests {
         let collections = reader.list_collections().await.unwrap();
         assert_eq!(collections, vec!["app.bsky.feed.post"]);
 
-        assert!(reader
-            .has_record("app.bsky.feed.post".into(), "abc123".into(), None)
-            .await
-            .unwrap());
+        assert!(
+            reader
+                .has_record("app.bsky.feed.post".into(), "abc123".into(), None)
+                .await
+                .unwrap()
+        );
 
         reader.delete_record(&uri).await.unwrap();
         assert_eq!(reader.record_count().await.unwrap(), 0);
@@ -436,9 +430,11 @@ mod tests {
         let (_dir, reader, did) = setup().await;
         let uri = make_uri(&did, "app.bsky.feed.post", "missing");
         assert!(reader.get_record(&uri, None, None).await.unwrap().is_none());
-        assert!(!reader
-            .has_record("app.bsky.feed.post".into(), "missing".into(), None)
-            .await
-            .unwrap());
+        assert!(
+            !reader
+                .has_record("app.bsky.feed.post".into(), "missing".into(), None)
+                .await
+                .unwrap()
+        );
     }
 }
