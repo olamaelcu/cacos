@@ -3,3 +3,4 @@
 
 pub mod db;
 pub mod observability;
+pub mod xrpc;
