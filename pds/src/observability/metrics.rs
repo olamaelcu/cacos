@@ -26,6 +26,7 @@ pub const HTTP_REQUEST_DURATION_SECONDS: &str = "cacos_http_request_duration_sec
 pub const SEQUENCER_POLL_INTERVAL_SECONDS: &str = "cacos_sequencer_poll_interval_seconds";
 pub const BLOB_PUT_BYTES: &str = "cacos_blob_put_bytes";
 pub const BLOB_GET_BYTES: &str = "cacos_blob_get_bytes";
+pub const BLOB_OPS_TOTAL: &str = "cacos_blob_ops_total";
 pub const ACTOR_CACHE_HITS_TOTAL: &str = "cacos_actor_cache_hits_total";
 pub const ACTOR_CACHE_MISSES_TOTAL: &str = "cacos_actor_cache_misses_total";
 pub const COMMITS_TOTAL: &str = "cacos_commits_total";
@@ -83,6 +84,11 @@ pub fn describe() {
     );
     describe_histogram!(BLOB_PUT_BYTES, Unit::Bytes, "Blob upload size");
     describe_histogram!(BLOB_GET_BYTES, Unit::Bytes, "Blob download size");
+    describe_counter!(
+        BLOB_OPS_TOTAL,
+        Unit::Count,
+        "Blob store operations, labeled by op"
+    );
     describe_counter!(ACTOR_CACHE_HITS_TOTAL, Unit::Count, "BlockMap cache hits");
     describe_counter!(
         ACTOR_CACHE_MISSES_TOTAL,
