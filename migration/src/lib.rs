@@ -9,7 +9,10 @@
 pub use sea_orm_migration::prelude::*;
 
 pub mod entities;
+pub mod error;
 pub mod migrator;
+pub mod schema;
+pub mod types;
 
 pub mod m20260801_000001_account;
 pub mod m20260801_000002_repo_seq;

@@ -1,10 +1,11 @@
 use sea_orm::entity::prelude::*;
+use crate::types::db_id::DbId;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(table_name = "account_pref")]
 pub struct Model {
-    #[sea_orm(primary_key)]
-    pub id: i64,
+    #[sea_orm(primary_key, auto_increment = false)]
+    pub id: DbId,
     pub name: String,
     #[sea_orm(column_name = "valueJson")]
     pub value_json: String,

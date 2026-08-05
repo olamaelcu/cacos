@@ -7,6 +7,7 @@
 use sea_orm_migration::prelude::*;
 
 use crate::entities::{account_pref, backlink, blob, record, record_blob, repo_block, repo_root};
+use crate::schema::pk_db_id;
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -23,7 +24,7 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(repo_root::Column::Did).string().not_null().primary_key())
                     .col(ColumnDef::new(repo_root::Column::Cid).string().not_null())
                     .col(ColumnDef::new(repo_root::Column::Rev).string().not_null())
-                    .col(ColumnDef::new(repo_root::Column::IndexedAt).string().not_null())
+                    .col(ColumnDef::new(repo_root::Column::IndexedAt).timestamp().not_null())
                     .to_owned(),
             )
             .await?;
@@ -63,7 +64,7 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(record::Column::Collection).string().not_null())
                     .col(ColumnDef::new(record::Column::Rkey).string().not_null())
                     .col(ColumnDef::new(record::Column::RepoRev).string().not_null())
-                    .col(ColumnDef::new(record::Column::IndexedAt).string().not_null())
+                    .col(ColumnDef::new(record::Column::IndexedAt).timestamp().not_null())
                     .col(ColumnDef::new(record::Column::TakedownRef).string())
                     .to_owned(),
             )
@@ -108,7 +109,7 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(blob::Column::TempKey).string())
                     .col(ColumnDef::new(blob::Column::Width).big_integer())
                     .col(ColumnDef::new(blob::Column::Height).big_integer())
-                    .col(ColumnDef::new(blob::Column::CreatedAt).string().not_null())
+                    .col(ColumnDef::new(blob::Column::CreatedAt).timestamp().not_null())
                     .col(ColumnDef::new(blob::Column::TakedownRef).string())
                     .to_owned(),
             )
@@ -176,13 +177,7 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(account_pref::Entity)
                     .if_not_exists()
-                    .col(
-                        ColumnDef::new(account_pref::Column::Id)
-                            .integer()
-                            .not_null()
-                            .auto_increment()
-                            .primary_key(),
-                    )
+                    .col(pk_db_id(account_pref::Column::Id))
                     .col(ColumnDef::new(account_pref::Column::Name).string().not_null())
                     .col(ColumnDef::new(account_pref::Column::ValueJson).string().not_null())
                     .to_owned(),

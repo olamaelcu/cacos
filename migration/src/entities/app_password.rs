@@ -1,15 +1,17 @@
 use sea_orm::entity::prelude::*;
+use crate::types::did::Did;
+use time::OffsetDateTime;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(table_name = "app_password")]
 pub struct Model {
     #[sea_orm(primary_key)]
-    pub did: String,
+    pub did: Did,
     #[sea_orm(primary_key)]
     pub name: String,
     pub password: String,
     #[sea_orm(column_name = "createdAt")]
-    pub created_at: String,
+    pub created_at: OffsetDateTime,
     pub privileged: i16,
 }
 

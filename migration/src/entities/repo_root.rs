@@ -1,14 +1,16 @@
 use sea_orm::entity::prelude::*;
+use crate::types::did::Did;
+use time::OffsetDateTime;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(table_name = "repo_root")]
 pub struct Model {
     #[sea_orm(primary_key)]
-    pub did: String,
+    pub did: Did,
     pub cid: String,
     pub rev: String,
     #[sea_orm(column_name = "indexedAt")]
-    pub indexed_at: String,
+    pub indexed_at: OffsetDateTime,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

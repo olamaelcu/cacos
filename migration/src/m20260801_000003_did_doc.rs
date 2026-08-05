@@ -21,7 +21,7 @@ impl MigrationTrait for Migration {
                     .if_not_exists()
                     .col(ColumnDef::new(did_doc::Column::Did).string().not_null().primary_key())
                     .col(ColumnDef::new(did_doc::Column::Doc).string().not_null())
-                    .col(ColumnDef::new(did_doc::Column::UpdatedAt).big_integer().not_null())
+                    .col(ColumnDef::new(did_doc::Column::UpdatedAt).timestamp().not_null())
                     .to_owned(),
             )
             .await?;

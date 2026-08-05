@@ -457,6 +457,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "cacos-pds"
+version = "0.1.0"
+dependencies = [
+ "cacos-migration",
+ "camino",
+ "camino-tempfile",
+ "sea-orm",
+ "time",
+ "tokio",
+]
+
+[[package]]
 name = "camino"
 version = "1.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1607,18 +1619,6 @@ dependencies = [
  "redox_syscall",
  "smallvec",
  "windows-link",
-]
-
-[[package]]
-name = "pds"
-version = "0.1.0"
-dependencies = [
- "cacos-migration",
- "camino",
- "camino-tempfile",
- "sea-orm",
- "tempfile",
- "tokio",
 ]
 
 [[package]]

@@ -1,4 +1,5 @@
 use sea_orm::entity::prelude::*;
+use time::OffsetDateTime;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(table_name = "space_repo")]
@@ -12,7 +13,7 @@ pub struct Model {
     pub lthash_state: Vec<u8>,
     pub oplog_floor_rev: Option<String>,
     pub deleted: i16,
-    pub created_at: String,
+    pub created_at: OffsetDateTime,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

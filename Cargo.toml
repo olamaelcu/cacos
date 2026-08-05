@@ -44,4 +44,3 @@ tracing-timing = { version = "0.7", features = ["layer"] }
 tracing-unwrap = "1.0"
 
 # --- misc ---
-tempfile = "3"

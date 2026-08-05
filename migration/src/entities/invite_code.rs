@@ -1,4 +1,6 @@
 use sea_orm::entity::prelude::*;
+use crate::types::did::Did;
+use time::OffsetDateTime;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(table_name = "invite_code")]
@@ -9,11 +11,11 @@ pub struct Model {
     pub available_uses: i32,
     pub disabled: i16,
     #[sea_orm(column_name = "forAccount")]
-    pub for_account: String,
+    pub for_account: Did,
     #[sea_orm(column_name = "createdBy")]
-    pub created_by: String,
+    pub created_by: Did,
     #[sea_orm(column_name = "createdAt")]
-    pub created_at: String,
+    pub created_at: OffsetDateTime,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

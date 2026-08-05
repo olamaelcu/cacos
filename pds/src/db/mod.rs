@@ -2,7 +2,7 @@
 //! latest schema.
 //!
 //! Entities and migrators live in the `migration` crate.
-use std::path::Path;
+use camino::Utf8Path;
 use std::time::Duration;
 
 use migration::{
@@ -10,7 +10,7 @@ use migration::{
     migrator::{AccountMigrator, ActorMigrator, DidCacheMigrator, SequencerMigrator},
 };
 use sea_orm::{
-    ConnectOptions, Database, DatabaseConnection, DbErr,
+    ConnectOptions, Database, DatabaseConnection,
     sqlx::sqlite::{SqliteJournalMode, SqliteSynchronous},
 };
 
@@ -34,8 +34,8 @@ fn base_options(url: String) -> ConnectOptions {
 }
 
 /// `sqlite://{path}?mode=rwc` — `mode=rwc` creates the file if missing.
-fn sqlite_url(path: impl AsRef<Path>) -> String {
-    format!("sqlite://{}?mode=rwc", path.as_ref().display())
+fn sqlite_url(path: impl AsRef<Utf8Path>) -> String {
+    format!("sqlite://{}?mode=rwc", path.as_ref().as_str())
 }
 
 #[derive(Debug)]
@@ -47,7 +47,7 @@ pub enum DatabaseKind {
 }
 
 impl DatabaseKind {
-    pub async fn open(self, path: impl AsRef<Path>) -> std::result::Result<DatabaseConnection, DbErr> {
+    pub async fn open(self, path: impl AsRef<Utf8Path>) -> migration::error::Result<DatabaseConnection> {
         let db = Database::connect(base_options(sqlite_url(path))).await?;
         match self {
             Self::Account => AccountMigrator::up(&db, None).await?,
@@ -62,7 +62,7 @@ impl DatabaseKind {
 
 #[cfg(test)]
 mod tests {
-    use sea_orm::{ConnectionTrait, DatabaseBackend, DatabaseConnection, Statement};
+    use sea_orm::{ConnectionTrait, DatabaseBackend, DatabaseConnection, EntityTrait, Set, Statement};
 
     use super::*;
 
@@ -92,7 +92,7 @@ mod tests {
 
     #[tokio::test]
     async fn migrates_account_db_schema() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = camino_tempfile::Utf8TempDir::new().unwrap();
         let db = DatabaseKind::Account
             .open(dir.path().join("account.sqlite"))
             .await
@@ -104,6 +104,7 @@ mod tests {
             [
                 "account",
                 "account_device",
+                "account_migrations",
                 "actor",
                 "app_password",
                 "authorization_request",
@@ -113,7 +114,6 @@ mod tests {
                 "invite_code",
                 "invite_code_use",
                 "lexicon",
-                "migrations",
                 "refresh_token",
                 "repo_root",
                 "token",
@@ -124,29 +124,29 @@ mod tests {
 
     #[tokio::test]
     async fn migrates_sequencer_db_schema() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = camino_tempfile::Utf8TempDir::new().unwrap();
         let db = DatabaseKind::Sequencer
             .open(dir.path().join("sequencer.sqlite"))
             .await
             .unwrap();
         SequencerMigrator::up(&db, None).await.unwrap();
-        assert_eq!(table_names(&db).await, ["migrations", "repo_seq"]);
+        assert_eq!(table_names(&db).await, ["repo_seq", "sequencer_migrations"]);
     }
 
     #[tokio::test]
     async fn migrates_did_cache_db_schema() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = camino_tempfile::Utf8TempDir::new().unwrap();
         let db = DatabaseKind::DidCache
             .open(dir.path().join("did_cache.sqlite"))
             .await
             .unwrap();
         DidCacheMigrator::up(&db, None).await.unwrap();
-        assert_eq!(table_names(&db).await, ["did_doc", "migrations"]);
+        assert_eq!(table_names(&db).await, ["did_cache_migrations", "did_doc"]);
     }
 
     #[tokio::test]
     async fn migrates_actor_db_schema() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = camino_tempfile::Utf8TempDir::new().unwrap();
         let db = DatabaseKind::Actor
             .open(dir.path().join("store.sqlite"))
             .await
@@ -179,7 +179,7 @@ mod tests {
 
     #[tokio::test]
     async fn account_db_has_lower_case_unique_indexes() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = camino_tempfile::Utf8TempDir::new().unwrap();
         let db = DatabaseKind::Account
             .open(dir.path().join("account.sqlite"))
             .await
@@ -196,7 +196,7 @@ mod tests {
 
     #[tokio::test]
     async fn sqlite_journal_mode_is_wal() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = camino_tempfile::Utf8TempDir::new().unwrap();
         let db = DatabaseKind::Account
             .open(dir.path().join("account.sqlite"))
             .await
@@ -206,5 +206,43 @@ mod tests {
         let row = db.query_one_raw(stmt).await.unwrap().unwrap();
         let mode: String = row.try_get_by_index(0).unwrap();
         assert_eq!(mode, "wal");
+    }
+
+    #[tokio::test]
+    async fn custom_types_roundtrip() {
+        use sea_orm::{ActiveModelTrait, EntityTrait, Set};
+
+        let dir = camino_tempfile::Utf8TempDir::new().unwrap();
+        let db = DatabaseKind::Sequencer
+            .open(dir.path().join("sequencer.sqlite"))
+            .await
+            .unwrap();
+
+        let test_did: migration::types::did::Did = "did:plc:test123".parse().unwrap();
+        let now = time::OffsetDateTime::now_utc();
+
+        // Insert into repo_seq — exercises i64 PK, Did, OffsetDateTime, Vec<u8>
+        let model = entities::repo_seq::ActiveModel {
+            seq: Set(1_i64),
+            did: Set(test_did.clone()),
+            event_type: Set("test".to_owned()),
+            event: Set(b"test event".to_vec()),
+            invalidated: Set(Some(0)),
+            sequenced_at: Set(now),
+        };
+        let res = model.insert(&db).await.unwrap();
+        assert_eq!(res.seq, 1_i64);
+        assert_eq!(res.did, test_did);
+        assert_eq!(res.event, b"test event");
+
+        // Read it back
+        let fetched = entities::repo_seq::Entity::find_by_id(1_i64)
+            .one(&db)
+            .await
+            .unwrap()
+            .expect("should find inserted row");
+        assert_eq!(fetched.did, test_did);
+        assert_eq!(fetched.event_type, "test");
+        assert_eq!(fetched.sequenced_at, now);
     }
 }

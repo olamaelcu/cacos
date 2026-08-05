@@ -11,6 +11,7 @@ use crate::entities::{
     email_token, invite_code, invite_code_use, lexicon, refresh_token, repo_root, token,
     used_refresh_token,
 };
+use crate::schema::{pk_db_id, db_id, db_id_null};
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -26,10 +27,10 @@ impl MigrationTrait for Migration {
                     .if_not_exists()
                     .col(ColumnDef::new(actor::Column::Did).string().not_null().primary_key())
                     .col(ColumnDef::new(actor::Column::Handle).string())
-                    .col(ColumnDef::new(actor::Column::CreatedAt).string().not_null())
+                    .col(ColumnDef::new(actor::Column::CreatedAt).timestamp().not_null())
                     .col(ColumnDef::new(actor::Column::TakedownRef).string())
-                    .col(ColumnDef::new(actor::Column::DeactivatedAt).string())
-                    .col(ColumnDef::new(actor::Column::DeleteAfter).string())
+                    .col(ColumnDef::new(actor::Column::DeactivatedAt).timestamp())
+                    .col(ColumnDef::new(actor::Column::DeleteAfter).timestamp())
                     .to_owned(),
             )
             .await?;
@@ -61,14 +62,14 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(account::Column::Email).string().not_null())
                     .col(ColumnDef::new(account::Column::RecoveryKey).string())
                     .col(ColumnDef::new(account::Column::Password).string().not_null())
-                    .col(ColumnDef::new(account::Column::CreatedAt).string().not_null())
+                    .col(ColumnDef::new(account::Column::CreatedAt).timestamp().not_null())
                     .col(
                         ColumnDef::new(account::Column::InvitesDisabled)
                             .integer()
                             .not_null()
                             .default(0),
                     )
-                    .col(ColumnDef::new(account::Column::EmailConfirmedAt).string())
+                    .col(ColumnDef::new(account::Column::EmailConfirmedAt).timestamp())
                     .col(ColumnDef::new(account::Column::InviteNote).string())
                     .to_owned(),
             )
@@ -88,7 +89,7 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(app_password::Column::Did).string().not_null())
                     .col(ColumnDef::new(app_password::Column::Name).string().not_null())
                     .col(ColumnDef::new(app_password::Column::Password).string().not_null())
-                    .col(ColumnDef::new(app_password::Column::CreatedAt).string().not_null())
+                    .col(ColumnDef::new(app_password::Column::CreatedAt).timestamp().not_null())
                     .col(
                         ColumnDef::new(app_password::Column::Privileged)
                             .integer()
@@ -113,7 +114,7 @@ impl MigrationTrait for Migration {
                     .if_not_exists()
                     .col(ColumnDef::new(refresh_token::Column::Id).string().not_null().primary_key())
                     .col(ColumnDef::new(refresh_token::Column::Did).string().not_null())
-                    .col(ColumnDef::new(refresh_token::Column::ExpiresAt).string().not_null())
+                    .col(ColumnDef::new(refresh_token::Column::ExpiresAt).timestamp().not_null())
                     .col(ColumnDef::new(refresh_token::Column::NextId).string())
                     .col(ColumnDef::new(refresh_token::Column::AppPasswordName).string())
                     .to_owned(),
@@ -138,7 +139,7 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(repo_root::Column::Did).string().not_null().primary_key())
                     .col(ColumnDef::new(repo_root::Column::Cid).string().not_null())
                     .col(ColumnDef::new(repo_root::Column::Rev).string().not_null())
-                    .col(ColumnDef::new(repo_root::Column::IndexedAt).string().not_null())
+                    .col(ColumnDef::new(repo_root::Column::IndexedAt).timestamp().not_null())
                     .to_owned(),
             )
             .await?;
@@ -163,7 +164,7 @@ impl MigrationTrait for Migration {
                     )
                     .col(ColumnDef::new(invite_code::Column::ForAccount).string().not_null())
                     .col(ColumnDef::new(invite_code::Column::CreatedBy).string().not_null())
-                    .col(ColumnDef::new(invite_code::Column::CreatedAt).string().not_null())
+                    .col(ColumnDef::new(invite_code::Column::CreatedAt).timestamp().not_null())
                     .to_owned(),
             )
             .await?;
@@ -185,7 +186,7 @@ impl MigrationTrait for Migration {
                     .if_not_exists()
                     .col(ColumnDef::new(invite_code_use::Column::Code).string().not_null())
                     .col(ColumnDef::new(invite_code_use::Column::UsedBy).string().not_null())
-                    .col(ColumnDef::new(invite_code_use::Column::UsedAt).string().not_null())
+                    .col(ColumnDef::new(invite_code_use::Column::UsedAt).timestamp().not_null())
                     .primary_key(
                         Index::create()
                             .name("pk_invite_code_use")
@@ -205,7 +206,7 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(email_token::Column::Purpose).string().not_null())
                     .col(ColumnDef::new(email_token::Column::Did).string().not_null())
                     .col(ColumnDef::new(email_token::Column::Token).string().not_null())
-                    .col(ColumnDef::new(email_token::Column::RequestedAt).string().not_null())
+                    .col(ColumnDef::new(email_token::Column::RequestedAt).timestamp().not_null())
                     .primary_key(
                         Index::create()
                             .name("pk_email_token")
@@ -235,14 +236,9 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(authorization_request::Entity)
                     .if_not_exists()
-                    .col(
-                        ColumnDef::new(authorization_request::Column::Id)
-                            .string()
-                            .not_null()
-                            .primary_key(),
-                    )
+                    .col(pk_db_id(authorization_request::Column::Id))
                     .col(ColumnDef::new(authorization_request::Column::Did).string())
-                    .col(ColumnDef::new(authorization_request::Column::DeviceId).string())
+                    .col(db_id_null(authorization_request::Column::DeviceId))
                     .col(ColumnDef::new(authorization_request::Column::ClientId).string().not_null())
                     .col(
                         ColumnDef::new(authorization_request::Column::ClientAuth)
@@ -256,7 +252,7 @@ impl MigrationTrait for Migration {
                     )
                     .col(
                         ColumnDef::new(authorization_request::Column::ExpiresAt)
-                            .string()
+                            .timestamp()
                             .not_null(),
                     )
                     .col(ColumnDef::new(authorization_request::Column::Code).string())
@@ -284,11 +280,11 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(device::Entity)
                     .if_not_exists()
-                    .col(ColumnDef::new(device::Column::Id).string().not_null().primary_key())
+                    .col(pk_db_id(device::Column::Id))
                     .col(ColumnDef::new(device::Column::SessionId).string().not_null())
                     .col(ColumnDef::new(device::Column::UserAgent).string())
                     .col(ColumnDef::new(device::Column::IpAddress).string().not_null())
-                    .col(ColumnDef::new(device::Column::LastSeenAt).string().not_null())
+                    .col(ColumnDef::new(device::Column::LastSeenAt).timestamp().not_null())
                     .to_owned(),
             )
             .await?;
@@ -311,9 +307,9 @@ impl MigrationTrait for Migration {
                     .table(account_device::Entity)
                     .if_not_exists()
                     .col(ColumnDef::new(account_device::Column::Did).string().not_null())
-                    .col(ColumnDef::new(account_device::Column::DeviceId).string().not_null())
-                    .col(ColumnDef::new(account_device::Column::CreatedAt).string().not_null())
-                    .col(ColumnDef::new(account_device::Column::UpdatedAt).string().not_null())
+                    .col(db_id(account_device::Column::DeviceId))
+                    .col(ColumnDef::new(account_device::Column::CreatedAt).timestamp().not_null())
+                    .col(ColumnDef::new(account_device::Column::UpdatedAt).timestamp().not_null())
                     .primary_key(
                         Index::create()
                             .name("pk_account_device")
@@ -357,8 +353,8 @@ impl MigrationTrait for Migration {
                     .if_not_exists()
                     .col(ColumnDef::new(authorized_client::Column::Did).string().not_null())
                     .col(ColumnDef::new(authorized_client::Column::ClientId).string().not_null())
-                    .col(ColumnDef::new(authorized_client::Column::CreatedAt).string().not_null())
-                    .col(ColumnDef::new(authorized_client::Column::UpdatedAt).string().not_null())
+                    .col(ColumnDef::new(authorized_client::Column::CreatedAt).timestamp().not_null())
+                    .col(ColumnDef::new(authorized_client::Column::UpdatedAt).timestamp().not_null())
                     .col(ColumnDef::new(authorized_client::Column::Data).string().not_null())
                     .primary_key(
                         Index::create()
@@ -384,21 +380,15 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(token::Entity)
                     .if_not_exists()
-                    .col(
-                        ColumnDef::new(token::Column::Id)
-                            .integer()
-                            .not_null()
-                            .auto_increment()
-                            .primary_key(),
-                    )
+                    .col(pk_db_id(token::Column::Id))
                     .col(ColumnDef::new(token::Column::Did).string().not_null())
                     .col(ColumnDef::new(token::Column::TokenId).string().not_null())
-                    .col(ColumnDef::new(token::Column::CreatedAt).string().not_null())
-                    .col(ColumnDef::new(token::Column::UpdatedAt).string().not_null())
-                    .col(ColumnDef::new(token::Column::ExpiresAt).string().not_null())
+                    .col(ColumnDef::new(token::Column::CreatedAt).timestamp().not_null())
+                    .col(ColumnDef::new(token::Column::UpdatedAt).timestamp().not_null())
+                    .col(ColumnDef::new(token::Column::ExpiresAt).timestamp().not_null())
                     .col(ColumnDef::new(token::Column::ClientId).string().not_null())
                     .col(ColumnDef::new(token::Column::ClientAuth).string().not_null())
-                    .col(ColumnDef::new(token::Column::DeviceId).string())
+                    .col(db_id_null(token::Column::DeviceId))
                     .col(ColumnDef::new(token::Column::Parameters).string().not_null())
                     .col(ColumnDef::new(token::Column::Details).string())
                     .col(ColumnDef::new(token::Column::Code).string())
@@ -455,7 +445,7 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .primary_key(),
                     )
-                    .col(ColumnDef::new(used_refresh_token::Column::TokenId).big_integer().not_null())
+                    .col(db_id(used_refresh_token::Column::TokenId))
                     .foreign_key(
                         ForeignKey::create()
                             .name("fk_used_refresh_token_token")
@@ -484,9 +474,9 @@ impl MigrationTrait for Migration {
                     .table(lexicon::Entity)
                     .if_not_exists()
                     .col(ColumnDef::new(lexicon::Column::Nsid).string().not_null().primary_key())
-                    .col(ColumnDef::new(lexicon::Column::CreatedAt).string().not_null())
-                    .col(ColumnDef::new(lexicon::Column::UpdatedAt).string().not_null())
-                    .col(ColumnDef::new(lexicon::Column::LastSucceededAt).string())
+                    .col(ColumnDef::new(lexicon::Column::CreatedAt).timestamp().not_null())
+                    .col(ColumnDef::new(lexicon::Column::UpdatedAt).timestamp().not_null())
+                    .col(ColumnDef::new(lexicon::Column::LastSucceededAt).timestamp())
                     .col(ColumnDef::new(lexicon::Column::Uri).string())
                     .col(ColumnDef::new(lexicon::Column::Lexicon).string())
                     .to_owned(),

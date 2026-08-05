@@ -10,6 +10,7 @@ use crate::entities::{
     space_blob_ref, space_def, space_host_reg, space_member, space_oplog, space_record,
     space_repo, space_repo_notify, space_used_jti, space_writer,
 };
+use crate::schema::pk_db_id;
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -41,7 +42,7 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .default(0),
                     )
-                    .col(ColumnDef::new(space_repo::Column::CreatedAt).string().not_null())
+                    .col(ColumnDef::new(space_repo::Column::CreatedAt).timestamp().not_null())
                     .to_owned(),
             )
             .await?;
@@ -75,13 +76,7 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(space_oplog::Entity)
                     .if_not_exists()
-                    .col(
-                        ColumnDef::new(space_oplog::Column::Id)
-                            .integer()
-                            .not_null()
-                            .auto_increment()
-                            .primary_key(),
-                    )
+                    .col(pk_db_id(space_oplog::Column::Id))
                     .col(ColumnDef::new(space_oplog::Column::SpaceUri).string().not_null())
                     .col(ColumnDef::new(space_oplog::Column::Rev).string().not_null())
                     .col(ColumnDef::new(space_oplog::Column::Collection).string().not_null())
@@ -132,7 +127,7 @@ impl MigrationTrait for Migration {
                     .if_not_exists()
                     .col(ColumnDef::new(space_repo_notify::Column::SpaceUri).string().not_null())
                     .col(ColumnDef::new(space_repo_notify::Column::Endpoint).string().not_null())
-                    .col(ColumnDef::new(space_repo_notify::Column::ExpiresAt).string().not_null())
+                    .col(ColumnDef::new(space_repo_notify::Column::ExpiresAt).timestamp().not_null())
                     .primary_key(
                         Index::create()
                             .name("pk_space_repo_notify")
@@ -177,7 +172,7 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .default(0),
                     )
-                    .col(ColumnDef::new(space_def::Column::CreatedAt).string().not_null())
+                    .col(ColumnDef::new(space_def::Column::CreatedAt).timestamp().not_null())
                     .to_owned(),
             )
             .await?;
@@ -228,7 +223,7 @@ impl MigrationTrait for Migration {
                     .if_not_exists()
                     .col(ColumnDef::new(space_host_reg::Column::SpaceUri).string().not_null())
                     .col(ColumnDef::new(space_host_reg::Column::Endpoint).string().not_null())
-                    .col(ColumnDef::new(space_host_reg::Column::ExpiresAt).string().not_null())
+                    .col(ColumnDef::new(space_host_reg::Column::ExpiresAt).timestamp().not_null())
                     .primary_key(
                         Index::create()
                             .name("pk_space_host_reg")

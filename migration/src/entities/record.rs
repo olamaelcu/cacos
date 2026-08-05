@@ -1,4 +1,5 @@
 use sea_orm::entity::prelude::*;
+use time::OffsetDateTime;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(table_name = "record")]
@@ -11,7 +12,7 @@ pub struct Model {
     #[sea_orm(column_name = "repoRev")]
     pub repo_rev: String,
     #[sea_orm(column_name = "indexedAt")]
-    pub indexed_at: String,
+    pub indexed_at: OffsetDateTime,
     #[sea_orm(column_name = "takedownRef")]
     pub takedown_ref: Option<String>,
 }

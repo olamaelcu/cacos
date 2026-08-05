@@ -1,4 +1,5 @@
 use sea_orm::entity::prelude::*;
+use time::OffsetDateTime;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(table_name = "blob")]
@@ -13,7 +14,7 @@ pub struct Model {
     pub width: Option<i64>,
     pub height: Option<i64>,
     #[sea_orm(column_name = "createdAt")]
-    pub created_at: String,
+    pub created_at: OffsetDateTime,
     #[sea_orm(column_name = "takedownRef")]
     pub takedown_ref: Option<String>,
 }

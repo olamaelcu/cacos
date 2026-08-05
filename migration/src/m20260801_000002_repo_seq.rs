@@ -23,7 +23,6 @@ impl MigrationTrait for Migration {
                         ColumnDef::new(repo_seq::Column::Seq)
                             .integer()
                             .not_null()
-                            .auto_increment()
                             .primary_key(),
                     )
                     .col(ColumnDef::new(repo_seq::Column::Did).string().not_null())
@@ -35,7 +34,7 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .default(0),
                     )
-                    .col(ColumnDef::new(repo_seq::Column::SequencedAt).string().not_null())
+                    .col(ColumnDef::new(repo_seq::Column::SequencedAt).timestamp().not_null())
                     .to_owned(),
             )
             .await?;
