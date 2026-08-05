@@ -1,5 +1,5 @@
-use sea_orm::entity::prelude::*;
 use crate::types::did::Did;
+use sea_orm::entity::prelude::*;
 use time::OffsetDateTime;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]

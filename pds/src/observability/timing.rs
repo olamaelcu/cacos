@@ -9,8 +9,8 @@
 
 use std::time::Duration;
 
+use tracing_timing::LayerDowncaster;
 use tracing_timing::group::{ByMessage, ByName};
-use tracing_timing::{Builder, Histogram, LayerDowncaster};
 
 use crate::observability::metrics::{TIMING_P50_SECONDS, TIMING_P90_SECONDS, TIMING_P99_SECONDS};
 
@@ -25,10 +25,7 @@ impl TimingReporter {
     ///
     /// Captures the current [`tracing::Dispatch`] (thread-local or global) at start
     /// so the `LayerDowncaster` can find the `TimingLayer` from any thread.
-    pub fn start(
-        interval: Duration,
-        downcaster: LayerDowncaster<ByName, ByMessage>,
-    ) -> Self {
+    pub fn start(interval: Duration, downcaster: LayerDowncaster<ByName, ByMessage>) -> Self {
         let dispatch = tracing::dispatcher::get_default(|d| d.clone());
         let (shutdown_tx, mut shutdown_rx) = tokio::sync::watch::channel(false);
 
@@ -115,6 +112,7 @@ mod tests {
     use metrics_exporter_prometheus::PrometheusBuilder;
     use tracing_subscriber::layer::SubscriberExt;
     use tracing_subscriber::registry::Registry;
+    use tracing_timing::{Builder, Histogram};
 
     use super::*;
 

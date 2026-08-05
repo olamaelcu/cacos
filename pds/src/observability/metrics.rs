@@ -30,17 +30,45 @@ pub const BLOB_GET_BYTES: &str = "cacos_blob_get_bytes";
 
 /// Register a description (HELP line) for every cacos metric. Idempotent.
 pub fn describe() {
-    describe_counter!(HTTP_REQUESTS_TOTAL, Unit::Count, "Total HTTP requests handled");
-    describe_counter!(HTTP_REQUEST_ERRORS_TOTAL, Unit::Count, "HTTP requests that errored");
+    describe_counter!(
+        HTTP_REQUESTS_TOTAL,
+        Unit::Count,
+        "Total HTTP requests handled"
+    );
+    describe_counter!(
+        HTTP_REQUEST_ERRORS_TOTAL,
+        Unit::Count,
+        "HTTP requests that errored"
+    );
     describe_counter!(SIGNUPS_TOTAL, Unit::Count, "New account signups");
     describe_counter!(SESSIONS_TOTAL, Unit::Count, "Auth sessions created");
     describe_counter!(INVITE_USAGE_TOTAL, Unit::Count, "Invite codes redeemed");
-    describe_counter!(SEQ_EVENTS_TOTAL, Unit::Count, "Events sequenced by the sequencer");
+    describe_counter!(
+        SEQ_EVENTS_TOTAL,
+        Unit::Count,
+        "Events sequenced by the sequencer"
+    );
     describe_gauge!(LAST_SEQ, Unit::Count, "Last sequence number written");
-    describe_gauge!(OUTBOX_BUFFER_LAG, Unit::Count, "SubscribeRepos outbox buffer lag");
-    describe_gauge!(TIMING_P50_SECONDS, Unit::Seconds, "p50 inter-event timing (seconds)");
-    describe_gauge!(TIMING_P90_SECONDS, Unit::Seconds, "p90 inter-event timing (seconds)");
-    describe_gauge!(TIMING_P99_SECONDS, Unit::Seconds, "p99 inter-event timing (seconds)");
+    describe_gauge!(
+        OUTBOX_BUFFER_LAG,
+        Unit::Count,
+        "SubscribeRepos outbox buffer lag"
+    );
+    describe_gauge!(
+        TIMING_P50_SECONDS,
+        Unit::Seconds,
+        "p50 inter-event timing (seconds)"
+    );
+    describe_gauge!(
+        TIMING_P90_SECONDS,
+        Unit::Seconds,
+        "p90 inter-event timing (seconds)"
+    );
+    describe_gauge!(
+        TIMING_P99_SECONDS,
+        Unit::Seconds,
+        "p99 inter-event timing (seconds)"
+    );
     describe_histogram!(
         HTTP_REQUEST_DURATION_SECONDS,
         Unit::Seconds,

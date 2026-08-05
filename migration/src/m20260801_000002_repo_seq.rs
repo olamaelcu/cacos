@@ -22,7 +22,11 @@ impl MigrationTrait for Migration {
                     .if_not_exists()
                     .col(pk_db_id(repo_seq::Column::Seq))
                     .col(ColumnDef::new(repo_seq::Column::Did).string().not_null())
-                    .col(ColumnDef::new(repo_seq::Column::EventType).string().not_null())
+                    .col(
+                        ColumnDef::new(repo_seq::Column::EventType)
+                            .string()
+                            .not_null(),
+                    )
                     .col(ColumnDef::new(repo_seq::Column::Event).blob().not_null())
                     .col(
                         ColumnDef::new(repo_seq::Column::Invalidated)
@@ -30,7 +34,11 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .default(0),
                     )
-                    .col(ColumnDef::new(repo_seq::Column::SequencedAt).timestamp().not_null())
+                    .col(
+                        ColumnDef::new(repo_seq::Column::SequencedAt)
+                            .timestamp()
+                            .not_null(),
+                    )
                     .to_owned(),
             )
             .await?;

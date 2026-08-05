@@ -3,6 +3,7 @@ use std::{
     fmt::{Display, Formatter},
     str::FromStr,
     string::FromUtf8Error,
+    sync::{Mutex, OnceLock},
 };
 
 /// Error returned when parsing a hex string into a [`DbId`] fails.
@@ -21,12 +22,24 @@ pub enum HexError {
 use serde::{Deserialize, Serialize};
 use ulid::Ulid;
 
-#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct DbId(pub Ulid);
 
+static ULID_GENERATOR: OnceLock<Mutex<ulid::Generator>> = OnceLock::new();
+
+fn ulid_generator() -> &'static Mutex<ulid::Generator> {
+    ULID_GENERATOR.get_or_init(|| Mutex::new(ulid::Generator::new()))
+}
+
 impl DbId {
+    /// Generate a new monotonic [`DbId`]. Successive calls produce strictly
+    /// increasing ULIDs, suitable for use as an ordering or sequence key.
     pub fn new() -> Self {
-        Self(Ulid::generate())
+        let mut g = ulid_generator().lock().expect("ulid generator poisoned");
+        Self(
+            g.generate()
+                .unwrap_or_else(|o| o.commit_overflow_increment()),
+        )
     }
 
     pub fn from_bytes(bytes: [u8; 16]) -> Self {
@@ -47,6 +60,12 @@ impl DbId {
             out[i * 2 + 1] = HEX[(b & 0x0f) as usize];
         }
         String::from_utf8(out.to_vec()).expect("valid utf-8")
+    }
+
+    /// Extract the 48-bit timestamp (milliseconds since Unix epoch) as a
+    /// `u64`. Useful as a coarse-grained ordering value.
+    pub fn timestamp_ms(self) -> u64 {
+        self.0.timestamp_ms()
     }
 
     /// Parse a 32-char hex string (lowercase or uppercase) into a DbId.
@@ -100,6 +119,12 @@ impl<'de> Deserialize<'de> for DbId {
 impl From<DbId> for sea_orm::Value {
     fn from(val: DbId) -> Self {
         sea_orm::Value::Bytes(Some(val.to_bytes().to_vec()))
+    }
+}
+
+impl From<DbId> for u64 {
+    fn from(id: DbId) -> Self {
+        id.timestamp_ms()
     }
 }
 
@@ -230,5 +255,42 @@ mod tests {
         let s = id.to_string();
         let parsed: DbId = s.parse().unwrap();
         assert_eq!(id, parsed);
+    }
+
+    #[test]
+    fn monotonic_ids_strictly_increase() {
+        let mut prev = DbId::new();
+        for _ in 0..1000 {
+            let next = DbId::new();
+            assert!(
+                prev < next,
+                "expected monotonic ordering: {:?} >= {:?}",
+                prev,
+                next
+            );
+            prev = next;
+        }
+    }
+
+    #[test]
+    fn timestamp_ms_is_non_decreasing() {
+        let id = DbId::new();
+        let ts = id.timestamp_ms();
+        let reconstructed = Ulid::from_parts(ts, id.0.random());
+        assert_eq!(reconstructed, id.0);
+    }
+
+    #[test]
+    fn order_by_time() {
+        let a = DbId::new();
+        std::thread::sleep(std::time::Duration::from_millis(2));
+        let b = DbId::new();
+        assert!(a < b);
+    }
+
+    #[test]
+    fn into_u64_matches_timestamp_ms() {
+        let id = DbId::new();
+        assert_eq!(id.timestamp_ms(), u64::from(id));
     }
 }

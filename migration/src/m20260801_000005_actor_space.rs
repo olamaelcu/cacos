@@ -7,8 +7,8 @@
 use sea_orm_migration::prelude::*;
 
 use crate::entities::{
-    space_blob_ref, space_def, space_host_reg, space_member, space_oplog, space_record,
-    space_repo, space_repo_notify, space_used_jti, space_writer,
+    space_blob_ref, space_def, space_host_reg, space_member, space_oplog, space_record, space_repo,
+    space_repo_notify, space_used_jti, space_writer,
 };
 use crate::schema::pk_db_id;
 
@@ -30,11 +30,23 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .primary_key(),
                     )
-                    .col(ColumnDef::new(space_repo::Column::Authority).string().not_null())
-                    .col(ColumnDef::new(space_repo::Column::SpaceType).string().not_null())
+                    .col(
+                        ColumnDef::new(space_repo::Column::Authority)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(space_repo::Column::SpaceType)
+                            .string()
+                            .not_null(),
+                    )
                     .col(ColumnDef::new(space_repo::Column::Skey).string().not_null())
                     .col(ColumnDef::new(space_repo::Column::Rev).string().not_null())
-                    .col(ColumnDef::new(space_repo::Column::LthashState).blob().not_null())
+                    .col(
+                        ColumnDef::new(space_repo::Column::LthashState)
+                            .blob()
+                            .not_null(),
+                    )
                     .col(ColumnDef::new(space_repo::Column::OplogFloorRev).string())
                     .col(
                         ColumnDef::new(space_repo::Column::Deleted)
@@ -42,7 +54,11 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .default(0),
                     )
-                    .col(ColumnDef::new(space_repo::Column::CreatedAt).timestamp().not_null())
+                    .col(
+                        ColumnDef::new(space_repo::Column::CreatedAt)
+                            .timestamp()
+                            .not_null(),
+                    )
                     .to_owned(),
             )
             .await?;
@@ -53,12 +69,36 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(space_record::Entity)
                     .if_not_exists()
-                    .col(ColumnDef::new(space_record::Column::SpaceUri).string().not_null())
-                    .col(ColumnDef::new(space_record::Column::Collection).string().not_null())
-                    .col(ColumnDef::new(space_record::Column::Rkey).string().not_null())
-                    .col(ColumnDef::new(space_record::Column::Cid).string().not_null())
-                    .col(ColumnDef::new(space_record::Column::Rev).string().not_null())
-                    .col(ColumnDef::new(space_record::Column::Value).blob().not_null())
+                    .col(
+                        ColumnDef::new(space_record::Column::SpaceUri)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(space_record::Column::Collection)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(space_record::Column::Rkey)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(space_record::Column::Cid)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(space_record::Column::Rev)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(space_record::Column::Value)
+                            .blob()
+                            .not_null(),
+                    )
                     .primary_key(
                         Index::create()
                             .name("pk_space_record")
@@ -77,10 +117,22 @@ impl MigrationTrait for Migration {
                     .table(space_oplog::Entity)
                     .if_not_exists()
                     .col(pk_db_id(space_oplog::Column::Id))
-                    .col(ColumnDef::new(space_oplog::Column::SpaceUri).string().not_null())
+                    .col(
+                        ColumnDef::new(space_oplog::Column::SpaceUri)
+                            .string()
+                            .not_null(),
+                    )
                     .col(ColumnDef::new(space_oplog::Column::Rev).string().not_null())
-                    .col(ColumnDef::new(space_oplog::Column::Collection).string().not_null())
-                    .col(ColumnDef::new(space_oplog::Column::Rkey).string().not_null())
+                    .col(
+                        ColumnDef::new(space_oplog::Column::Collection)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(space_oplog::Column::Rkey)
+                            .string()
+                            .not_null(),
+                    )
                     .col(ColumnDef::new(space_oplog::Column::Cid).string())
                     .col(ColumnDef::new(space_oplog::Column::Prev).string())
                     .to_owned(),
@@ -103,10 +155,26 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(space_blob_ref::Entity)
                     .if_not_exists()
-                    .col(ColumnDef::new(space_blob_ref::Column::SpaceUri).string().not_null())
-                    .col(ColumnDef::new(space_blob_ref::Column::BlobCid).string().not_null())
-                    .col(ColumnDef::new(space_blob_ref::Column::Collection).string().not_null())
-                    .col(ColumnDef::new(space_blob_ref::Column::Rkey).string().not_null())
+                    .col(
+                        ColumnDef::new(space_blob_ref::Column::SpaceUri)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(space_blob_ref::Column::BlobCid)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(space_blob_ref::Column::Collection)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(space_blob_ref::Column::Rkey)
+                            .string()
+                            .not_null(),
+                    )
                     .primary_key(
                         Index::create()
                             .name("pk_space_blob_ref")
@@ -125,9 +193,21 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(space_repo_notify::Entity)
                     .if_not_exists()
-                    .col(ColumnDef::new(space_repo_notify::Column::SpaceUri).string().not_null())
-                    .col(ColumnDef::new(space_repo_notify::Column::Endpoint).string().not_null())
-                    .col(ColumnDef::new(space_repo_notify::Column::ExpiresAt).timestamp().not_null())
+                    .col(
+                        ColumnDef::new(space_repo_notify::Column::SpaceUri)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(space_repo_notify::Column::Endpoint)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(space_repo_notify::Column::ExpiresAt)
+                            .timestamp()
+                            .not_null(),
+                    )
                     .primary_key(
                         Index::create()
                             .name("pk_space_repo_notify")
@@ -150,7 +230,11 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .primary_key(),
                     )
-                    .col(ColumnDef::new(space_def::Column::SpaceType).string().not_null())
+                    .col(
+                        ColumnDef::new(space_def::Column::SpaceType)
+                            .string()
+                            .not_null(),
+                    )
                     .col(ColumnDef::new(space_def::Column::Skey).string().not_null())
                     .col(
                         ColumnDef::new(space_def::Column::Policy)
@@ -172,7 +256,11 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .default(0),
                     )
-                    .col(ColumnDef::new(space_def::Column::CreatedAt).timestamp().not_null())
+                    .col(
+                        ColumnDef::new(space_def::Column::CreatedAt)
+                            .timestamp()
+                            .not_null(),
+                    )
                     .to_owned(),
             )
             .await?;
@@ -183,8 +271,16 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(space_member::Entity)
                     .if_not_exists()
-                    .col(ColumnDef::new(space_member::Column::SpaceUri).string().not_null())
-                    .col(ColumnDef::new(space_member::Column::Did).string().not_null())
+                    .col(
+                        ColumnDef::new(space_member::Column::SpaceUri)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(space_member::Column::Did)
+                            .string()
+                            .not_null(),
+                    )
                     .primary_key(
                         Index::create()
                             .name("pk_space_member")
@@ -201,9 +297,21 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(space_writer::Entity)
                     .if_not_exists()
-                    .col(ColumnDef::new(space_writer::Column::SpaceUri).string().not_null())
-                    .col(ColumnDef::new(space_writer::Column::Did).string().not_null())
-                    .col(ColumnDef::new(space_writer::Column::Rev).string().not_null())
+                    .col(
+                        ColumnDef::new(space_writer::Column::SpaceUri)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(space_writer::Column::Did)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(space_writer::Column::Rev)
+                            .string()
+                            .not_null(),
+                    )
                     .col(ColumnDef::new(space_writer::Column::Hash).string())
                     .primary_key(
                         Index::create()
@@ -221,9 +329,21 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(space_host_reg::Entity)
                     .if_not_exists()
-                    .col(ColumnDef::new(space_host_reg::Column::SpaceUri).string().not_null())
-                    .col(ColumnDef::new(space_host_reg::Column::Endpoint).string().not_null())
-                    .col(ColumnDef::new(space_host_reg::Column::ExpiresAt).timestamp().not_null())
+                    .col(
+                        ColumnDef::new(space_host_reg::Column::SpaceUri)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(space_host_reg::Column::Endpoint)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(space_host_reg::Column::ExpiresAt)
+                            .timestamp()
+                            .not_null(),
+                    )
                     .primary_key(
                         Index::create()
                             .name("pk_space_host_reg")
@@ -240,8 +360,17 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(space_used_jti::Entity)
                     .if_not_exists()
-                    .col(ColumnDef::new(space_used_jti::Column::Jti).string().not_null().primary_key())
-                    .col(ColumnDef::new(space_used_jti::Column::Exp).big_integer().not_null())
+                    .col(
+                        ColumnDef::new(space_used_jti::Column::Jti)
+                            .string()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(
+                        ColumnDef::new(space_used_jti::Column::Exp)
+                            .big_integer()
+                            .not_null(),
+                    )
                     .to_owned(),
             )
             .await?;

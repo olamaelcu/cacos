@@ -1,0 +1,28 @@
+[tools]
+rust = "1.97.0"
+"cargo:cargo-nextest" = "0.9.115"
+"github:corca-ai/nose" = "0.20.0"
+
+[tasks.check]
+description = "Type-check the whole workspace"
+run = "cargo check --workspace --all-targets"
+
+[tasks.fmt]
+description = "Check rustfmt formatting"
+run = "cargo fmt --all -- --check"
+
+[tasks.format]
+description = "Apply rustfmt formatting"
+run = "cargo fmt --all"
+
+[tasks.lint]
+description = "Clippy lint with warnings denied"
+run = "cargo clippy --workspace --all-targets -- -D warnings"
+
+[tasks.test]
+description = "Run tests with nextest"
+run = "cargo nextest run --workspace"
+
+[tasks.dup]
+description = "Report code duplication (nose)"
+run = "nose query -r pds/src -r pds/tests -r migration/src"

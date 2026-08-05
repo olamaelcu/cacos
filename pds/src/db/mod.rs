@@ -47,7 +47,10 @@ pub enum DatabaseKind {
 }
 
 impl DatabaseKind {
-    pub async fn open(self, path: impl AsRef<Utf8Path>) -> migration::error::Result<DatabaseConnection> {
+    pub async fn open(
+        self,
+        path: impl AsRef<Utf8Path>,
+    ) -> migration::error::Result<DatabaseConnection> {
         let db = Database::connect(base_options(sqlite_url(path))).await?;
         match self {
             Self::Account => AccountMigrator::up(&db, None).await?,
@@ -62,7 +65,7 @@ impl DatabaseKind {
 
 #[cfg(test)]
 mod tests {
-    use sea_orm::{ConnectionTrait, DatabaseBackend, DatabaseConnection, Set, Statement};
+    use sea_orm::{ConnectionTrait, DatabaseBackend, DatabaseConnection, Statement};
 
     use super::*;
 

@@ -1,5 +1,5 @@
-use sea_orm::entity::prelude::*;
 use crate::types::db_id::DbId;
+use sea_orm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(table_name = "used_refresh_token")]
