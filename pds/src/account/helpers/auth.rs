@@ -207,18 +207,20 @@ pub fn create_refresh_token(opts: CreateTokensOpts) -> Result<String> {
     PDS_JWT_KEYPAIR.sign(claims)
 }
 
-// KNOWN ISSUE (preserved verbatim — see the Known Issues section): the default
-// `exp` below is emitted in MILLISECONDS (`now` is micros, `/1000` → ms), but
-// JWT verifiers interpret `exp` in seconds. Ported as-is from the reference.
+// Emits a service JWT with `exp` in seconds since the Unix epoch
+// (`now_seconds + MINUTE/1000` = now + 1 minute). JWT verifiers interpret
+// `exp` as seconds; emitting milliseconds would push the expiry ~54,000
+// years into the future and effectively make the token never expire.
 pub async fn create_service_jwt(params: ServiceJwtParams) -> Result<String> {
     let ServiceJwtParams { iss, aud, .. } = params;
     let now = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
         .expect("timestamp in micros since UNIX epoch")
         .as_micros() as usize;
-    let exp = params
-        .exp
-        .unwrap_or(((now + MINUTE as usize) / 1000) as u64);
+    let now_secs = (now / 1_000_000) as u64;
+    // rsky-common's MINUTE is in milliseconds (SECOND = 1000 ms), so MINUTE / 1000
+    // gives 60 seconds — matches atproto's `iat + MINUTE / 1e3`.
+    let exp = params.exp.unwrap_or(now_secs + (MINUTE as u64 / 1000));
     let lxm = params.lxm;
     let jti = get_random_str();
     let header = ServiceJwtHeader {
@@ -686,6 +688,45 @@ mod tests {
         let header_b64 = service_jwt.split('.').next().unwrap();
         let header_json = base64_url::decode(header_b64).unwrap();
         assert!(String::from_utf8_lossy(&header_json).contains("\"alg\":\"ES256K\""));
+    }
+
+    #[tokio::test]
+    async fn service_jwt_exp_is_seconds_since_epoch() {
+        init_env();
+        let service_jwt = create_service_jwt(ServiceJwtParams {
+            iss: "did:web:pds.test".to_owned(),
+            aud: "did:web:appview.test".to_owned(),
+            exp: None,
+            lxm: Some("com.atproto.repo.uploadBlob".to_owned()),
+            jti: None,
+        })
+        .await
+        .unwrap();
+        // Decode the payload segment (index 1) as base64url JSON.
+        let payload_b64 = service_jwt.split('.').nth(1).unwrap();
+        let payload_json = base64_url::decode(payload_b64).unwrap();
+        let payload: serde_json::Value =
+            serde_json::from_slice(&payload_json).expect("payload is JSON");
+        let exp = payload
+            .get("exp")
+            .and_then(|v| v.as_u64())
+            .expect("payload.exp present as u64");
+
+        // Current epoch seconds (the JWT exp is now + 1 minute, in seconds).
+        let now_secs = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        // JWT exp must be in seconds, NOT milliseconds (~1.7e12).
+        assert!(
+            exp < 10 * now_secs,
+            "exp must be seconds since epoch, got {exp} (now_secs={now_secs})"
+        );
+        assert!(exp > now_secs, "exp must be in the future, got {exp}");
+        assert!(
+            exp <= now_secs + 120,
+            "exp must be within 2 minutes (default MINUTE), got {exp}"
+        );
     }
 
     #[tokio::test]
