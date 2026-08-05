@@ -10,3 +10,8 @@ name = "migration"
 [dependencies]
 sea-orm = { workspace = true }
 sea-orm-migration = { workspace = true }
+miette = { workspace = true }
+thiserror = { workspace = true }
+ulid = { workspace = true }
+time = { workspace = true }
+serde = { workspace = true }

@@ -263,17 +263,11 @@ impl MigrationTrait for Migration {
                     .to_owned(),
             )
             .await?;
-        manager
-            .create_index(
-                Index::create()
-                    .name("authorization_request_code_idx")
-                    .unique()
-                    .table(authorization_request::Entity)
-                    .col((authorization_request::Column::Code, IndexOrder::Desc))
-                    .and_where(Expr::col(authorization_request::Column::Code).is_not_null())
-                    .to_owned(),
-            )
-            .await?;
+        raw_sql(
+            manager,
+            "CREATE UNIQUE INDEX authorization_request_code_idx ON authorization_request (code DESC) WHERE code IS NOT NULL",
+        )
+        .await?;
         manager
             .create_index(
                 Index::create()
@@ -422,17 +416,11 @@ impl MigrationTrait for Migration {
                     .to_owned(),
             )
             .await?;
-        manager
-            .create_index(
-                Index::create()
-                    .name("token_code_idx")
-                    .unique()
-                    .table(token::Entity)
-                    .col((token::Column::Code, IndexOrder::Desc))
-                    .and_where(Expr::col(token::Column::Code).is_not_null())
-                    .to_owned(),
-            )
-            .await?;
+        raw_sql(
+            manager,
+            "CREATE UNIQUE INDEX token_code_idx ON token (code DESC) WHERE code IS NOT NULL",
+        )
+        .await?;
         // The two `UNIQUE (...)` constraints from the reference DDL.
         manager
             .create_index(
@@ -504,16 +492,11 @@ impl MigrationTrait for Migration {
                     .to_owned(),
             )
             .await?;
-        manager
-            .create_index(
-                Index::create()
-                    .name("lexicon_failures_idx")
-                    .table(lexicon::Entity)
-                    .col((lexicon::Column::UpdatedAt, IndexOrder::Desc))
-                    .and_where(Expr::col(lexicon::Column::Lexicon).is_null())
-                    .to_owned(),
-            )
-            .await?;
+        raw_sql(
+            manager,
+            "CREATE INDEX lexicon_failures_idx ON lexicon (\"updatedAt\" DESC) WHERE lexicon IS NULL",
+        )
+        .await?;
 
         Ok(())
     }
@@ -525,7 +508,7 @@ async fn raw_sql(manager: &SchemaManager<'_>, sql: &str) -> Result<(), DbErr> {
     use sea_orm_migration::sea_orm::{ConnectionTrait, Statement};
     manager
         .get_connection()
-        .execute(Statement::from_string(
+        .execute_raw(Statement::from_string(
             manager.get_database_backend(),
             sql.to_owned(),
         ))

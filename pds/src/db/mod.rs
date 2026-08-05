@@ -5,13 +5,12 @@
 use std::path::Path;
 use std::time::Duration;
 
-use anyhow::Result;
 use migration::{
     MigratorTrait,
     migrator::{AccountMigrator, ActorMigrator, DidCacheMigrator, SequencerMigrator},
 };
 use sea_orm::{
-    ConnectOptions, Database, DatabaseConnection,
+    ConnectOptions, Database, DatabaseConnection, DbErr,
     sqlx::sqlite::{SqliteJournalMode, SqliteSynchronous},
 };
 
@@ -48,7 +47,7 @@ pub enum DatabaseKind {
 }
 
 impl DatabaseKind {
-    pub async fn open(self, path: impl AsRef<Path>) -> Result<DatabaseConnection> {
+    pub async fn open(self, path: impl AsRef<Path>) -> std::result::Result<DatabaseConnection, DbErr> {
         let db = Database::connect(base_options(sqlite_url(path))).await?;
         match self {
             Self::Account => AccountMigrator::up(&db, None).await?,
@@ -74,7 +73,7 @@ mod tests {
              AND name NOT LIKE 'sqlite_%' ORDER BY name"
                 .to_owned(),
         );
-        let rows = db.query_all(stmt).await.unwrap();
+        let rows = db.query_all_raw(stmt).await.unwrap();
         rows.iter()
             .map(|row| row.try_get_by_index::<String>(0).unwrap())
             .collect()
@@ -85,7 +84,7 @@ mod tests {
             DatabaseBackend::Sqlite,
             format!("SELECT name FROM sqlite_master WHERE type = 'index' AND name = '{name}'"),
         );
-        let rows = db.query_all(stmt).await.unwrap();
+        let rows = db.query_all_raw(stmt).await.unwrap();
         rows.iter()
             .map(|row| row.try_get_by_index::<String>(0).unwrap())
             .collect()
@@ -204,7 +203,7 @@ mod tests {
             .unwrap();
         let stmt =
             Statement::from_string(DatabaseBackend::Sqlite, "PRAGMA journal_mode".to_owned());
-        let row = db.query_one(stmt).await.unwrap().unwrap();
+        let row = db.query_one_raw(stmt).await.unwrap().unwrap();
         let mode: String = row.try_get_by_index(0).unwrap();
         assert_eq!(mode, "wal");
     }

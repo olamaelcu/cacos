@@ -6,9 +6,10 @@ edition = "2024"
 
 [dependencies]
 migration = { path = "../migration", package = "cacos-migration" }
-anyhow = { workspace = true }
 sea-orm = { workspace = true }
 tokio = { workspace = true }
+camino = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
+camino-tempfile = { workspace = true }

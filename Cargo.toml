@@ -19,9 +19,16 @@ lexicon_cid = { package = "cid", version = "0.11.1", features = ["serde-codec"] 
 serde_ipld_dagcbor = { version = "0.6.1", features = ["codec"] }
 
 # --- storage (this plan) ---
-sea-orm = { version = "1.1", features = ["sqlx-sqlite", "runtime-tokio-rustls", "macros"] }
-sea-orm-migration = "1.1"
-sqlx = "0.8"
+sea-orm = { version = "2.0", features = ["sqlx-sqlite", "runtime-tokio-rustls", "macros", "with-time"] }
+sea-orm-migration = "2.0"
+sqlx = "0.9"
+miette = { version = "7", features = ["derive"] }
+thiserror = "2"
+camino = { version = "1", features = ["serde1"] }
+camino-tempfile = "1"
+ulid = { version = "3", features = ["serde", "std"] }
+time = { version = "0.3", features = ["serde", "formatting", "parsing"] }
+serde = { version = "1", features = ["derive"] }
 
 # --- http / runtime ---
 poem = { version = "3", features = ["tower-compat"] }
@@ -37,5 +44,4 @@ tracing-timing = { version = "0.7", features = ["layer"] }
 tracing-unwrap = "1.0"
 
 # --- misc ---
-anyhow = "1"
 tempfile = "3"
