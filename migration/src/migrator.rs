@@ -14,6 +14,8 @@ use sea_orm_migration::prelude::*;
 use crate::m20260801_000001_account;
 use crate::m20260801_000002_repo_seq;
 use crate::m20260801_000003_did_doc;
+use crate::m20260801_000004_actor;
+use crate::m20260801_000005_actor_space;
 
 /// Account database: 15 tables (port of `account_manager/db.rs` in rsky).
 pub struct AccountMigrator;
@@ -64,7 +66,10 @@ pub struct ActorMigrator;
 #[async_trait::async_trait]
 impl MigratorTrait for ActorMigrator {
     fn migrations() -> Vec<Box<dyn MigrationTrait>> {
-        vec![]
+        vec![
+            Box::new(m20260801_000004_actor::Migration),
+            Box::new(m20260801_000005_actor_space::Migration),
+        ]
     }
 
     fn migration_table_name() -> DynIden {
