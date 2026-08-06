@@ -4,7 +4,6 @@
 //! `health` land there. For now this mounts only the observability `/metrics`
 //! route so the server skeleton is exercisable end to end.
 
-
 /// Builds the app. Opens the account DB from `PDS_DB_PATH` (default
 /// `./account.sqlite`) when the OAuth JWT key is configured, and nests the
 /// OAuth route set (provider routes + headless-consent remote API)
