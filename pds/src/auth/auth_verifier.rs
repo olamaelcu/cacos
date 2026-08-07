@@ -872,7 +872,6 @@ mod tests {
     use super::*;
     use crate::account::helpers::auth::CustomClaimObj;
     use crate::account::helpers::auth::{ServiceJwtParams, create_service_jwt};
-    use jwt_simple::algorithms::ES256kKeyPair;
     use rsky_crypto::constants::SECP256K1_JWT_ALG;
     use rsky_crypto::did::format_did_key;
     use secp256k1::PublicKey;

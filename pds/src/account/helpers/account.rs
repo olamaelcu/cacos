@@ -9,7 +9,6 @@ use rsky_common::RFC3339_VARIANT;
 use rsky_lexicon::com::atproto::admin::StatusAttr;
 use sea_orm::{ConnectionTrait, DatabaseConnection, QueryResult, TransactionTrait, Value};
 use serde::{Deserialize, Serialize};
-use std::ops::Add;
 use std::time::SystemTime;
 use thiserror::Error;
 
