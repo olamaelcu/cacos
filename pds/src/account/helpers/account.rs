@@ -34,6 +34,21 @@ pub enum AccountStatus {
     Throttled,
 }
 
+impl From<AccountStatus> for (bool, Option<rsky_lexicon::com::atproto::sync::AccountStatus>) {
+    fn from(s: AccountStatus) -> Self {
+        use rsky_lexicon::com::atproto::sync::AccountStatus as Lex;
+        match s {
+            AccountStatus::Active => (true, None),
+            AccountStatus::Deactivated => (false, Some(Lex::Deactivated)),
+            AccountStatus::Takendown => (false, Some(Lex::Takendown)),
+            AccountStatus::Suspended => (false, Some(Lex::Suspended)),
+            AccountStatus::Deleted => (false, Some(Lex::Deleted)),
+            AccountStatus::Desynchronized => (false, None),
+            AccountStatus::Throttled => (true, Some(Lex::Throttled)),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct FormattedAccountStatus {
     pub active: bool,
@@ -777,6 +792,40 @@ mod tests {
             .status,
             Some(AccountStatus::Deactivated)
         );
+    }
+
+    #[test]
+    fn account_status_into_formatted_lex() {
+        use rsky_lexicon::com::atproto::sync::AccountStatus as Lex;
+
+        let (active, status): (bool, Option<Lex>) = AccountStatus::Active.into();
+        assert_eq!(active, true);
+        assert_eq!(status, None);
+
+        let (active, status): (bool, Option<Lex>) = AccountStatus::Deactivated.into();
+        assert_eq!(active, false);
+        assert!(matches!(status, Some(Lex::Deactivated)));
+
+        let (active, status): (bool, Option<Lex>) = AccountStatus::Takendown.into();
+        assert_eq!(active, false);
+        assert!(matches!(status, Some(Lex::Takendown)));
+
+        let (active, status): (bool, Option<Lex>) = AccountStatus::Suspended.into();
+        assert_eq!(active, false);
+        assert!(matches!(status, Some(Lex::Suspended)));
+
+        let (active, status): (bool, Option<Lex>) = AccountStatus::Deleted.into();
+        assert_eq!(active, false);
+        assert!(matches!(status, Some(Lex::Deleted)));
+
+        let (active, status): (bool, Option<Lex>) = AccountStatus::Throttled.into();
+        assert_eq!(active, true);
+        assert!(matches!(status, Some(Lex::Throttled)));
+
+        // Desynchronized doesn't exist in lexicon; map to (active=false, status=None)
+        let (active, status): (bool, Option<Lex>) = AccountStatus::Desynchronized.into();
+        assert_eq!(active, false);
+        assert_eq!(status, None);
     }
 
     #[tokio::test]
