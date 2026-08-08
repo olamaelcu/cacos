@@ -7,6 +7,8 @@
 //! remote API) is mounted conditionally when `PDS_JWT_KEY_K256_PRIVATE_KEY_HEX`
 //! is set, exactly as Plan 07 wired it.
 
+pub mod app;
+pub mod auth_extractors;
 pub mod com;
 pub mod error;
 pub mod health;
@@ -14,8 +16,6 @@ pub mod metrics;
 pub mod test_utils;
 pub mod types;
 pub mod well_known;
-
-pub mod app;
 
 pub use error::{ApiError, ApiResult, ErrorBody};
 
