@@ -5,11 +5,113 @@
 use crate::actor_store::db::{backlink, record};
 use crate::error::{PdsError, Result};
 use lexicon_cid::Cid;
+use rsky_repo::storage::Ipld;
+use rsky_repo::types::Lex;
 use sea_orm::{
     ColumnTrait, ConnectionTrait, DatabaseBackend, EntityTrait, PaginatorTrait, QueryFilter,
     QueryOrder, QuerySelect, Set, Statement, sea_query::OnConflict,
 };
 use std::collections::BTreeSet;
+
+/// Recursively walk a `RepoRecord` (= `BTreeMap<String, Lex>`) and collect
+/// `(link_to, path)` pairs for every strong-ref object (`{"uri": "<at://… or did:…>"}`)
+/// or leaf string starting with `at://` or `did:`.
+///
+/// The path is `<$type>/<slot>` where `<$type>` is the record's root `$type`
+/// value and `<slot>` is the JSON key under which the link is nested
+/// (e.g. `app.bsky.feed.post/parent` for `{"reply": {"parent": {"uri": …}}}`).
+/// Empty record yields no pairs.
+fn extract_links_from_repo_record(
+    record: &rsky_repo::types::RepoRecord,
+    out: &mut Vec<(String, String)>,
+) {
+    let collection = record.get("$type").and_then(|lex| match lex {
+        Lex::Ipld(Ipld::String(s)) => Some(s.clone()),
+        _ => None,
+    });
+    for (k, v) in record {
+        if k == "$type" {
+            continue;
+        }
+        walk_lex(v, k, &collection, out);
+    }
+}
+
+fn make_path(slot: &str, collection: &Option<String>) -> String {
+    match collection {
+        Some(c) => format!("{c}/{slot}"),
+        None => slot.to_string(),
+    }
+}
+
+fn walk_lex(
+    value: &Lex,
+    slot: &str,
+    collection: &Option<String>,
+    out: &mut Vec<(String, String)>,
+) {
+    match value {
+        Lex::Ipld(ipld) => walk_ipld(ipld, slot, collection, out),
+        Lex::Map(m) => walk_map_lex(m, slot, collection, out),
+        Lex::List(arr) => {
+            for v in arr {
+                walk_lex(v, slot, collection, out);
+            }
+        }
+        Lex::Blob(_) => {}
+    }
+}
+
+fn walk_map_lex(
+    m: &std::collections::BTreeMap<String, Lex>,
+    slot: &str,
+    collection: &Option<String>,
+    out: &mut Vec<(String, String)>,
+) {
+    if let Some(Lex::Ipld(Ipld::String(s))) = m.get("uri")
+        && (s.starts_with("at://") || s.starts_with("did:"))
+    {
+        out.push((s.clone(), make_path(slot, collection)));
+        return;
+    }
+    for (k, v) in m {
+        walk_lex(v, k, collection, out);
+    }
+}
+
+fn walk_ipld(value: &Ipld, slot: &str, collection: &Option<String>, out: &mut Vec<(String, String)>) {
+    match value {
+        Ipld::Map(m) => walk_map_ipld(m, slot, collection, out),
+        Ipld::List(arr) => {
+            for v in arr {
+                walk_ipld(v, slot, collection, out);
+            }
+        }
+        Ipld::String(s) => {
+            if s.starts_with("at://") || s.starts_with("did:") {
+                out.push((s.clone(), make_path(slot, collection)));
+            }
+        }
+        Ipld::Link(_) | Ipld::Bytes(_) | Ipld::Json(_) => {}
+    }
+}
+
+fn walk_map_ipld(
+    m: &std::collections::BTreeMap<String, Ipld>,
+    slot: &str,
+    collection: &Option<String>,
+    out: &mut Vec<(String, String)>,
+) {
+    if let Some(Ipld::String(s)) = m.get("uri")
+        && (s.starts_with("at://") || s.starts_with("did:"))
+    {
+        out.push((s.clone(), make_path(slot, collection)));
+        return;
+    }
+    for (k, v) in m {
+        walk_ipld(v, k, collection, out);
+    }
+}
 
 /// Public return type for `RecordReader::get_record`.
 #[derive(Debug, Clone, PartialEq)]
@@ -164,12 +266,43 @@ impl RecordReader {
     pub async fn get_backlink_conflicts(
         &self,
         _uri: &rsky_syntax::aturi::AtUri,
-        _record: &rsky_repo::types::RepoRecord,
+        record: &rsky_repo::types::RepoRecord,
     ) -> Result<Vec<rsky_syntax::aturi::AtUri>> {
-        // Walking the record's CID and inspecting block contents is deferred —
-        // a stub is sufficient for Plan 03 since no Plan 03 consumer uses this.
-        // Plan 08 fleshes it out.
-        Ok(vec![])
+        let mut links = Vec::new();
+        extract_links_from_repo_record(record, &mut links);
+        if links.is_empty() {
+            return Ok(vec![]);
+        }
+        let target_ph = "?,".repeat(links.len());
+        let target_ph = target_ph.trim_end_matches(',');
+        let path_ph = "?,".repeat(links.len());
+        let path_ph = path_ph.trim_end_matches(',');
+        let mut values: Vec<sea_orm::Value> = Vec::with_capacity(links.len() * 2);
+        for (target, _path) in &links {
+            values.push(target.clone().into());
+        }
+        for (_target, path) in &links {
+            values.push(path.clone().into());
+        }
+        let stmt = Statement::from_sql_and_values(
+            DatabaseBackend::Sqlite,
+            format!(
+                "SELECT DISTINCT uri FROM backlink WHERE \"linkTo\" IN ({target_ph}) AND path IN ({path_ph})"
+            ),
+            values,
+        );
+        let rows = self.db.query_all_raw(stmt).await.map_err(|e| {
+            PdsError::internal("get_backlink_conflicts", anyhow::Error::from(e))
+        })?;
+        let mut out = Vec::new();
+        for r in rows.iter() {
+            if let Ok(s) = r.try_get_by_index::<String>(0)
+                && let Ok(uri) = rsky_syntax::aturi::AtUri::new(s, None)
+            {
+                out.push(uri);
+            }
+        }
+        Ok(out)
     }
 
     pub async fn index_record(
@@ -347,14 +480,40 @@ impl RecordReader {
     }
 }
 
-/// Free function stub: walking a record's CID to the block storage and
-/// extracting backlinks (paths referencing the record's collection) lands with
-/// Plan 07. Plan 03 leaves this as an empty stub.
+/// Free function: walk a `RepoRecord` and find all existing `backlink` rows
+/// where the `link_to` matches any `at://` or `did:` string leaf in the record.
 pub async fn get_backlinks(
+    reader: &RecordReader,
     _uri: &rsky_syntax::aturi::AtUri,
-    _record: &rsky_repo::types::RepoRecord,
+    record: &rsky_repo::types::RepoRecord,
 ) -> Result<Vec<backlink::Model>> {
-    Ok(vec![])
+    let mut links = Vec::new();
+    extract_links_from_repo_record(record, &mut links);
+    if links.is_empty() {
+        return Ok(vec![]);
+    }
+    let target_ph = "?,".repeat(links.len());
+    let target_ph = target_ph.trim_end_matches(',');
+    let mut values: Vec<sea_orm::Value> = Vec::with_capacity(links.len());
+    for (target, _path) in &links {
+        values.push(target.clone().into());
+    }
+    let stmt = Statement::from_sql_and_values(
+        DatabaseBackend::Sqlite,
+        format!("SELECT * FROM backlink WHERE \"linkTo\" IN ({target_ph})"),
+        values,
+    );
+    let rows = reader.db.query_all_raw(stmt).await.map_err(|e| {
+        PdsError::internal("get_backlinks", anyhow::Error::from(e))
+    })?;
+    let mut out = Vec::new();
+    for r in rows.iter() {
+        let uri = r.try_get_by_index::<String>(0).unwrap_or_default();
+        let path = r.try_get_by_index::<String>(1).unwrap_or_default();
+        let link_to = r.try_get_by_index::<String>(2).unwrap_or_default();
+        out.push(backlink::Model { uri, path, link_to });
+    }
+    Ok(out)
 }
 
 #[cfg(test)]
@@ -584,5 +743,69 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(posts_lim.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn get_backlink_conflicts_detects_existing_links() {
+        use std::collections::BTreeSet;
+
+        let (_dir, reader, did) = setup().await;
+
+        // Pre-existing record claims a backlink to a target
+        let target_uri = make_uri(&did, "app.bsky.actor.profile", "self");
+        reader
+            .add_backlinks(
+                &target_uri,
+                BTreeSet::from(["app.bsky.feed.post/parent".to_string()]),
+            )
+            .await
+            .unwrap();
+
+        // Now build a new post record that would claim the same target/path
+        let repo_record: rsky_repo::types::RepoRecord = serde_json::from_value(serde_json::json!({
+            "$type": "app.bsky.feed.post",
+            "text": "hi",
+            "reply": { "parent": { "uri": target_uri.to_string() } }
+        }))
+        .unwrap();
+        let new_uri = make_uri(&did, "app.bsky.feed.post", "new");
+        let conflicts = reader
+            .get_backlink_conflicts(&new_uri, &repo_record)
+            .await
+            .unwrap();
+        assert!(!conflicts.is_empty(), "expected at least one conflict");
+        assert!(conflicts.iter().any(|u| u.to_string() == target_uri.to_string()));
+    }
+
+    #[tokio::test]
+    async fn get_backlink_conflicts_empty_record_returns_no_conflicts() {
+        let (_dir, reader, did) = setup().await;
+        let uri = make_uri(&did, "app.bsky.feed.post", "x");
+        let empty: rsky_repo::types::RepoRecord = serde_json::from_value(serde_json::json!({})).unwrap();
+        let conflicts = reader.get_backlink_conflicts(&uri, &empty).await.unwrap();
+        assert!(conflicts.is_empty());
+    }
+
+    #[tokio::test]
+    async fn free_get_backlinks_returns_links_for_record() {
+        use std::collections::BTreeSet;
+
+        let (_dir, reader, did) = setup().await;
+        let target_uri = make_uri(&did, "app.bsky.actor.profile", "self");
+        reader
+            .add_backlinks(
+                &target_uri,
+                BTreeSet::from(["app.bsky.feed.like/subject".to_string()]),
+            )
+            .await
+            .unwrap();
+
+        let repo_record: rsky_repo::types::RepoRecord = serde_json::from_value(serde_json::json!({
+            "$type": "app.bsky.feed.like",
+            "subject": { "uri": target_uri.to_string() }
+        }))
+        .unwrap();
+        let rows = get_backlinks(&reader, &target_uri, &repo_record).await.unwrap();
+        assert!(!rows.is_empty());
     }
 }
