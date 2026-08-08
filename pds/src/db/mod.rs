@@ -18,6 +18,9 @@ use sea_orm::{
 /// (entities physically live in the `migration` crate; Plans 03-09 import them
 /// through this alias, e.g. `crate::db::entities::repo_seq`).
 pub use migration::entities;
+/// Re-export the typed column wrappers so `crate::db::types::db_id::DbId`
+/// and `crate::db::types::did::Did` resolve from the PDS layer.
+pub use migration::types;
 
 /// Consent-state nonce helpers for the headless-consent remote API.
 pub mod consent_state;
@@ -67,15 +70,15 @@ impl DatabaseKind {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use sea_orm::{ConnectionTrait, DatabaseBackend, DatabaseConnection, Statement};
 
     use super::*;
 
     /// Test-only wrapper: an open PDS database with its backing temp dir kept
     /// alive for the lifetime of the value.
-    struct TestDb {
-        db: DatabaseConnection,
+    pub(crate) struct TestDb {
+        pub(crate) db: DatabaseConnection,
         _dir: camino_tempfile::Utf8TempDir,
     }
 
@@ -88,7 +91,7 @@ mod tests {
     }
 
     /// Test-only helper: open a `DatabaseKind` into a fresh temporary directory.
-    trait TestDatabaseKind {
+    pub(crate) trait TestDatabaseKind {
         async fn open_test_db(self) -> TestDb;
     }
 

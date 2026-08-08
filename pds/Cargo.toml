@@ -67,9 +67,22 @@ bytes = "1"
 reqwest = { version = "0.12", features = ["json"] }
 url = "2"
 
+# --- sequencer (Plan 07) ---
+serde_bytes = { workspace = true }
+serde_repr = { workspace = true }
+serde_cbor = { workspace = true }
+serde_ipld_dagcbor = { workspace = true }
+apalis = { workspace = true }
+apalis-sql = { workspace = true }
+sqlx_0_8 = { workspace = true }
+async-stream = "0.3"
+ipld-core = { workspace = true }
+ulid = { workspace = true }
+
 [dev-dependencies]
 camino-tempfile = { workspace = true }
 poem = { workspace = true, features = ["test"] }
 metrics = { workspace = true }
 serde_ipld_dagcbor = { workspace = true }
 wiremock = "0.6"
+tokio-tungstenite = "0.27"

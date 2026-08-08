@@ -1,8 +1,6 @@
 //! XRPC route assembly.
-//!
-//! Placeholder for Plan 08: real `com.atproto.*` handlers, `well_known`, and
-//! `health` land there. For now this mounts only the observability `/metrics`
-//! route so the server skeleton is exercisable end to end.
+
+pub mod com;
 
 /// Builds the app. Opens the account DB from `PDS_DB_PATH` (default
 /// `./account.sqlite`) when the OAuth JWT key is configured, and nests the

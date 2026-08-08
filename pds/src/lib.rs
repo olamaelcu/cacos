@@ -13,4 +13,5 @@ pub mod error;
 pub mod identity;
 pub mod oauth;
 pub mod observability;
+pub mod sequencer;
 pub mod xrpc;
