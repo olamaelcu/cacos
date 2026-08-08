@@ -322,3 +322,75 @@ fn backfill_time_date(backfill_time: &str) -> time::OffsetDateTime {
         })
         .unwrap_or(time::OffsetDateTime::UNIX_EPOCH)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn subscribe_repos_query_default_cursor_is_none() {
+        let query: SubscribeReposQuery = serde_json::from_str("{}").unwrap();
+        assert!(query.cursor.is_none());
+    }
+
+    #[test]
+    fn future_cursor_is_rejected_with_error_frame() {
+        let err = ErrorFrame::new(ErrorFrameBody {
+            error: "FutureCursor".to_string(),
+            message: Some("Cursor in the future.".to_string()),
+        });
+        let bytes = err.to_bytes().unwrap();
+        let mut values = serde_cbor::Deserializer::from_slice(&bytes).into_iter::<serde_cbor::Value>();
+        let header = values.next().unwrap().unwrap();
+        let body = values.next().unwrap().unwrap();
+        assert!(values.next().is_none());
+        if let serde_cbor::Value::Map(map) = header {
+            let op = map.get(&serde_cbor::Value::Text("op".to_string())).unwrap();
+            assert_eq!(op, &serde_cbor::Value::Integer(-1));
+        } else {
+            panic!("expected map header");
+        }
+        if let serde_cbor::Value::Map(map) = body {
+            assert_eq!(
+                map.get(&serde_cbor::Value::Text("error".to_string())),
+                Some(&serde_cbor::Value::Text("FutureCursor".to_string()))
+            );
+        } else {
+            panic!("expected map body");
+        }
+    }
+
+    #[test]
+    fn info_frame_for_outdated_cursor_carries_correct_discriminator() {
+        let frame = crate::sequencer::ws_frames::MessageFrame::new(
+            crate::sequencer::ws_frames::InfoFrameBody {
+                name: "OutdatedCursor".to_string(),
+                message: Some("Requested cursor exceeded limit".to_string()),
+            },
+            Some(crate::sequencer::ws_frames::MessageFrameOpts {
+                r#type: Some("#info".to_string()),
+            }),
+        );
+        let bytes = frame.to_bytes().unwrap();
+        let mut values = serde_cbor::Deserializer::from_slice(&bytes).into_iter::<serde_cbor::Value>();
+        let header = values.next().unwrap().unwrap();
+        let body = values.next().unwrap().unwrap();
+        assert!(values.next().is_none());
+        if let serde_cbor::Value::Map(map) = header {
+            let op = map.get(&serde_cbor::Value::Text("op".to_string())).unwrap();
+            assert_eq!(op, &serde_cbor::Value::Integer(1));
+            let t = map.get(&serde_cbor::Value::Text("t".to_string())).unwrap();
+            assert_eq!(t, &serde_cbor::Value::Text("#info".to_string()));
+        } else {
+            panic!("expected map header");
+        }
+        if let serde_cbor::Value::Map(map) = body {
+            assert_eq!(
+                map.get(&serde_cbor::Value::Text("name".to_string())),
+                Some(&serde_cbor::Value::Text("OutdatedCursor".to_string()))
+            );
+        } else {
+            panic!("expected map body");
+        }
+    }
+}
