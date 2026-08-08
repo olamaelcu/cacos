@@ -6,8 +6,8 @@ use crate::actor_store::db::{backlink, record};
 use crate::error::{PdsError, Result};
 use lexicon_cid::Cid;
 use sea_orm::{
-    ColumnTrait, ConnectionTrait, DatabaseBackend, EntityTrait, PaginatorTrait, QueryFilter, Set,
-    Statement, sea_query::OnConflict,
+    ColumnTrait, ConnectionTrait, DatabaseBackend, EntityTrait, PaginatorTrait, QueryFilter,
+    QueryOrder, QuerySelect, Set, Statement, sea_query::OnConflict,
 };
 use std::collections::BTreeSet;
 
@@ -266,6 +266,42 @@ impl RecordReader {
         Ok(())
     }
 
+    pub async fn list_records_for_collection(
+        &self,
+        collection: &str,
+        limit: Option<usize>,
+        reverse: Option<bool>,
+    ) -> Result<Vec<GetRecord>> {
+        let mut query = record::Entity::find().filter(record::Column::Collection.eq(collection));
+        if reverse.unwrap_or(false) {
+            query = query.order_by_desc(record::Column::Rkey);
+        } else {
+            query = query.order_by_asc(record::Column::Rkey);
+        }
+        if let Some(limit) = limit {
+            query = query.limit(limit as u64);
+        }
+        let rows = query.all(&self.db).await.map_err(|e| {
+            PdsError::internal(
+                "RecordReader::list_records_for_collection: find failed",
+                anyhow::Error::from(e),
+            )
+        })?;
+        Ok(rows
+            .into_iter()
+            .map(|m| GetRecord {
+                uri: m.uri,
+                cid: m.cid,
+                collection: m.collection,
+                rkey: m.rkey,
+                repo_rev: m.repo_rev,
+                indexed_at: m.indexed_at,
+                takedown_ref: m.takedown_ref,
+                value: None,
+            })
+            .collect())
+    }
+
     pub async fn remove_backlinks_by_uri(&self, uri: &rsky_syntax::aturi::AtUri) -> Result<()> {
         backlink::Entity::delete_many()
             .filter(backlink::Column::Uri.eq(uri.to_string()))
@@ -502,5 +538,51 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(reader.get_record_takedown_status(&uri).await.unwrap(), None);
+    }
+
+    #[tokio::test]
+    async fn list_records_for_collection_filters_and_orders() {
+        let (_dir, reader, did) = setup().await;
+        let uri_a = make_uri(&did, "app.bsky.feed.post", "aaa");
+        let uri_b = make_uri(&did, "app.bsky.feed.post", "bbb");
+        let uri_c = make_uri(&did, "app.bsky.feed.like", "ccc");
+        let cid_a = cid_for(b"a");
+        let cid_b = cid_for(b"b");
+        let cid_c = cid_for(b"c");
+        reader
+            .index_record(uri_a, cid_a, None, None, "rev-1".into(), None)
+            .await
+            .unwrap();
+        reader
+            .index_record(uri_b, cid_b, None, None, "rev-2".into(), None)
+            .await
+            .unwrap();
+        reader
+            .index_record(uri_c, cid_c, None, None, "rev-3".into(), None)
+            .await
+            .unwrap();
+
+        let posts = reader
+            .list_records_for_collection("app.bsky.feed.post", None, None)
+            .await
+            .unwrap();
+        assert_eq!(posts.len(), 2);
+        assert!(posts.iter().any(|r| r.rkey == "aaa"));
+        assert!(posts.iter().any(|r| r.rkey == "bbb"));
+        assert!(!posts.iter().any(|r| r.collection == "app.bsky.feed.like"));
+
+        // Reverse order
+        let posts_rev = reader
+            .list_records_for_collection("app.bsky.feed.post", None, Some(true))
+            .await
+            .unwrap();
+        assert_eq!(posts_rev.first().unwrap().rkey, "bbb");
+
+        // Limit
+        let posts_lim = reader
+            .list_records_for_collection("app.bsky.feed.post", Some(1), None)
+            .await
+            .unwrap();
+        assert_eq!(posts_lim.len(), 1);
     }
 }
