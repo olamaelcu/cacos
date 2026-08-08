@@ -1,7 +1,7 @@
 // src/lib/server/pds/types.ts
 // Contract types — pinned to the headless-consent and passkeys specs.
 // These are the typed shape of the JSON the PDS speaks. Verification is by
-// the unit tests in Task 3, not by a runtime schema.
+// unit tests.
 
 export type Screen = 'sign-in' | 'select' | 'consent' | 'create' | 'error';
 
