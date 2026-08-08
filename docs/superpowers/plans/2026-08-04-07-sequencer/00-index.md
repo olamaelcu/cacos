@@ -1,116 +1,44 @@
 # Sequencer Implementation Plan (Plan 07: events.rs + apalis + poem websocket subscribeRepos)
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+The architecture, contracts, and reconciliation decisions for this plan are recorded in [ADR-0008 — Sequencer and subscribeRepos firehose](../../../doc/adr/0008-sequencer-and-subscriberepos-firehose.md).
 
-**Goal:** Port the rsky sequencer (event formatting, repo_seq DB logic, outbox backfill/cutover) into the cacos `pds` crate, replacing the reference `EVENT_EMITTER` poll loop with an apalis-backed delivery channel (one job per sequenced event) and a poem websocket `subscribeRepos` endpoint.
+**Goal:** Port the rsky sequencer (event formatting, repo_seq DB logic, outbox backfill/cutover) into the cacos `pds` crate, replacing the reference `EVENT_EMITTER` poll loop with a delivery channel (one job per sequenced event) and a poem websocket `subscribeRepos` endpoint.
 
-**Architecture:** Events are formatted exactly like rsky (`events.rs`): `sequence_*` methods insert a row into `repo_seq` and return its `seq`. After the insert, `sequence_evt` converts the row back into a typed `SeqEvt`, JSON-encodes it (the "envelope"), and pushes one apalis `SeqEventJob { seq, envelope }` into an sqlite job queue. A single apalis worker publishes each envelope to a `tokio::sync::broadcast::Sender<String>` and bumps `cacos_seq_events_total`. The ported `Outbox` (rsky `outbox.rs`) subscribes to that broadcast channel instead of `EVENT_EMITTER`, keeps the backfill (DB page reads, half-page stop) and cutover (staged live events) logic, and is consumed by the poem websocket handler, which frames events as `CBOR(header) ++ CBOR(body)` (`ws_frames.rs`) with a 30s ping. Crawlers notify (rate-limited `requestCrawl` POST) is ported alongside the sequencer because `sequence_evt` calls it.
+**Status:** Implemented on branch `2026-08-04-07-sequencer` (worktree `.worktrees/2026-08-04-07-sequencer`). Workspace test suite: 228 passed, 0 failed.
 
-**Task ordering note (dependency-forced):** The reference `mod.rs` and its test suite consume `events.rs` types (`request_seq_range` returns `SeqEvt`; the mirrored tests call `sequence_commit` / `sequence_sync_evt` / ...), and `sequence_evt` calls `Crawlers::notify_of_update`. So the plan orders: **Task 1 = events.rs, Task 2 = db.rs + mod.rs (+ crawlers.rs port), Task 3 = ws_frames.rs, Task 4 = apalis worker + producer, Task 5 = outbox.rs, Task 6 = poem websocket, Task 7 = crawlers.rs tests**. All seven required components from the spec are present; only the order differs from the spec's numbering so that every task compiles and its tests pass independently. The poll loop (`start` / `destroy` / `is_destroyed` / `EVENT_EMITTER`) is *not* ported — apalis replaces it (documented deviation).
+**See also:**
+- [ADR-0008 — Sequencer and subscribeRepos firehose](../../../doc/adr/0008-sequencer-and-subscriberepos-firehose.md)
+- [ADR-0002 — PDS migration crate](../../../doc/adr/0002-pds-migration-crate.md) (typed `repo_seq` columns)
+- [ADR-0003 — PDS observability stack](../../../doc/adr/0003-pds-observability-stack.md) (`cacos_*` metrics reserved for this work)
+- [ADR-0006 — AccountManager and account helpers over sea-orm](../../../doc/adr/0006-pds-accountmanager-and-account-helpers-over-sea-orm.md) (raw `Statement::from_sql_and_values` convention reused by the sequencer)
+- [ADR-0007 — OAuth provider and auth verifier over sea-orm entities](../../../doc/adr/0007-oauth-provider-and-auth-verifier-over-sea-orm-entities.md) (cross-plan sequencing contract referenced by `RemoteCreateAccount`)
 
-**Tech Stack:** Rust (workspace), sea-orm 2.0 (SQLite, raw `Statement::from_sql_and_values` for dynamic SQL), apalis 0.6 + apalis-sql 0.6 (sqlite/tokio-comp/migrate, sqlx 0.8), tokio broadcast channels, poem 3 (`websocket` + `tower-compat` features), rsky-repo / rsky-lexicon / rsky-common / rsky-crypto / rsky-blobstore / rsky-identity / rsky-oauth / rsky-syntax from the git-pinned `olamaelcu/rsky` fork at rev `aee5aec5ad9473d80232beab58ddba25a936298a` (see `Cargo.toml:8-15`; the rsky-pds reference is gone — there is no `vendor/` checkout, ports come from the upstream crates), `metrics` 0.24 (`cacos_` prefix), async-stream, reqwest (crawlers), wiremock + tokio-tungstenite (dev, tests). The pinned `rsky-common` returns `time::OffsetDateTime` from `now()`, so the JSON envelope boundary converts to RFC3339 once with `rsky_common::RFC3339_VARIANT`.
+## Cross-plan contracts (as built)
 
----
+- **Workspace:** root `/home/vrgl/Code/olamaelcu/cacos`, members `["migration", "pds"]`. All code lives in the `pds` crate.
+- **Typed entity:** `migration/src/entities/repo_seq.rs` is the source of truth (re-exported via `pds/src/db/entities::repo_seq`). Columns: `seq: DbId` (BLOB(16) ULID PK, `auto_increment = false`), `did: Did` (TEXT), `event_type: String` (column `"eventType"`), `event: Vec<u8>` (BLOB), `invalidated: Option<i16>` (default 0), `sequenced_at: OffsetDateTime` (column `"sequencedAt"`).
+- **Database open:** `DatabaseKind::Sequencer.open(path)` (impl `pds/src/db/mod.rs:39-66`).
+- **rsky crates:** git-pinned `olamaelcu/rsky` fork at rev `aee5aec5ad9473d80232beab58ddba25a936298a` (Cargo.toml:7-15); no `vendor/` checkout.
+- **Sequencer public API:** `Sequencer::new(db, crawlers, job_pool, last_seen)` returning `Self`; methods `curr`, `next_seq`, `earliest_after_time`, `request_seq_range`, `sequence_evt`, `sequence_commit`, `sequence_handle_update`, `sequence_identity_evt`, `sequence_account_evt`, `sequence_sync_evt`, `delete_all_for_user`. `RequestSeqRangeOpts { earliest_seq, latest_seq, earliest_time, limit }` uses typed `DbId` / `OffsetDateTime` cursors.
+- **Delivery channel:** `SharedBroadcast { tx: broadcast::Sender<String> }` in `pds/src/sequencer/apalis_worker.rs`; `spawn_seq_event_worker(pool, broadcast)` runs the poller. The on-disk schema is `apalis_seq_jobs` (mirrors apalis-sql layout).
+- **Metrics:** `cacos_last_seq` (gauge) from `sequence_evt`; `cacos_seq_events_total` (counter) and `cacos_sequencer_poll_interval_seconds` (histogram) from the worker; `cacos_outbox_buffer_lag` (gauge) from `Outbox::events`.
+- **Config knobs:** `MAX_BUFFER: usize = 500`, `REPO_BACKFILL_LIMIT_MS: u64 = 3 * 24 * 60 * 60 * 1000` in the handler.
+- **Documented deviations:** `EVENT_EMITTER` and the in-process poll loop are not ported; the typed `apalis` 0.7 worker was replaced with direct `sqlx_0_8` over an `apalis_seq_jobs` table that matches the apalis-sql schema (see ADR-0008 decision 4).
 
-## Cross-plan contracts (must match the other 8 plan documents)
-
-- **Workspace:** root `/home/vrgl/Code/olamaelcu/cacos`, members `["migration", "pds"]`. All paths below are relative to the workspace root. All code lives in the `pds` crate.
-- **Plan 01 (assumed):** sea-orm entity for table `repo_seq` is the SHARED entity in `migration/src/entities/repo_seq.rs` (re-exported through `pds/src/db/entities::repo_seq` per `pds/src/db/mod.rs:18-20`). Source of truth: `migration/src/entities/repo_seq.rs:1-18` and the migration at `migration/src/m20260801_000002_repo_seq.rs`. Entity columns: `seq: DbId` (BLOB(16) ULID PK, `auto_increment = false`, NOT a SQL autoincrement), `did: Did` (TEXT), `event_type: String` (column `"eventType"`, TEXT), `event: Vec<u8>` (BLOB), `invalidated: Option<i16>` (INTEGER, nullable, default 0), `sequenced_at: OffsetDateTime` (column `"sequencedAt"`, TIMESTAMP). `DbId` and `Did` are typed wrappers from `migration::types::{db_id, did}` (sea-orm `ValueType` + `TryGetable` implementations). The PK is ULID-generated by the application — never SQL `AUTOINCREMENT`.
-- **Database open:** `DatabaseKind::Sequencer.open(path).await` (impl `pds/src/db/mod.rs:39-66`). The plan adds a thin shim `pub async fn open_sequencer_db(path: impl AsRef<Path>) -> anyhow::Result<sea_orm::DatabaseConnection>` that delegates to it for caller convenience.
-- **Ported plain struct** `pds::sequencer::RepoSeq` (Task 1) — typed end-to-end (`seq: DbId`, `did: Did`, `event_type: String` [serde `eventType`], `event: Vec<u8>`, `invalidated: Option<i16>`, `sequenced_at: OffsetDateTime` [serde `sequencedAt`], plus `RepoSeq::new(did, event_type, event, sequenced_at)`). The plain struct mirrors the entity but uses the typed wrappers so the formatters and outbox never touch raw `i64`/`String` for the PK, DID, or timestamp. NOTE: if the entity's Model struct is named `RepoSeq`, it is ALWAYS referred to as `crate::db::entities::repo_seq::Model` in this plan; the plain ported struct below owns the name `RepoSeq`.
-- **Envelope format:** JSON of the full typed `SeqEvt` (untagged), e.g. `{"type":"commit","seq":1,"time":"2026-08-04T00:00:00.000Z","evt":{...}}`. Built by `pds::sequencer::events::seq_evt_to_envelope(&SeqEvt) -> String`; parsed by the outbox with `serde_json::from_str::<SeqEvt>`.
-- **Delivery channel:** `pds::context::SharedBroadcast { pub tx: tokio::sync::broadcast::Sender<String> }` (Clone). One shared `Sender` is cloned into (a) the apalis worker state and (b) the poem route state. The `Sequencer` itself does NOT hold the broadcast sender — it only pushes apalis jobs.
-- **apalis:** `apalis = "0.6"`, `apalis-sql = { version = "0.6", features = ["sqlite", "tokio-comp", "migrate"] }` (the `migrate` feature creates the job tables via `SqliteStorage::<()>::setup(&pool)`), `sqlx_0_8 = { package = "sqlx", version = "0.8", features = ["sqlite", "runtime-tokio-rustls", "json", "macros", "migrate"] }`. Job type `SeqEventJob { seq: DbId, envelope: String }` in `pds/src/sequencer/apalis_worker.rs`. Jobs DB: env `PDS_JOBS_DB_LOCATION`, default `{data}/jobs.sqlite` (Task 4 `connect_jobs_db`). `DbId` is the workspace ULID wrapper (`migration::types::db_id::DbId`), serialized via its `Display` impl (canonical 26-char Crockford) on the JSON envelope boundary.
-- **Sequencer public API (final, Task 4+; Plan 08 calls these):** typed wrappers (`DbId`, `Did`, `OffsetDateTime`) on the persistence layer (entity, `RepoSeqNew`, `RequestSeqRangeOpts`). The formatters take `did: String` for caller ergonomics and convert via `RepoSeqNew::new(did: impl Into<Did>, ...)`. Externally:
-  - `pds::sequencer::Sequencer::new(db: DatabaseConnection, crawlers: Crawlers, job_pool: Option<Arc<SqlitePool>>, last_seen: Option<DbId>) -> Self`
-  - `async fn curr(&self) -> Result<Option<DbId>>`
-  - `async fn next_seq(&self, cursor: DbId) -> Result<Option<repo_seq::Model>>`
-  - `async fn earliest_after_time(&self, time: OffsetDateTime) -> Result<Option<repo_seq::Model>>`
-  - `async fn request_seq_range(&self, opts: RequestSeqRangeOpts) -> Result<Vec<repo_seq::Model>>`
-  - `async fn sequence_evt(&mut self, evt: RepoSeqNew) -> Result<DbId>`  (the typed insert struct)
-  - `async fn sequence_commit(&mut self, did: String, commit_data: CommitDataWithOps) -> Result<DbId>`  (formatter)
-  - `async fn sequence_handle_update(&mut self, did: String, handle: String) -> Result<DbId>`  (formatter)
-  - `async fn sequence_identity_evt(&mut self, did: String, handle: Option<String>) -> Result<DbId>`  (formatter)
-  - `async fn sequence_account_evt(&mut self, did: String, active: bool, status: Option<rsky_lexicon::com::atproto::sync::AccountStatus>) -> Result<DbId>`  (formatter; ATProto lexicon type, NOT the internal `crate::account::helpers::account::AccountStatus`)
-  - `async fn sequence_sync_evt(&mut self, did: String, rev: String, blocks: BlockMap) -> Result<DbId>`  (formatter)
-  - `async fn delete_all_for_user(&self, did: &str) -> Result<()>`  (string DID at the API; internally filters by `Did`)
-  - `RequestSeqRangeOpts { pub earliest_seq: Option<DbId>, pub latest_seq: Option<DbId>, pub earliest_time: Option<OffsetDateTime>, pub limit: Option<i64> }` — `limit` stays `i64` because it's a SQL `LIMIT` count, not an identifier.
-  - `RepoSeqNew` (the typed insert struct; not the public `RepoSeq`): `{ did: Did, event_type: String, event: Vec<u8>, sequenced_at: OffsetDateTime }` with `new(did: impl Into<Did>, ...)`. The `seq` is filled by sea-orm's `InsertResult::last_insert_id`; the `invalidated` default is `Some(0)`.
-- **Constructor note for Plan 08:** Plan 08's `test_utils.rs` scaffolds `Sequencer::new(sequencer_db)` (single arg) and `SharedSequencer { sequencer: RwLock::new(...) }`. Plan 08's own adaptation note says to adjust `test_utils.rs` when constructors differ — the final cacos constructor is the 4-arg `Sequencer::new(db, crawlers, job_storage, last_seen)` above, and `SharedSequencer` is the struct `{ pub sequencer: RwLock<Sequencer> }` (matches Plan 08/09's `state.sequencer.sequencer.write().await`).
-- **External types consumed (assumed from earlier plans):** `crate::actor_store::repo::types::SyncEvtData { cid: Cid, rev: String, blocks: BlockMap }` (Plan 03); `crate::account::helpers::account::AccountStatus` with variants `Active, Takendown, Suspended, Deleted, Deactivated, Desynchronized, Throttled` (Plan 05 — same shape as the git-pinned rsky fork `rsky-account` at the pinned rev; see `Cargo.toml:8-15`). The rsky protocol crates are consumed from the git-pinned `olamaelcu/rsky` fork at rev `aee5aec5ad9473d80232beab58ddba25a936298a` (Cargo.toml workspace `rsky-*` entries), not from a local `vendor/` checkout.
-- **ws frame codec location:** `pds/src/sequencer/ws_frames.rs` (the spec's chosen location; the reference keeps these in `xrpc_server/stream/`).
-- **subscribeRepos route location:** `pds/src/xrpc/com/atproto/sync/subscribe_repos.rs` (matches the `pds/src/xrpc/` layout in PROMPT.md).
-- **Metrics (exact names/points):** `cacos_last_seq` gauge — set in `sequence_evt` after INSERT (`seq.timestamp_ms() as f64`; the ULID timestamp_ms surrogate is the stable ordering key). `cacos_seq_events_total` counter — incremented in `run_seq_event_job` per delivered envelope. `cacos_outbox_buffer_lag` gauge — set in `Outbox::events` live loop each iteration to `max(0, curr.timestamp_ms() - last_seen.timestamp_ms())`. `cacos_sequencer_poll_interval_seconds` histogram — recorded in `run_seq_event_job` around the publish (dispatch processing time; the poll loop it names is gone, the histogram keeps the spec's name).
-- **Config knobs (Plan 08 wiring):** handler constants `MAX_BUFFER: usize = 500` and `REPO_BACKFILL_LIMIT_MS: u64 = 3 * 24 * 60 * 60 * 1000` (3 days) stand in for rsky's `cfg.subscription.max_buffer` / `repo_backfill_limit_ms`.
-- **Not ported (documented deviations):** `EVENT_EMITTER`; the in-process poll loop (`Sequencer::start`, `destroy`, `is_destroyed`, the `notify: Notify` field); the `start_*` sequencer tests. `Outbox::backfill_cursor` is retained as a pub field but unused (as in the reference).
-
-### Dependency additions (final, after reconciliation with workspace `Cargo.toml`)
-
-Most workspace entries are already declared at `Cargo.toml:7-61`; `pds/Cargo.toml` references them via `workspace = true`. The sequencer plan DOES NOT redeclare them. The plan adds only:
-
-| Crate | Version | Features | Where | Why |
-| --- | --- | --- | --- | --- |
-| `apalis` | `0.6` | `default-features = false` | `[workspace.dependencies]` | producer + worker for `SeqEventJob` (Task 4) |
-| `apalis-sql` | `0.6` | `sqlite`, `tokio-comp`, `migrate` | `[workspace.dependencies]` | `SqliteStorage` + `SqliteStorage::<()>::setup` (Task 4) |
-| `sqlx_0_8` (package `sqlx`) | `0.8` | `sqlite`, `runtime-tokio-rustls`, `json`, `macros`, `migrate` | `[workspace.dependencies]` | underpins `apalis-sql`; aliased so the workspace's sqlx 0.9 (sea-orm) coexists |
-| `serde_bytes` | `0.11` | — | `[dependencies]` | `CommitEvt.blocks` / `SyncEvt.blocks` (Task 1) |
-| `serde_repr` | `0.1` | — | `[dependencies]` | `FrameType` repr(i8) (Task 3) |
-| `async-stream` | `0.3` | — | `[dependencies]` | `Outbox::events` (Task 5) |
-| `serde_ipld_dagcbor` | `0.6` | `codec` | **promote to `[dependencies]`** (was dev) | runtime CBOR encode for `frame.to_bytes()` (Task 3); the `codec` feature is already on the workspace entry |
-| `serde_cbor` | `0.11` | — | `[dev-dependencies]` | tests assert CBOR wire shape (Task 3) |
-| `tokio-tungstenite` | `0.27` | — | `[dev-dependencies]` | matches the version poem uses for its own websocket tests (Task 6) |
-| `chrono` | `0.4` | — | `[dependencies]` | `REPO_BACKFILL_LIMIT_MS` formatting in `subscribe_repos.rs` (Task 6) — already in `pds/Cargo.toml` |
-| `wiremock` | `0.6` | — | `[dev-dependencies]` | crawler rate-limit test (Task 7) — already in `pds/Cargo.toml` |
-
-Drop duplicates (already in workspace or `pds/Cargo.toml`): `tokio`, `metrics`, `metrics-exporter-prometheus`, `metrics-tracing-context`, `futures`, `reqwest`, `chrono`, `rsky-common`, `rsky-repo`, `rsky-syntax`, `rsky-crypto`, `rsky-blobstore`, `rsky-lexicon`, `rsky-oauth`, `rsky-identity`, `serde`, `serde_json`, `serde_derive`, `serde_bytes` (move to `[dependencies]` if needed), `lexicon_cid` (workspace `cid`), `wiremock` (already in `pds/Cargo.toml` dev-deps).
-
-**Dual sqlx note:** sea-orm 2.0 pulls in `sqlx = "0.9"` (workspace entry); `apalis-sql 0.6` requires `sqlx = "0.8"`. The workspace exposes the 0.8 dep as the `sqlx_0_8` package alias (`[workspace.dependencies] sqlx_0_8 = { package = "sqlx", version = "0.8", ... }`) so both versions coexist in the resolved lockfile (Cargo's union feature for shared dependencies handles this). Plan 09 should be aware when it adds new queries via sea-orm (sqlx 0.9) vs via the apalis jobs DB (sqlx 0.8 via `crate::db::sqlx_0_8`).
-
-**`rsky_common::now()` typing:** the git-pinned `rsky-common` already returns `time::OffsetDateTime` (not `String`) at the pinned rev. The plan's formatters use it as the typed path; the JSON envelope / `WsMessage::time` boundaries convert to RFC3339 with `rsky_common::RFC3339_VARIANT` and parse back with `rsky_common::time::from_str_to_utc`. `chrono::DateTime<Utc>` appears ONLY at the WebSocket frame boundary (`subscribe_repos.rs:441-547`).
-
-**Package name:** `cargo test -p pds` becomes `cargo test -p cacos-pds` (the binary crate's package name is `cacos-pds` per `pds/Cargo.toml:3`). Every `cargo test` / `cargo check` invocation in the per-task files uses `cargo test -p cacos-pds` / `cargo check -p cacos-pds`.
-
----
-
-## File structure
+## File structure (as built)
 
 ```
 pds/
-├── Cargo.toml                        # deps added per task
 └── src/
-    ├── context.rs                    # Task 4: + SharedBroadcast, SharedSequencer, APP_USER_AGENT
+    ├── context.rs                    # SharedBroadcast / SharedSequencer seam (now in apalis_worker.rs)
     ├── sequencer/
-    │   ├── mod.rs                    # Task 1 scaffold (RepoSeq) -> Task 2 (Sequencer, RequestSeqRangeOpts, seq_evt_from_row) -> Task 4 (job_storage field + enqueue in sequence_evt)
-    │   ├── events.rs                 # Task 1: event structs + formatters + seq_evt_to_envelope (port verbatim)
-    │   ├── db.rs                     # Task 2: SELECT_REPO_SEQ + repo_seq_from_row (sea-orm QueryResult mapper)
-    │   ├── crawlers.rs               # Task 2: Crawlers + CrawlerRequest (port verbatim; Task 7 adds tests)
-    │   ├── ws_frames.rs              # Task 3: FrameType, headers, ErrorFrame/MessageFrame codec + tests
-    │   ├── apalis_worker.rs          # Task 4: SeqEventJob, run_seq_event_job, connect_jobs_db, worker builder
-    │   └── outbox.rs                 # Task 5: Outbox + events() + get_backfill (broadcast subscription)
+    │   ├── mod.rs                    # Sequencer, RequestSeqRangeOpts, typed_seq_evt, repo_seq_from_row
+    │   ├── events.rs                 # CommitEvt/HandleEvt/IdentityEvt/AccountEvt/SyncEvt/Typed*Evt/SeqEvt + formatters
+    │   ├── db.rs                     # placeholder migration shim (entity is the migration crate)
+    │   ├── crawlers.rs               # Crawlers + CrawlerRequest + APP_USER_AGENT
+    │   ├── ws_frames.rs              # FrameType, MessageFrame, ErrorFrame, InfoFrameBody
+    │   ├── apalis_worker.rs          # SeqEventJob, SharedBroadcast, connect_jobs_db, run_seq_event_job, spawn_seq_event_worker
+    │   └── outbox.rs                 # Outbox + OutboxStream (broadcast subscription, backfill/cutover/live loop)
     └── xrpc/com/atproto/sync/
-        └── subscribe_repos.rs        # Task 6: poem WebSocket handler + tests
+        └── subscribe_repos.rs        # poem WebSocket handler (cursor validation, OutdatedCursor, 30s ping)
 ```
-
----
-
-## Task Index
-
-| Task # | Title | File |
-| --- | --- | --- |
-| 1 | `events.rs` — event structs and formatters (port verbatim) | `01-events-rs-event-structs-and-formatters-port-verbatim.md` |
-| 2 | `db.rs` + `mod.rs` — Sequencer DB logic over sea-orm (+ `crawlers.rs` port) | `02-db-rs-mod-rs-sequencer-db-logic-over-sea-orm-crawlers-rs-port.md` |
-| 3 | `ws_frames.rs` — the frame codec (port verbatim) | `03-ws-frames-rs-the-frame-codec-port-verbatim.md` |
-| 4 | apalis worker + producer — `SeqEventJob`, broadcast delivery, enqueue in `sequence_evt` | `04-apalis-worker-producer-seqeventjob-broadcast-delivery-enqueue-in-sequence-evt.md` |
-| 5 | `outbox.rs` — ported Outbox with broadcast subscription | `05-outbox-rs-ported-outbox-with-broadcast-subscription.md` |
-| 6 | poem websocket `subscribeRepos` route | `06-poem-websocket-subscriberepos-route.md` |
-| 7 | `crawlers.rs` — rate-limit tests (port landed in Task 2) | `07-crawlers-rs-rate-limit-tests-port-landed-in-task-2.md` |
-
----
-
-## Plan completeness checklist (for the executing agent)
-
-- All 7 spec components present: events.rs port (T1), sea-orm sequencer DB (T2), ws frame codec (T3), apalis worker + producer (T4), outbox port (T5), poem websocket route (T6), crawlers port + rate-limit tests (T7).
-- Poll loop / EVENT_EMITTER intentionally not ported (documented deviation); apalis + broadcast replace them.
-- Metrics: `cacos_last_seq` (T2/T4 sequence_evt), `cacos_seq_events_total` + `cacos_sequencer_poll_interval_seconds` (T4 worker), `cacos_outbox_buffer_lag` (T5 live loop).
-- Envelope contract: `seq_evt_to_envelope` (T1) -> `SeqEventJob.envelope` (T4) -> outbox `serde_json::from_str::<SeqEvt>` (T5).
-- Plan 08 calls `sequence_commit` / `sequence_identity_evt` / `sequence_account_evt` / `sequence_sync_evt` / `sequence_handle_update` on a `SharedSequencer`; the broadcast + `SharedBroadcast` is the live-delivery glue, wired at startup with `spawn_seq_event_worker`.
