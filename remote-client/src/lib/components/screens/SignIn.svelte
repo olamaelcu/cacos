@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { ClientInfo } from '$lib/server/pds/types';
+  import { goto } from '$app/navigation';
   let { rqid, state, deviceId, client, loginHint, error }: {
     rqid: string; state: string; deviceId: string;
     client: ClientInfo; loginHint: string | null; error: string | null;
@@ -22,5 +23,8 @@
   const r = await beginAuth(start);
   const body = authToFinishBody(rqid, state, deviceId, r);
   const res = await fetch('/api/passkey/finish', { method: 'POST', headers: {'content-type':'application/json'}, body: JSON.stringify(body) });
-  if (res.ok) location.reload(); else alert('Passkey sign-in failed');
+  if (!res.ok) { alert('Passkey sign-in failed'); return; }
+  const payload = await res.json();
+  // Re-enter the flow with the rotated state so the next screen renders.
+  goto(`/?rqid=${encodeURIComponent(rqid)}&state=${encodeURIComponent(payload.state ?? '')}`);
 }}>Sign in with passkey</button>
