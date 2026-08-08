@@ -16,3 +16,11 @@
   <label>Password <input name="password" type="password" autocomplete="current-password" required /></label>
   <button type="submit">Sign in</button>
 </form>
+<button type="button" onclick={async () => {
+  const start = await fetch('/api/passkey/start', { method: 'POST', headers: {'content-type':'application/json'}, body: JSON.stringify({ rqid, state, mode: 'entryway' }) }).then(r => r.json());
+  const { beginAuth, authToFinishBody } = await import('$lib/passkey/client');
+  const r = await beginAuth(start);
+  const body = authToFinishBody(rqid, state, deviceId, r);
+  const res = await fetch('/api/passkey/finish', { method: 'POST', headers: {'content-type':'application/json'}, body: JSON.stringify(body) });
+  if (res.ok) location.reload(); else alert('Passkey sign-in failed');
+}}>Sign in with passkey</button>

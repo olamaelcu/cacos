@@ -23,3 +23,11 @@
   <input type="hidden" name="device_id" value={deviceId} />
   <button type="submit">Deny</button>
 </form>
+<button type="button" onclick={async () => {
+  const start = await fetch('/api/passkey/register/start', { method: 'POST', headers: {'content-type':'application/json'}, body: JSON.stringify({ rqid, state, did: session.did }) }).then(r => r.json());
+  const { beginRegister, registerToFinishBody } = await import('$lib/passkey/client');
+  const r = await beginRegister(start);
+  const body = registerToFinishBody(rqid, state, deviceId, session.did, r);
+  await fetch('/api/passkey/register/finish', { method: 'POST', headers: {'content-type':'application/json'}, body: JSON.stringify(body) });
+  alert('Passkey added.');
+}}>Add a passkey</button>
