@@ -1,7 +1,6 @@
 //! Process-wide keypairs and shared sequencer state used across helpers
 //! and HTTP handlers.
 
-use crate::sequencer::apalis_worker::SharedBroadcast;
 use crate::sequencer::Sequencer;
 use secp256k1::{Keypair, Secp256k1, SecretKey};
 use std::env;

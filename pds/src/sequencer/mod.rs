@@ -18,17 +18,20 @@ pub mod ws_frames;
 use crate::db::entities::repo_seq;
 use crate::db::types::db_id::DbId;
 use crate::error::PdsError;
-use crate::sequencer::apalis_worker::{enqueue_seq_event_job, SeqEventJob};
+use crate::sequencer::apalis_worker::{SeqEventJob, enqueue_seq_event_job};
 use crate::sequencer::crawlers::Crawlers;
 use crate::sequencer::events::{
-    format_offset_datetime, RepoSeqNew, SeqEvt, TypedAccountEvt, TypedCommitEvt, TypedIdentityEvt,
-    TypedSyncEvt,
+    RepoSeqNew, SeqEvt, TypedAccountEvt, TypedCommitEvt, TypedIdentityEvt, TypedSyncEvt,
+    format_offset_datetime,
 };
 use anyhow::Result;
 use rsky_lexicon::com::atproto::sync::AccountStatus as RskyLexiconAccountStatus;
 use rsky_repo::block_map::BlockMap;
 use rsky_repo::types::CommitDataWithOps;
-use sea_orm::{ColumnTrait, ConnectionTrait, DatabaseBackend, DatabaseConnection, EntityTrait, QueryFilter, Statement};
+use sea_orm::{
+    ColumnTrait, ConnectionTrait, DatabaseBackend, DatabaseConnection, EntityTrait, QueryFilter,
+    Statement,
+};
 use sqlx_0_8::sqlite::SqlitePool;
 use std::sync::Arc;
 use time::OffsetDateTime;
@@ -148,7 +151,9 @@ impl Sequencer {
         let mut values: Vec<sea_orm::Value> = Vec::new();
         if let Some(earliest_seq) = earliest_seq {
             sql.push_str(&format!(" AND seq > ?{}", values.len() + 1));
-            values.push(sea_orm::Value::Bytes(Some(earliest_seq.to_bytes().to_vec())));
+            values.push(sea_orm::Value::Bytes(Some(
+                earliest_seq.to_bytes().to_vec(),
+            )));
         }
         if let Some(latest_seq) = latest_seq {
             sql.push_str(&format!(" AND seq <= ?{}", values.len() + 1));
@@ -180,7 +185,9 @@ impl Sequencer {
         // generate it locally so the INSERT succeeds.
         let next_seq = DbId::new();
         active.seq = sea_orm::ActiveValue::Set(next_seq);
-        let insert = repo_seq::Entity::insert(active).exec_with_returning(&self.db).await?;
+        let insert = repo_seq::Entity::insert(active)
+            .exec_with_returning(&self.db)
+            .await?;
         let seq = insert.seq;
         // Best-effort crawler notify; never block sequencing on it.
         if let Err(err) = self.crawlers.notify_of_update().await {
@@ -199,10 +206,7 @@ impl Sequencer {
                 tracing::warn!("failed to push seq event job: {err}");
             }
         }
-        metrics::gauge!(
-            crate::observability::metrics::LAST_SEQ,
-        )
-        .set(seq.0.timestamp_ms() as f64);
+        metrics::gauge!(crate::observability::metrics::LAST_SEQ,).set(seq.0.timestamp_ms() as f64);
         Ok(seq)
     }
 
@@ -265,7 +269,7 @@ pub fn typed_seq_evt(row: &repo_seq::Model) -> Result<SeqEvt> {
     let typed = match row.event_type.as_str() {
         "append" | "rebase" => {
             let evt: events::CommitEvt = serde_ipld_dagcbor::from_slice(&row.event)
-                .map_err(|e| PdsError::internal("dagcbor decode commit", anyhow::Error::from(e)))?;
+                .map_err(|e| PdsError::internal("dagcbor decode commit", e))?;
             SeqEvt::TypedCommitEvt(Box::new(TypedCommitEvt {
                 r#type: "commit".to_string(),
                 seq,
@@ -275,7 +279,7 @@ pub fn typed_seq_evt(row: &repo_seq::Model) -> Result<SeqEvt> {
         }
         "sync" => {
             let evt: events::SyncEvt = serde_ipld_dagcbor::from_slice(&row.event)
-                .map_err(|e| PdsError::internal("dagcbor decode sync", anyhow::Error::from(e)))?;
+                .map_err(|e| PdsError::internal("dagcbor decode sync", e))?;
             SeqEvt::TypedSyncEvt(TypedSyncEvt {
                 r#type: "sync".to_string(),
                 seq,
@@ -284,9 +288,9 @@ pub fn typed_seq_evt(row: &repo_seq::Model) -> Result<SeqEvt> {
             })
         }
         "identity" => {
-            let evt: events::IdentityEvt = serde_ipld_dagcbor::from_slice(&row.event)
-                .map_err(|e| {
-                    PdsError::internal("dagcbor decode identity", anyhow::Error::from(e))
+            let evt: events::IdentityEvt =
+                serde_ipld_dagcbor::from_slice(&row.event).map_err(|e| {
+                    PdsError::internal("dagcbor decode identity", e)
                 })?;
             SeqEvt::TypedIdentityEvt(TypedIdentityEvt {
                 r#type: "identity".to_string(),
@@ -296,8 +300,10 @@ pub fn typed_seq_evt(row: &repo_seq::Model) -> Result<SeqEvt> {
             })
         }
         "account" => {
-            let evt: events::AccountEvt = serde_ipld_dagcbor::from_slice(&row.event)
-                .map_err(|e| PdsError::internal("dagcbor decode account", anyhow::Error::from(e)))?;
+            let evt: events::AccountEvt =
+                serde_ipld_dagcbor::from_slice(&row.event).map_err(|e| {
+                    PdsError::internal("dagcbor decode account", e)
+                })?;
             SeqEvt::TypedAccountEvt(TypedAccountEvt {
                 r#type: "account".to_string(),
                 seq,
@@ -311,7 +317,7 @@ pub fn typed_seq_evt(row: &repo_seq::Model) -> Result<SeqEvt> {
 }
 
 pub fn repo_seq_from_row(row: &sea_orm::QueryResult) -> Result<repo_seq::Model> {
-    use sea_orm::TryGetable;
+    
     let bytes: Vec<u8> = row.try_get_by_index(0)?;
     let seq = if bytes.len() == 16 {
         let mut arr = [0u8; 16];
@@ -333,12 +339,14 @@ pub fn repo_seq_from_row(row: &sea_orm::QueryResult) -> Result<repo_seq::Model> 
         "[year]-[month]-[day]T[hour]:[minute]:[second].[subsecond digits:3]Z"
     );
     let sequenced_at = OffsetDateTime::parse(&sequenced_at_str, format)
-        .or_else(|_| OffsetDateTime::parse(&sequenced_at_str, &time::format_description::well_known::Rfc3339))
-        .map_err(|e| {
-            PdsError::internal(
-                "sequencer parse OffsetDateTime",
-                anyhow::Error::from(e),
+        .or_else(|_| {
+            OffsetDateTime::parse(
+                &sequenced_at_str,
+                &time::format_description::well_known::Rfc3339,
             )
+        })
+        .map_err(|e| {
+            PdsError::internal("sequencer parse OffsetDateTime", e)
         })?;
     Ok(repo_seq::Model {
         seq,
@@ -361,7 +369,7 @@ pub(crate) mod test_util {
     use crate::db::tests::TestDatabaseKind;
     use crate::sequencer::crawlers::Crawlers;
 
-    pub async fn test_sequencer() -> Sequencer {
+    pub async fn _test_sequencer() -> Sequencer {
         let db = DatabaseKind::Sequencer.open_test_db().await;
         Sequencer::new(
             db.clone(),

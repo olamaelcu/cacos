@@ -10,8 +10,6 @@
 //! fan-out. The on-disk schema matches what apalis-sql would create.
 
 use crate::observability::metrics::{SEQ_EVENTS_TOTAL, SEQUENCER_POLL_INTERVAL_SECONDS};
-use crate::sequencer::crawlers::Crawlers;
-use crate::error::PdsError;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -99,10 +97,7 @@ pub async fn run_seq_event_job(
 
 /// Push a job into the backing SQLite queue. The worker task drains the
 /// queue and publishes to the broadcast channel.
-pub async fn enqueue_seq_event_job(
-    pool: &SqlitePool,
-    job: &SeqEventJob,
-) -> anyhow::Result<()> {
+pub async fn enqueue_seq_event_job(pool: &SqlitePool, job: &SeqEventJob) -> anyhow::Result<()> {
     let id = format!("seq-{}", job.seq);
     sqlx_0_8::query(
         "INSERT OR REPLACE INTO apalis_seq_jobs \
@@ -139,12 +134,10 @@ pub fn spawn_seq_event_worker(
                 tokio::time::sleep(Duration::from_millis(200)).await;
                 continue;
             };
-            let _ = sqlx_0_8::query(
-                "UPDATE apalis_seq_jobs SET status = 'Done' WHERE id = ?1",
-            )
-            .bind(id)
-            .execute(pool.as_ref())
-            .await;
+            let _ = sqlx_0_8::query("UPDATE apalis_seq_jobs SET status = 'Done' WHERE id = ?1")
+                .bind(id)
+                .execute(pool.as_ref())
+                .await;
             if let Err(err) = run_seq_event_job(
                 SeqEventJob {
                     seq,
@@ -167,15 +160,15 @@ pub fn spawn_seq_event_worker(
 }
 
 #[allow(dead_code)]
-const _CRAWLERS_REF: fn() -> Crawlers = || Crawlers::new(String::new(), vec![]);
+const _CRAWLERS_REF: fn() -> crate::sequencer::Crawlers =
+    || crate::sequencer::Crawlers::new(String::new(), vec![]);
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::entities::repo_seq;
     use crate::db::DatabaseKind;
+    use crate::db::entities::repo_seq;
     use crate::sequencer::events::now_offset;
-    use crate::sequencer::tests::test_sequencer;
     use camino_tempfile::Utf8TempDir;
     use sea_orm::EntityTrait;
     use std::time::Duration;
@@ -215,11 +208,12 @@ mod tests {
         };
         enqueue_seq_event_job(pool.as_ref(), &job).await.unwrap();
         // Verify the row is actually in the table.
-        let count: i64 = sqlx_0_8::query_scalar("SELECT COUNT(*) FROM apalis_seq_jobs WHERE id = ?1")
-            .bind("seq-1")
-            .fetch_one(pool.as_ref())
-            .await
-            .unwrap();
+        let count: i64 =
+            sqlx_0_8::query_scalar("SELECT COUNT(*) FROM apalis_seq_jobs WHERE id = ?1")
+                .bind("seq-1")
+                .fetch_one(pool.as_ref())
+                .await
+                .unwrap();
         assert_eq!(count, 1, "row should be in the queue");
         let received = tokio::time::timeout(Duration::from_secs(5), rx.recv())
             .await

@@ -4,6 +4,8 @@
 //! subscribers. The handler validates the cursor, backfills from the
 //! sequencer DB if needed, then live-streams from the broadcast channel.
 
+use crate::context::SharedSequencer;
+use crate::db::types::db_id::DbId;
 use crate::sequencer::apalis_worker::SharedBroadcast;
 use crate::sequencer::events::{
     SeqEvt, TypedAccountEvt, TypedCommitEvt, TypedIdentityEvt, TypedSyncEvt,
@@ -12,20 +14,18 @@ use crate::sequencer::outbox::{Outbox, OutboxOpts};
 use crate::sequencer::ws_frames::{
     ErrorFrame, ErrorFrameBody, Frame, InfoFrameBody, MessageFrame, MessageFrameOpts,
 };
-use crate::context::SharedSequencer;
-use crate::db::types::db_id::DbId;
 use chrono::offset::Utc as UtcOffset;
 use chrono::{DateTime, Duration};
 use futures::{SinkExt, StreamExt};
-use poem::web::websocket::{Message, WebSocket};
 use poem::IntoResponse;
+use poem::web::websocket::{Message, WebSocket};
 use rsky_common::RFC3339_VARIANT;
 use rsky_lexicon::com::atproto::sync::{
     SubscribeReposAccount, SubscribeReposCommit, SubscribeReposCommitOperation,
     SubscribeReposIdentity, SubscribeReposSync,
 };
 use std::time::SystemTime;
-use tokio::time::{interval, Duration as TokioDuration};
+use tokio::time::{Duration as TokioDuration, interval};
 
 fn get_backfill_limit(ms: u64) -> String {
     let system_time = SystemTime::now();
@@ -63,7 +63,11 @@ pub async fn subscribe_repos(
     let config = RepoBackfillConfig::default();
     let backfill_time = get_backfill_limit(config.repo_backfill_limit_ms);
 
-    let sequencer_lock = shared.sequencer.read().expect("sequencer lock poisoned").clone();
+    let sequencer_lock = shared
+        .sequencer
+        .read()
+        .expect("sequencer lock poisoned")
+        .clone();
     let seq_broadcast = (*broadcast).clone();
 
     ws.on_upgrade(move |mut socket| async move {
@@ -314,7 +318,7 @@ fn backfill_time_date(backfill_time: &str) -> time::OffsetDateTime {
             let dt_utc = dt.with_timezone(&UtcOffset);
             let nanos = dt_utc.timestamp_nanos_opt().unwrap_or(0);
             time::OffsetDateTime::from_unix_timestamp_nanos(nanos as i128)
-                .unwrap_or_else(|_| time::OffsetDateTime::UNIX_EPOCH)
+                .unwrap_or(time::OffsetDateTime::UNIX_EPOCH)
         })
-        .unwrap_or_else(|_| time::OffsetDateTime::UNIX_EPOCH)
+        .unwrap_or(time::OffsetDateTime::UNIX_EPOCH)
 }

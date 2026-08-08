@@ -5,14 +5,15 @@
 //! channel and the Stream interface. The consumer `next()`s on a unbuffered
 //! mpsc sender that we feed from the broadcast on a small background task.
 
+use crate::sequencer::Sequencer;
 use crate::sequencer::apalis_worker::SharedBroadcast;
 use crate::sequencer::events::SeqEvt;
-use crate::sequencer::Sequencer;
 use anyhow::Result;
 use futures::stream::{self, Stream, StreamExt};
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
+#[cfg(test)]
 use std::time::Duration;
 use tokio::sync::Mutex;
 
@@ -41,7 +42,11 @@ pub struct Outbox {
 }
 
 impl Outbox {
-    pub fn new(sequencer: Sequencer, broadcast: SharedBroadcast, _opts: Option<OutboxOpts>) -> Self {
+    pub fn new(
+        sequencer: Sequencer,
+        broadcast: SharedBroadcast,
+        _opts: Option<OutboxOpts>,
+    ) -> Self {
         Self {
             caught_up: Arc::new(Mutex::new(false)),
             last_seen: -1,
@@ -91,10 +96,8 @@ impl Outbox {
                                 }
                                 v
                             };
-                            if seq > last_seen_now {
-                                if tx.send(evt).await.is_err() {
-                                    break;
-                                }
+                            if seq > last_seen_now && tx.send(evt).await.is_err() {
+                                break;
                             }
                         }
                     }
@@ -186,7 +189,7 @@ mod tests {
     use crate::db::tests::TestDatabaseKind;
     use crate::db::types::did::Did;
     use crate::sequencer::crawlers::Crawlers;
-    use crate::sequencer::events::{now_offset, RepoSeqNew};
+    use crate::sequencer::events::{RepoSeqNew, now_offset};
     use futures::StreamExt;
 
     async fn test_sequencer() -> (Sequencer, crate::db::tests::TestDb) {
@@ -201,7 +204,9 @@ mod tests {
     }
 
     fn typed_event(did: &str, kind: &str) -> SeqEvt {
-        use crate::sequencer::events::{AccountEvt, IdentityEvt, TypedAccountEvt, TypedIdentityEvt};
+        use crate::sequencer::events::{
+            AccountEvt, IdentityEvt, TypedAccountEvt, TypedIdentityEvt,
+        };
         match kind {
             "identity" => SeqEvt::TypedIdentityEvt(TypedIdentityEvt {
                 r#type: "identity".to_string(),

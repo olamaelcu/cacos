@@ -9,7 +9,6 @@
 
 use crate::db::entities::repo_seq;
 use crate::db::types;
-use crate::error::PdsError;
 use anyhow::Result;
 use lexicon_cid::Cid;
 use rsky_repo::block_map::BlockMap;
@@ -17,8 +16,6 @@ use rsky_repo::car::blocks_to_car_file;
 use rsky_repo::types::{CommitAction, CommitDataWithOps};
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
-#[cfg(test)]
-use ipld_core::ipld::Ipld;
 
 pub use rsky_common::struct_to_cbor;
 
@@ -300,7 +297,10 @@ pub fn format_seq_handle_update(did: String, handle: String) -> Result<RepoSeqNe
 }
 
 pub fn format_seq_identity_evt(did: String, handle: Option<String>) -> Result<RepoSeqNew> {
-    let evt = IdentityEvt { did: did.clone(), handle };
+    let evt = IdentityEvt {
+        did: did.clone(),
+        handle,
+    };
     Ok(RepoSeqNew::new(
         did,
         "identity".to_string(),
@@ -364,14 +364,12 @@ pub fn sync_evt_data_from_commit(
 /// The inverse of `seq_evt_to_envelope`.
 pub fn envelope_from_repo_row(row: &repo_seq::Model) -> Result<SeqEvt> {
     let seq = row.seq.0.timestamp_ms() as i64;
-    let time = format!(
-        "{}",
-        row.sequenced_at
-            .format(time::macros::format_description!(
-                "[year]-[month]-[day]T[hour]:[minute]:[second].[subsecond digits:3]Z"
-            ))
-            .unwrap_or_else(|_| row.sequenced_at.to_string())
-    );
+    let time = row
+        .sequenced_at
+        .format(time::macros::format_description!(
+            "[year]-[month]-[day]T[hour]:[minute]:[second].[subsecond digits:3]Z"
+        ))
+        .unwrap_or_else(|_| row.sequenced_at.to_string());
     let typed = match row.event_type.as_str() {
         "append" | "rebase" => {
             let evt: CommitEvt = serde_ipld_dagcbor::from_slice(&row.event)?;
@@ -513,7 +511,9 @@ mod tests {
         assert_eq!(decoded.ops[0].action, CommitEvtOpAction::Create);
         // "tooBig" snake-case in Rust -> camelCase in CBOR
         let ipld: Ipld = serde_ipld_dagcbor::from_slice(&bytes).unwrap();
-        let Ipld::Map(map) = ipld else { panic!("expected map") };
+        let Ipld::Map(map) = ipld else {
+            panic!("expected map")
+        };
         assert!(map.contains_key("tooBig"));
     }
 
@@ -526,7 +526,9 @@ mod tests {
         };
         let bytes = serde_ipld_dagcbor::to_vec(&evt).unwrap();
         let decoded: Ipld = serde_ipld_dagcbor::from_slice(&bytes).unwrap();
-        let Ipld::Map(map) = decoded else { panic!("expected map") };
+        let Ipld::Map(map) = decoded else {
+            panic!("expected map")
+        };
         match map.get("blocks") {
             Some(Ipld::Bytes(b)) => assert_eq!(b, &vec![1u8, 2, 3]),
             other => panic!("expected bytes, got {other:?}"),
@@ -541,7 +543,9 @@ mod tests {
         };
         let bytes = serde_ipld_dagcbor::to_vec(&evt).unwrap();
         let ipld: Ipld = serde_ipld_dagcbor::from_slice(&bytes).unwrap();
-        let Ipld::Map(map) = ipld else { panic!("expected map") };
+        let Ipld::Map(map) = ipld else {
+            panic!("expected map")
+        };
         assert!(!map.contains_key("handle"));
 
         let evt = IdentityEvt {
@@ -550,7 +554,9 @@ mod tests {
         };
         let bytes = serde_ipld_dagcbor::to_vec(&evt).unwrap();
         let ipld: Ipld = serde_ipld_dagcbor::from_slice(&bytes).unwrap();
-        let Ipld::Map(map) = ipld else { panic!("expected map") };
+        let Ipld::Map(map) = ipld else {
+            panic!("expected map")
+        };
         assert!(map.contains_key("handle"));
     }
 
@@ -563,7 +569,9 @@ mod tests {
         };
         let bytes = serde_ipld_dagcbor::to_vec(&evt).unwrap();
         let ipld: Ipld = serde_ipld_dagcbor::from_slice(&bytes).unwrap();
-        let Ipld::Map(map) = ipld else { panic!("expected map") };
+        let Ipld::Map(map) = ipld else {
+            panic!("expected map")
+        };
         assert!(!map.contains_key("status"));
 
         let evt = AccountEvt {
@@ -573,7 +581,9 @@ mod tests {
         };
         let bytes = serde_ipld_dagcbor::to_vec(&evt).unwrap();
         let ipld: Ipld = serde_ipld_dagcbor::from_slice(&bytes).unwrap();
-        let Ipld::Map(map) = ipld else { panic!("expected map") };
+        let Ipld::Map(map) = ipld else {
+            panic!("expected map")
+        };
         assert!(map.contains_key("status"));
     }
 
