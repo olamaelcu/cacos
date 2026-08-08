@@ -33,6 +33,12 @@ camino-tempfile = "1"
 ulid = { version = "3", features = ["serde", "std"] }
 time = { version = "0.3", features = ["serde", "formatting", "parsing"] }
 serde = { version = "1", features = ["derive"] }
+serde_repr = "0.1"
+apalis = { version = "0.6", default-features = false }
+apalis-sql = { version = "0.6", default-features = false, features = ["sqlite", "tokio-comp", "migrate"] }
+sqlx_0_8 = { package = "sqlx", version = "0.8", features = ["sqlite", "runtime-tokio-rustls", "json", "macros", "migrate"] }
+async-stream = "0.3"
+ipld-core = "0.4"
 
 # --- serde ecosystem (required by rsky-* crate manifests via workspace = true) ---
 serde_bytes = "0.11"
@@ -43,10 +49,9 @@ rand = "0.8"
 rand_core = "0.6"
 secp256k1 = { version = "0.28", features = ["global-context", "rand"] }
 sha2 = "0.10"
-ipld-core = "0.4"
 
 # --- http / runtime ---
-poem = { version = "3", features = ["tower-compat"] }
+poem = { version = "3", features = ["tower-compat", "websocket"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync", "net", "fs"] }
 
 # --- observability (pins locked in Plan 02, verified against docs.rs) ---
