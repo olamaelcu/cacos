@@ -47,3 +47,9 @@ run = "docker compose down"
 description = "Run the PDS with MinIO up"
 depends = ["infra-up"]
 run = "cargo run -p cacos-pds"
+
+[tasks.pds-dev]
+description = "Run the frontend remote client"
+env = { _.file = "remote-client/.env" }
+dir = "remote-client"
+run = "pnpm dev"
