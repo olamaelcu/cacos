@@ -31,3 +31,4 @@
   await fetch('/api/passkey/register/finish', { method: 'POST', headers: {'content-type':'application/json'}, body: JSON.stringify(body) });
   alert('Passkey added.');
 }}>Add a passkey</button>
+<a href="/account?did={session.did}&handle={session.handle ?? ''}">View account info</a>
