@@ -288,10 +288,8 @@ pub fn typed_seq_evt(row: &repo_seq::Model) -> Result<SeqEvt> {
             })
         }
         "identity" => {
-            let evt: events::IdentityEvt =
-                serde_ipld_dagcbor::from_slice(&row.event).map_err(|e| {
-                    PdsError::internal("dagcbor decode identity", e)
-                })?;
+            let evt: events::IdentityEvt = serde_ipld_dagcbor::from_slice(&row.event)
+                .map_err(|e| PdsError::internal("dagcbor decode identity", e))?;
             SeqEvt::TypedIdentityEvt(TypedIdentityEvt {
                 r#type: "identity".to_string(),
                 seq,
@@ -300,10 +298,8 @@ pub fn typed_seq_evt(row: &repo_seq::Model) -> Result<SeqEvt> {
             })
         }
         "account" => {
-            let evt: events::AccountEvt =
-                serde_ipld_dagcbor::from_slice(&row.event).map_err(|e| {
-                    PdsError::internal("dagcbor decode account", e)
-                })?;
+            let evt: events::AccountEvt = serde_ipld_dagcbor::from_slice(&row.event)
+                .map_err(|e| PdsError::internal("dagcbor decode account", e))?;
             SeqEvt::TypedAccountEvt(TypedAccountEvt {
                 r#type: "account".to_string(),
                 seq,
@@ -317,7 +313,6 @@ pub fn typed_seq_evt(row: &repo_seq::Model) -> Result<SeqEvt> {
 }
 
 pub fn repo_seq_from_row(row: &sea_orm::QueryResult) -> Result<repo_seq::Model> {
-    
     let bytes: Vec<u8> = row.try_get_by_index(0)?;
     let seq = if bytes.len() == 16 {
         let mut arr = [0u8; 16];
@@ -345,9 +340,7 @@ pub fn repo_seq_from_row(row: &sea_orm::QueryResult) -> Result<repo_seq::Model> 
                 &time::format_description::well_known::Rfc3339,
             )
         })
-        .map_err(|e| {
-            PdsError::internal("sequencer parse OffsetDateTime", e)
-        })?;
+        .map_err(|e| PdsError::internal("sequencer parse OffsetDateTime", e))?;
     Ok(repo_seq::Model {
         seq,
         did: did_str.into(),
@@ -390,14 +383,15 @@ mod tests {
     use crate::sequencer::events::{CommitEvt, now_offset};
     use sea_orm::EntityTrait;
 
-    pub(crate) async fn test_sequencer() -> Sequencer {
+    pub(crate) async fn test_sequencer() -> (Sequencer, crate::db::tests::TestDb) {
         let db = DatabaseKind::Sequencer.open_test_db().await;
-        Sequencer::new(
+        let seq = Sequencer::new(
             db.clone(),
             Crawlers::new("pds.test".to_string(), vec![]),
             None,
             None,
-        )
+        );
+        (seq, db)
     }
 
     fn make_commit_event_bytes() -> Vec<u8> {
@@ -419,7 +413,7 @@ mod tests {
 
     #[tokio::test]
     async fn repo_seq_new_uses_insert_defaults() {
-        let mut seq = test_sequencer().await;
+        let (mut seq, _db) = test_sequencer().await;
         let evt = RepoSeqNew::new(
             Did::from("did:plc:test".to_string()),
             "identity".to_string(),
@@ -436,7 +430,7 @@ mod tests {
 
     #[tokio::test]
     async fn sequences_and_reads_events() {
-        let mut seq = test_sequencer().await;
+        let (mut seq, _db) = test_sequencer().await;
         let did = Did::from("did:plc:alice".to_string());
         let evt1 = RepoSeqNew::new(
             did.clone(),
@@ -479,7 +473,7 @@ mod tests {
 
     #[tokio::test]
     async fn deletes_events_for_user() {
-        let mut seq = test_sequencer().await;
+        let (mut seq, _db) = test_sequencer().await;
         let alice = Did::from("did:plc:alice".to_string());
         let bob = Did::from("did:plc:bob".to_string());
         for did in [&alice, &bob] {

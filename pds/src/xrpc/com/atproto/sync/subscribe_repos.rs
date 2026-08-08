@@ -340,7 +340,8 @@ mod tests {
             message: Some("Cursor in the future.".to_string()),
         });
         let bytes = err.to_bytes().unwrap();
-        let mut values = serde_cbor::Deserializer::from_slice(&bytes).into_iter::<serde_cbor::Value>();
+        let mut values =
+            serde_cbor::Deserializer::from_slice(&bytes).into_iter::<serde_cbor::Value>();
         let header = values.next().unwrap().unwrap();
         let body = values.next().unwrap().unwrap();
         assert!(values.next().is_none());
@@ -372,7 +373,8 @@ mod tests {
             }),
         );
         let bytes = frame.to_bytes().unwrap();
-        let mut values = serde_cbor::Deserializer::from_slice(&bytes).into_iter::<serde_cbor::Value>();
+        let mut values =
+            serde_cbor::Deserializer::from_slice(&bytes).into_iter::<serde_cbor::Value>();
         let header = values.next().unwrap().unwrap();
         let body = values.next().unwrap().unwrap();
         assert!(values.next().is_none());
