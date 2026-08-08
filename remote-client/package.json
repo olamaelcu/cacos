@@ -29,6 +29,7 @@
     "vitest": "^2"
   },
   "dependencies": {
+    "@awesome.me/webawesome": "^3.11.0",
     "@simplewebauthn/browser": "^10"
   }
 }

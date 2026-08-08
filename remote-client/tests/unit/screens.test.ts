@@ -18,24 +18,25 @@ describe('Screens render', () => {
     expect(getByText(/Local dev/i)).toBeTruthy();
   });
   it('SignIn renders identifier + password fields', () => {
-    const { getByLabelText } = render(SignIn, { props: { ...baseProps, loginHint: null, error: null } });
-    expect(getByLabelText(/identifier/i)).toBeTruthy();
-    expect(getByLabelText(/password/i)).toBeTruthy();
+    const { container } = render(SignIn, { props: { ...baseProps, loginHint: null, error: null } });
+    expect(container.querySelector('wa-input[name=identifier]')).toBeTruthy();
+    expect(container.querySelector('wa-input[name=password]')).toBeTruthy();
+    expect(container.querySelector('wa-input[name=identifier]')?.getAttribute('label')).toMatch(/identifier/i);
+    expect(container.querySelector('wa-input[name=password]')?.getAttribute('label')).toMatch(/password/i);
   });
 
   it('Consent renders client + Allow/Deny', () => {
-    const { getByText } = render(Consent, { props: { ...baseProps, scopes: ['atproto'], session: { did: 'did:plc:x', handle: 'a', email: null } } });
-    expect(getByText(/Example/)).toBeTruthy();
-    expect(getByText(/Allow/i)).toBeTruthy();
-    expect(getByText(/Deny/i)).toBeTruthy();
+    const { container } = render(Consent, { props: { ...baseProps, scopes: ['atproto'], session: { did: 'did:plc:x', handle: 'a', email: null } } });
+    expect(container.textContent).toMatch(/Example/);
+    expect(container.querySelector('form[action="?/accept"]')).toBeTruthy();
+    expect(container.querySelector('form[action="?/reject"]')).toBeTruthy();
   });
 
   it('CreateAccount renders handle/email/password/invite fields', () => {
-    const { getByLabelText } = render(CreateAccount, { props: { ...baseProps, error: null, error_description: null } });
-    expect(getByLabelText(/handle/i)).toBeTruthy();
-    expect(getByLabelText(/email/i)).toBeTruthy();
-    expect(getByLabelText(/password/i)).toBeTruthy();
-    expect(getByLabelText(/invite/i)).toBeTruthy();
+    const { container } = render(CreateAccount, { props: { ...baseProps, error: null, error_description: null } });
+    for (const name of ['handle', 'email', 'password', 'invite_code']) {
+      expect(container.querySelector(`wa-input[name=${name}]`)).toBeTruthy();
+    }
   });
 
   it('Error surfaces error_description', () => {

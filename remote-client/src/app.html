@@ -1,9 +1,22 @@
 <!doctype html>
-<html lang="en">
+<html
+  lang="en"
+  class="wa-cloak wa-theme-default wa-palette-default wa-brand-blue wa-neutral-gray wa-success-green wa-warning-yellow wa-danger-red"
+>
   <head>
     <meta charset="utf-8" />
     <link rel="icon" href="%sveltekit.assets%/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script>
+      // Apply dark mode based on OS preference before paint to avoid a flash.
+      (function () {
+        try {
+          if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.documentElement.classList.add('wa-dark');
+          }
+        } catch (_) {}
+      })();
+    </script>
     %sveltekit.head%
   </head>
   <body data-sveltekit-preload-data="hover">
