@@ -1,0 +1,34 @@
+{
+  "name": "cacos-remote-client",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint .",
+    "e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@sveltejs/adapter-node": "^5",
+    "@sveltejs/kit": "^2",
+    "@sveltejs/vite-plugin-svelte": "^4",
+    "@types/node": "^22",
+    "svelte": "^5",
+    "svelte-check": "^4",
+    "typescript": "^5",
+    "vite": "^5",
+    "vite-plugin-mkcert": "^1",
+    "vitest": "^2",
+    "@testing-library/svelte": "^5",
+    "@playwright/test": "^1",
+    "jsdom": "^25"
+  },
+  "dependencies": {
+    "@simplewebauthn/browser": "^10"
+  }
+}
