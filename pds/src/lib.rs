@@ -12,6 +12,7 @@ pub mod db;
 pub mod error;
 pub mod handle;
 pub mod identity;
+pub mod mailer;
 pub mod oauth;
 pub mod observability;
 pub mod plc;
