@@ -26,21 +26,13 @@ impl PreferenceReader {
             .filter(account_pref::Column::Name.eq(name))
             .one(&self.db)
             .await
-            .map_err(|e| {
-                PdsError::internal(
-                    "PreferenceReader::get",
-                    anyhow::Error::from(e),
-                )
-            })?;
+            .map_err(|e| PdsError::internal("PreferenceReader::get", anyhow::Error::from(e)))?;
         Ok(row.and_then(|m| serde_json::from_str(&m.value_json).ok()))
     }
 
     pub async fn put(&self, name: &str, value: serde_json::Value) -> Result<()> {
         let value_json = serde_json::to_string(&value).map_err(|e| {
-            PdsError::internal(
-                "PreferenceReader::put: serialize",
-                anyhow::Error::from(e),
-            )
+            PdsError::internal("PreferenceReader::put: serialize", anyhow::Error::from(e))
         })?;
         let id = migration::types::db_id::DbId::new();
         let am = account_pref::ActiveModel {
@@ -57,10 +49,7 @@ impl PreferenceReader {
             .exec(&self.db)
             .await
             .map_err(|e| {
-                PdsError::internal(
-                    "PreferenceReader::put: insert",
-                    anyhow::Error::from(e),
-                )
+                PdsError::internal("PreferenceReader::put: insert", anyhow::Error::from(e))
             })?;
         Ok(())
     }
@@ -70,15 +59,14 @@ impl PreferenceReader {
             .order_by_asc(account_pref::Column::Name)
             .all(&self.db)
             .await
-            .map_err(|e| {
-                PdsError::internal(
-                    "PreferenceReader::list",
-                    anyhow::Error::from(e),
-                )
-            })?;
+            .map_err(|e| PdsError::internal("PreferenceReader::list", anyhow::Error::from(e)))?;
         Ok(rows
             .into_iter()
-            .filter_map(|m| serde_json::from_str(&m.value_json).ok().map(|v| (m.name, v)))
+            .filter_map(|m| {
+                serde_json::from_str(&m.value_json)
+                    .ok()
+                    .map(|v| (m.name, v))
+            })
             .collect())
     }
 }

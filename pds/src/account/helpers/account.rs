@@ -34,7 +34,12 @@ pub enum AccountStatus {
     Throttled,
 }
 
-impl From<AccountStatus> for (bool, Option<rsky_lexicon::com::atproto::sync::AccountStatus>) {
+impl From<AccountStatus>
+    for (
+        bool,
+        Option<rsky_lexicon::com::atproto::sync::AccountStatus>,
+    )
+{
     fn from(s: AccountStatus) -> Self {
         use rsky_lexicon::com::atproto::sync::AccountStatus as Lex;
         match s {
