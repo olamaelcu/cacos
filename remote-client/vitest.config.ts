@@ -8,7 +8,6 @@ export default defineConfig({
     conditions: ['browser'],
     alias: {
       $lib: fileURLToPath(new URL('./src/lib', import.meta.url)),
-      'server-only': fileURLToPath(new URL('./tests/stubs/server-only.ts', import.meta.url)),
     },
   },
   test: {
