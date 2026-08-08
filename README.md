@@ -1,8 +1,24 @@
 # Cacos
 
-> A white-label [ATProto PDS][1] by [Olamaelcu][]
+> A white-label Rust [ATProto PDS][1] by [Olamaelcu][]
 
 [1]: https://atproto.com/guides/glossary#pds-personal-data-server
+[Olamaelcu]: https://github.com/olamaelcu
+
+Cacos is a white-label ATProto Personal Data Server written in Rust. It
+organises its data across four SQLite domains (Account, Sequencer, DID cache,
+and a per-actor Actor store sharded by `sha256(did)`), persists each
+actor's repository under their own SQLite file, and serves blob traffic
+through an OpenDAL-backed blobstore with per-DID partitioning so a single
+backend (S3/MinIO or local disk) can host every tenant without leakage.
+Observability is first-class: a Prometheus recorder exposes a `cacos_`-prefixed
+metric set at `/metrics` alongside tracing/timing layers. The headless
+OAuth provider (`/oauth/*`, `/oauth/remote/*`) is conditionally mounted —
+it only boots when `PDS_JWT_KEY_K256_PRIVATE_KEY_HEX` is set; deployments
+that don't need federated OAuth still get the same PDS surface with no
+extra surface area or dependencies.
+
+[ATProto]: https://atproto.com
 [Olamaelcu]: https://github.com/olamaelcu
 
 ## Status
