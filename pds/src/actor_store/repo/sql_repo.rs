@@ -224,6 +224,37 @@ impl SqlRepoReader {
         }
     }
 
+    pub async fn list_existing_blocks(&self, cids: Vec<Cid>) -> Result<Vec<Cid>> {
+        if cids.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let cid_strings: Vec<String> = cids.iter().map(ToString::to_string).collect();
+        let mut existing = Vec::new();
+        for batch in cid_strings.chunks(500) {
+            let rows = repo_block::Entity::find()
+                .filter(repo_block::Column::Cid.is_in(batch.to_vec()))
+                .all(&self.db)
+                .await
+                .map_err(|e| {
+                    PdsError::internal(
+                        "SqlRepoReader::list_existing_blocks: find failed",
+                        anyhow::Error::from(e),
+                    )
+                })?;
+            for model in rows {
+                let cid = Cid::try_from(model.cid.as_str()).map_err(|e| {
+                    PdsError::internal(
+                        "SqlRepoReader::list_existing_blocks: Cid::try_from failed",
+                        anyhow::Error::from(e),
+                    )
+                })?;
+                existing.push(cid);
+            }
+        }
+        Ok(existing)
+    }
+
     /// Delete a batch of blocks by cid (batched 500-at-a-time like the read path).
     /// Also evicts the entries from the local BlockMap cache so a subsequent
     /// `has()`/`get_bytes()` reflects the deletion immediately.
@@ -739,6 +770,24 @@ mod tests {
             .await
             .unwrap();
         cid
+    }
+
+    #[tokio::test]
+    async fn list_existing_blocks_returns_only_present_cids() {
+        let (_dir, reader) = test_reader().await;
+        let present = cid_for(b"present");
+        let missing = cid_for(b"missing");
+        reader
+            .put_block(present, b"present".to_vec(), "rev-1".to_owned())
+            .await
+            .unwrap();
+
+        let existing = reader
+            .list_existing_blocks(vec![present, missing])
+            .await
+            .unwrap();
+
+        assert_eq!(existing, vec![present]);
     }
 
     #[tokio::test]
