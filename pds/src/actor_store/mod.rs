@@ -11,6 +11,7 @@
 
 use crate::actor_store::blob::BlobReader;
 use crate::actor_store::db::ActorDb;
+use crate::actor_store::preference::PreferenceReader;
 use crate::actor_store::record::RecordReader;
 use crate::actor_store::repo::sql_repo::SqlRepoReader;
 use crate::actor_store::repo::types::SyncEvtData;
@@ -45,6 +46,7 @@ use tokio::sync::{OwnedMutexGuard, RwLock};
 
 pub mod blob;
 pub mod db;
+pub mod preference;
 pub mod record;
 pub mod repo;
 
@@ -467,6 +469,7 @@ pub struct ActorStoreReader {
     pub storage: Arc<RwLock<SqlRepoReader>>,
     pub record: RecordReader,
     pub blob: BlobReader,
+    pub pref: PreferenceReader,
     key_location: PathBuf,
 }
 
@@ -485,6 +488,7 @@ impl ActorStoreReader {
                 db.clone(),
             ))),
             record: RecordReader::new(did.clone(), db.clone()),
+            pref: PreferenceReader::new(did.clone(), db.clone()),
             blob: BlobReader::new(blobstore, db, background_queue),
             did,
             key_location,

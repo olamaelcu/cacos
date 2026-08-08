@@ -244,6 +244,19 @@ impl MigrationTrait for Migration {
                     .to_owned(),
             )
             .await?;
+        // Each per-actor DB holds preferences for a single DID, so `name` is
+        // unique within this DB. The unique index is what enables
+        // `PreferenceReader::put` to upsert via `ON CONFLICT(name) DO UPDATE`.
+        manager
+            .create_index(
+                Index::create()
+                    .name("account_pref_name_unique_idx")
+                    .table(account_pref::Entity)
+                    .col(account_pref::Column::Name)
+                    .unique()
+                    .to_owned(),
+            )
+            .await?;
 
         Ok(())
     }

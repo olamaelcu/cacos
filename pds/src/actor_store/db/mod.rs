@@ -20,7 +20,7 @@ pub type ActorDb = DatabaseConnection;
 // Models replace the plan's private row structs (`RepoBlock`, `Record`,
 // `Backlink`); every query that previously mapped a row struct now uses
 // `repo_block::Model` / `record::Model` / `backlink::Model` directly.
-pub use crate::db::entities::{backlink, record, repo_block, repo_root};
+pub use crate::db::entities::{account_pref, backlink, record, repo_block, repo_root};
 
 #[cfg(test)]
 mod tests {
