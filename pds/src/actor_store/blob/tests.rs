@@ -469,7 +469,7 @@ async fn process_write_blobs_deletes_dereferenced() {
     assert!(t.store.has_stored(cid).await.unwrap());
     assert_eq!(
         t.reader.get_records_for_blob(cid).await.unwrap(),
-        [record_uri.clone()]
+        vec![record_uri.as_str()]
     );
 
     // deleting the record dereferences and deletes the blob

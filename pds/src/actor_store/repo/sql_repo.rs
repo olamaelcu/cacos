@@ -95,7 +95,7 @@ impl SqlRepoReader {
             cache_guard.get_many(cids).map_err(|e| {
                 PdsError::internal(
                     "SqlRepoReader::get_blocks_impl: BlockMap::get_many failed",
-                    anyhow::Error::from(e),
+                    e,
                 )
             })?
         };
@@ -138,14 +138,14 @@ impl SqlRepoReader {
             cache_guard.add_map(blocks.clone()).map_err(|e| {
                 PdsError::internal(
                     "SqlRepoReader::get_blocks_impl: BlockMap::add_map failed",
-                    anyhow::Error::from(e),
+                    e,
                 )
             })?;
         }
         blocks.add_map(cached.blocks).map_err(|e| {
             PdsError::internal(
                 "SqlRepoReader::get_blocks_impl: BlockMap::add_map(cached) failed",
-                anyhow::Error::from(e),
+                e,
             )
         })?;
 
@@ -532,7 +532,7 @@ impl SqlRepoReader {
             .map_err(|e| {
                 PdsError::internal(
                     "SqlRepoReader::get_car_stream: blocks_to_car_file failed",
-                    anyhow::Error::from(e),
+                    e,
                 )
             })
     }

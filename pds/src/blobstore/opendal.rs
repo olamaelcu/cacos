@@ -363,11 +363,10 @@ impl BlobStore for OpenDALBlobStore {
                 format!("blocks/{did}"),
                 format!("quarantine/{did}"),
             ] {
-                if let Err(err) = op.remove_all(&prefix).await {
-                    if err.kind() != ErrorKind::NotFound {
+                if let Err(err) = op.remove_all(&prefix).await
+                    && err.kind() != ErrorKind::NotFound {
                         return Err(anyhow::Error::from(err));
                     }
-                }
             }
             Ok(())
         }))

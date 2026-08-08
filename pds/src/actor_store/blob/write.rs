@@ -25,15 +25,14 @@ pub async fn accepted_mime(mime: String, accepted: Vec<String>) -> bool {
 }
 
 pub async fn verify_blob(blob: &PreparedBlobRef, found: &super::types::BlobRow) -> Result<()> {
-    if let Some(max_size) = blob.constraints.max_size {
-        if found.size as usize > max_size {
+    if let Some(max_size) = blob.constraints.max_size
+        && found.size as usize > max_size {
             bail!(
                 "BlobTooLarge: This file is too large. It is {:?} but the maximum size is {:?}",
                 found.size,
                 max_size
             )
         }
-    }
     if blob.mime_type != found.mime_type {
         bail!(
             "InvalidMimeType: Referenced MimeType does not match stored blob. Expected: {:?}, Got: {:?}",
@@ -41,15 +40,14 @@ pub async fn verify_blob(blob: &PreparedBlobRef, found: &super::types::BlobRow) 
             blob.mime_type
         )
     }
-    if let Some(ref accept) = blob.constraints.accept {
-        if !accepted_mime(blob.mime_type.clone(), accept.clone()).await {
+    if let Some(ref accept) = blob.constraints.accept
+        && !accepted_mime(blob.mime_type.clone(), accept.clone()).await {
             bail!(
                 "Wrong type of file. It is {:?} but it must match {:?}.",
                 blob.mime_type,
                 accept
             )
         }
-    }
     Ok(())
 }
 
@@ -61,7 +59,7 @@ pub async fn sha256_stream(to_hash: Vec<u8>) -> Result<Vec<u8>> {
 
 /// `?,?,...` for an `IN (...)` clause.
 fn in_placeholders(n: usize) -> String {
-    std::iter::repeat("?").take(n).collect::<Vec<_>>().join(",")
+    std::iter::repeat_n("?", n).collect::<Vec<_>>().join(",")
 }
 
 impl BlobReader {

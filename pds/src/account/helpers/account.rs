@@ -804,32 +804,32 @@ mod tests {
         use rsky_lexicon::com::atproto::sync::AccountStatus as Lex;
 
         let (active, status): (bool, Option<Lex>) = AccountStatus::Active.into();
-        assert_eq!(active, true);
+        assert!(active);
         assert_eq!(status, None);
 
         let (active, status): (bool, Option<Lex>) = AccountStatus::Deactivated.into();
-        assert_eq!(active, false);
+        assert!(!active);
         assert!(matches!(status, Some(Lex::Deactivated)));
 
         let (active, status): (bool, Option<Lex>) = AccountStatus::Takendown.into();
-        assert_eq!(active, false);
+        assert!(!active);
         assert!(matches!(status, Some(Lex::Takendown)));
 
         let (active, status): (bool, Option<Lex>) = AccountStatus::Suspended.into();
-        assert_eq!(active, false);
+        assert!(!active);
         assert!(matches!(status, Some(Lex::Suspended)));
 
         let (active, status): (bool, Option<Lex>) = AccountStatus::Deleted.into();
-        assert_eq!(active, false);
+        assert!(!active);
         assert!(matches!(status, Some(Lex::Deleted)));
 
         let (active, status): (bool, Option<Lex>) = AccountStatus::Throttled.into();
-        assert_eq!(active, true);
+        assert!(active);
         assert!(matches!(status, Some(Lex::Throttled)));
 
         // Desynchronized doesn't exist in lexicon; map to (active=false, status=None)
         let (active, status): (bool, Option<Lex>) = AccountStatus::Desynchronized.into();
-        assert_eq!(active, false);
+        assert!(!active);
         assert_eq!(status, None);
     }
 

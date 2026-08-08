@@ -84,7 +84,7 @@ impl BlobReader {
         rows.iter()
             .map(|row| {
                 let cid: String = row.try_get_by_index(0)?;
-                Ok(Cid::from_str(&cid).map_err(anyhow::Error::new)?)
+                Cid::from_str(&cid).map_err(anyhow::Error::new)
             })
             .collect()
     }

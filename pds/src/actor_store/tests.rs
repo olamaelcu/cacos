@@ -263,7 +263,7 @@ async fn lru_evicts_least_recently_used_db() {
         .unwrap();
     assert!(
         store
-            .read(did_bob.to_owned(), test_blobstore(&did_bob))
+            .read(did_bob.to_owned(), test_blobstore(did_bob))
             .await
             .is_ok()
     );

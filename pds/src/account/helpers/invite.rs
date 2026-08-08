@@ -241,7 +241,7 @@ pub async fn get_account_invite_codes(
         .await?;
     let res: Vec<InviteCode> = rows
         .iter()
-        .map(|row| invite_code_from_row(row))
+        .map(invite_code_from_row)
         .collect::<Result<Vec<InviteCode>, sea_orm::DbErr>>()?;
 
     let codes: Vec<String> = res.iter().map(|row| row.code.clone()).collect();
@@ -312,7 +312,7 @@ pub async fn get_invited_by_for_accounts(
     let rows: Vec<QueryResult> = db.query_all_raw(sql(&query, values)).await?;
     let res: Vec<InviteCode> = rows
         .iter()
-        .map(|row| invite_code_from_row(row))
+        .map(invite_code_from_row)
         .collect::<Result<Vec<InviteCode>, sea_orm::DbErr>>()?;
 
     let codes: Vec<String> = res.iter().map(|row| row.code.clone()).collect();

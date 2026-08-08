@@ -178,14 +178,14 @@ impl ActorStore {
 
     pub async fn exists(&self, did: &str) -> Result<bool> {
         let location = self.get_location(did)?;
-        Ok(tokio::fs::try_exists(&location.db_location)
+        tokio::fs::try_exists(&location.db_location)
             .await
             .map_err(|e| {
                 PdsError::internal(
                     "ActorStore::exists: tokio::fs::try_exists failed",
                     anyhow::Error::from(e),
                 )
-            })?)
+            })
     }
 
     pub async fn keypair(&self, did: &str) -> Result<Keypair> {
@@ -678,14 +678,13 @@ impl ActorStoreTransactor {
                 anyhow::anyhow!("No repo root found for `{}`", self.did),
             )
         })?;
-        if let Some(swap_commit) = swap_commit {
-            if !current_root.cid.eq(&swap_commit) {
+        if let Some(swap_commit) = swap_commit
+            && !current_root.cid.eq(&swap_commit) {
                 return Err(PdsError::internal(
                     "ActorStoreTransactor::format_commit: swap commit mismatch",
                     anyhow::anyhow!("BadCommitSwapError: current root is `{}`", current_root.cid),
                 ));
             }
-        }
         {
             let storage_guard = self.storage.write().await;
             storage_guard.cache_rev(current_root.rev.clone()).await?;
