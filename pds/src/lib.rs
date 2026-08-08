@@ -10,6 +10,7 @@ pub mod config;
 pub mod context;
 pub mod db;
 pub mod error;
+pub mod handle;
 pub mod identity;
 pub mod oauth;
 pub mod observability;

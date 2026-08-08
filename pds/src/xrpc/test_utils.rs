@@ -112,6 +112,7 @@ pub async fn test_state() -> (SharedState, Vec<tempfile::TempDir>) {
         identity: crate::config::IdentityConfig {
             plc_url: "https://plc.test".to_string(),
             resolver_timeout: 3000,
+            service_handle_domains: vec![".test".to_string()],
         },
         actor_store: crate::actor_store::ActorStoreConfig {
             directory: path_str(actor_dir.path()),

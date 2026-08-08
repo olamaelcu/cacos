@@ -48,6 +48,7 @@ pub struct ServiceDbConfig {
 pub struct IdentityConfig {
     pub plc_url: String,
     pub resolver_timeout: u64,
+    pub service_handle_domains: Vec<String>,
 }
 
 /// Per-actor blob store configuration. The blobstore is built once at
@@ -114,6 +115,15 @@ pub fn env_to_cfg() -> ServerConfig {
             resolver_timeout: env_or("PDS_IDENTITY_RESOLVER_TIMEOUT_MS", "3000")
                 .parse()
                 .unwrap_or(3000),
+            service_handle_domains: env::var("PDS_SERVICE_HANDLE_DOMAINS")
+                .ok()
+                .map(|s| {
+                    s.split(',')
+                        .map(|p| p.trim().to_string())
+                        .filter(|p| !p.is_empty())
+                        .collect()
+                })
+                .unwrap_or_default(),
         },
         actor_store: crate::actor_store::ActorStoreConfig {
             directory: env_or("PDS_ACTOR_STORE_DIRECTORY", "./actors"),
