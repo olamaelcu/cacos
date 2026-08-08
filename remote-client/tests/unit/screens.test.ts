@@ -4,6 +4,7 @@ import SignIn from '../../src/lib/components/screens/SignIn.svelte';
 import Consent from '../../src/lib/components/screens/Consent.svelte';
 import CreateAccount from '../../src/lib/components/screens/CreateAccount.svelte';
 import ErrorScreen from '../../src/lib/components/screens/Error.svelte';
+import Splash from '../../src/lib/components/screens/Splash.svelte';
 
 const baseProps = {
   rqid: 'r', state: 's', deviceId: 'd',
@@ -11,6 +12,11 @@ const baseProps = {
 };
 
 describe('Screens render', () => {
+  it('Splash renders without props', () => {
+    const { getByRole, getByText } = render(Splash);
+    expect(getByRole('heading', { name: /cacos RemoteClient/i })).toBeTruthy();
+    expect(getByText(/Local dev/i)).toBeTruthy();
+  });
   it('SignIn renders identifier + password fields', () => {
     const { getByLabelText } = render(SignIn, { props: { ...baseProps, loginHint: null, error: null } });
     expect(getByLabelText(/identifier/i)).toBeTruthy();

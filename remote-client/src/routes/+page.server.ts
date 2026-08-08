@@ -7,7 +7,9 @@ import type { PageServerLoad } from './$types';
 export const load: PageServerLoad = async ({ url, locals }) => {
   const rqid = url.searchParams.get('rqid');
   const state = url.searchParams.get('state');
-  if (!rqid || !state) throw redirect(302, '/');
+  if (!rqid || !state) {
+    return { splash: true as const, deviceId: locals.deviceId };
+  }
   try {
     const payload = await pds().request({ rqid, state, device_id: locals.deviceId });
     return { rqid, state: payload.state ?? state, payload, deviceId: locals.deviceId };
