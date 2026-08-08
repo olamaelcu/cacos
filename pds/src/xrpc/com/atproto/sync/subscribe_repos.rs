@@ -396,3 +396,382 @@ mod tests {
         }
     }
 }
+
+// -----------------------------------------------------------------------------
+// End-to-end TCP roundtrip tests
+// -----------------------------------------------------------------------------
+//
+// These tests boot a real `poem::Server` bound to an ephemeral 127.0.0.1
+// port and drive the `subscribe_repos` handler with a real
+// `tokio_tungstenite::connect_async` client. They cover three flows:
+//
+// 1. **Backfill + live broadcast**: a `commit` row is sequenced before the
+//    websocket connects; the WS client should receive it via the backfill
+//    path. Then an `identity` event is sequenced after the connection and
+//    should arrive via the live `tokio::sync::broadcast` path.
+// 2. **Future cursor rejection**: a cursor strictly greater than every
+//    `repo_seq.sequencedAt` is rejected with the on-wire `ErrorFrame`
+//    (`op == -1`, `error == "FutureCursor"`).
+//
+// Each test relies on the apalis-style worker that the production
+// sequencer already uses (`spawn_seq_event_worker`) to publish envelopes
+// to the shared broadcast — no short-circuit bypass.
+#[cfg(test)]
+mod tcp_roundtrip_tests {
+    use super::subscribe_repos;
+    use crate::context::SharedSequencer;
+    use crate::db::DatabaseKind;
+    use crate::sequencer::Sequencer;
+    use crate::sequencer::apalis_worker::{
+        SharedBroadcast, connect_jobs_db, spawn_seq_event_worker,
+    };
+    use crate::sequencer::crawlers::Crawlers;
+    use futures::StreamExt;
+    use lexicon_cid::Cid;
+    use rsky_repo::block_map::BlockMap;
+    use rsky_repo::cid_set::CidSet;
+    use rsky_repo::types::{CommitAction, CommitData, CommitDataWithOps, CommitOp};
+    use std::str::FromStr;
+    use std::time::Duration;
+
+    const TEST_CID: &str = "bafkreibjfgx2gprinfvicegelk5kosd6y2frmqpqzwqkg7usac74l3t2v4";
+    const TEST_REPO_DID: &str = "did:plc:rounrdtrip";
+    const TEST_REPO_REV: &str = "3jzfcijpj2z2a";
+    const TEST_IDENTITY_DID: &str = "did:plc:identitylive";
+    const TEST_IDENTITY_HANDLE: &str = "alice.roundtrip";
+
+    fn make_commit_data() -> CommitDataWithOps {
+        let cid = Cid::from_str(TEST_CID).expect("valid test CID");
+        let mut blocks = BlockMap::new();
+        let _ = blocks.add(cid);
+        CommitDataWithOps {
+            commit_data: CommitData {
+                cid,
+                rev: TEST_REPO_REV.to_string(),
+                since: None,
+                prev: None,
+                new_blocks: BlockMap::new(),
+                relevant_blocks: blocks,
+                removed_cids: CidSet::new(None),
+            },
+            ops: vec![CommitOp {
+                action: CommitAction::Create,
+                path: format!("app.bsky.feed.post/{TEST_REPO_REV}"),
+                cid: Some(cid),
+                prev: None,
+            }],
+            prev_data: None,
+        }
+    }
+
+    /// Build a fresh sequencer DB + jobs DB + worker + broadcast + shared
+    /// sequencer for one test. Returns the test-owned `SharedSequencer`
+    /// (used to insert events) plus the broadcast (used to subscribe a
+    /// sentinel) plus the worker's join handle (caller must abort on
+    /// teardown).
+    async fn setup_env(
+        dir: &camino_tempfile::Utf8TempDir,
+    ) -> (
+        SharedSequencer,
+        SharedBroadcast,
+        tokio::task::JoinHandle<()>,
+    ) {
+        let seq_db_path = dir.path().join("sequencer.sqlite");
+        let jobs_db_path = dir.path().join("jobs.sqlite");
+        let seq_db = DatabaseKind::Sequencer
+            .open(&seq_db_path)
+            .await
+            .expect("open sequencer DB");
+        let pool = connect_jobs_db(jobs_db_path.as_str())
+            .await
+            .expect("connect jobs DB");
+        let broadcast = SharedBroadcast::new(64);
+        let sequencer = Sequencer::new(
+            seq_db.clone(),
+            Crawlers::new("pds.test".to_string(), vec![]),
+            Some(pool.clone()),
+            None,
+        );
+        let shared_seq = SharedSequencer::new(sequencer);
+        let worker = spawn_seq_event_worker(pool, broadcast.clone());
+        (shared_seq, broadcast, worker)
+    }
+
+    /// Bind a real TCP listener on an ephemeral 127.0.0.1 port, hand the
+    /// resulting acceptor to `poem::Server`, and spawn the server task.
+    async fn spawn_app<E>(app: E) -> (std::net::SocketAddr, tokio::task::JoinHandle<()>)
+    where
+        E: poem::Endpoint<Output = poem::Response> + 'static,
+    {
+        use poem::listener::{Acceptor, Listener};
+        let acceptor = poem::listener::TcpListener::bind("127.0.0.1:0")
+            .into_acceptor()
+            .await
+            .expect("bind ephemeral TCP listener");
+        let addr = acceptor
+            .local_addr()
+            .into_iter()
+            .next()
+            .expect("listener local addr")
+            .as_socket_addr()
+            .cloned()
+            .expect("socket addr");
+        let handle = tokio::spawn(async move {
+            let _ = poem::Server::new_with_acceptor(acceptor).run(app).await;
+        });
+        // Tiny grace period so the kernel hands the listening socket to
+        // poem before the client tries to connect.
+        tokio::time::sleep(Duration::from_millis(25)).await;
+        (addr, handle)
+    }
+
+    /// Read from the WS client stream until we get a binary data frame,
+    /// transparently skipping control frames (Ping/Pong). This matches how
+    /// a real firehose client behaves — `tungstenite` auto-responds to
+    /// Pings with Pongs but our handler doesn't auto-pong, so the client
+    /// receives Ping frames as part of the stream.
+    async fn next_binary_frame<S>(stream: &mut S) -> Vec<u8>
+    where
+        S: futures::Stream<
+                Item = std::result::Result<
+                    tokio_tungstenite::tungstenite::Message,
+                    tokio_tungstenite::tungstenite::Error,
+                >,
+            > + Unpin,
+    {
+        let deadline = Duration::from_secs(10);
+        loop {
+            let msg = tokio::time::timeout(deadline, stream.next())
+                .await
+                .unwrap_or_else(|_| panic!("timed out waiting for next ws binary frame"))
+                .expect("ws stream closed unexpectedly")
+                .expect("ws error");
+            match msg {
+                tokio_tungstenite::tungstenite::Message::Binary(b) => {
+                    return b.to_vec();
+                }
+                tokio_tungstenite::tungstenite::Message::Ping(_) => continue,
+                tokio_tungstenite::tungstenite::Message::Pong(_) => continue,
+                tokio_tungstenite::tungstenite::Message::Close(frame) => {
+                    panic!("ws closed before binary frame arrived: {frame:?}")
+                }
+                other => panic!("expected binary frame, got {other:?}"),
+            }
+        }
+    }
+
+    fn decode_two(bytes: &[u8]) -> (serde_cbor::Value, serde_cbor::Value) {
+        let mut iter = serde_cbor::Deserializer::from_slice(bytes).into_iter::<serde_cbor::Value>();
+        let header = iter.next().expect("missing header").expect("header CBOR");
+        let body = iter.next().expect("missing body").expect("body CBOR");
+        assert!(
+            iter.next().is_none(),
+            "frame must be exactly two CBOR values"
+        );
+        (header, body)
+    }
+
+    fn map_get<'a>(map: &'a serde_cbor::Value, key: &str) -> Option<&'a serde_cbor::Value> {
+        let serde_cbor::Value::Map(entries) = map else {
+            panic!("expected cbor map, got {map:?}");
+        };
+        entries
+            .iter()
+            .find(|(k, _)| matches!(k, serde_cbor::Value::Text(t) if t == key))
+            .map(|(_, v)| v)
+    }
+
+    fn build_app(
+        shared_seq: SharedSequencer,
+        broadcast: SharedBroadcast,
+    ) -> impl poem::Endpoint<Output = poem::Response> {
+        use poem::EndpointExt;
+        poem::Route::new()
+            .at(
+                "/xrpc/com.atproto.sync.subscribeRepos",
+                poem::get(subscribe_repos),
+            )
+            .data(shared_seq)
+            .data(broadcast)
+    }
+
+    #[tokio::test]
+    async fn subscribe_repos_roundtrip_streams_commit_backfill_then_identity_live() {
+        let dir = camino_tempfile::tempdir().expect("tempdir");
+        let (shared_seq, broadcast, worker) = setup_env(&dir).await;
+
+        let app = build_app(shared_seq.clone(), broadcast.clone());
+        let (addr, server) = spawn_app(app).await;
+
+        // Subscribe to the broadcast BEFORE inserting events so the test
+        // acts as a sentinel: if the apalis worker is publishing, we will
+        // see an envelope; if not, the WS would also miss the live
+        // identity event.
+        let mut bcast_rx = broadcast.tx.subscribe();
+
+        // Insert a commit BEFORE the WS client connects so the handler
+        // delivers it via the backfill path (DB read > cursor=0). We
+        // take the lock briefly to clone the inner Sequencer (matching
+        // the handler's read+clone pattern), then drop the guard before
+        // awaiting so the std::sync::RwLock is not held across `.await`.
+        let inserted_seq = {
+            let mut sequencer_clone = shared_seq.sequencer.read().expect("sequencer lock").clone();
+            sequencer_clone
+                .sequence_commit(TEST_REPO_DID.to_string(), make_commit_data())
+                .await
+                .expect("sequence_commit")
+        };
+        assert!(
+            inserted_seq.timestamp_ms() > 0,
+            "DbId timestamp should be > 0"
+        );
+
+        // Connect via real WebSocket client.
+        let url = format!("ws://{addr}/xrpc/com.atproto.sync.subscribeRepos?cursor=0");
+        let (mut ws, _resp) = tokio_tungstenite::connect_async(&url)
+            .await
+            .expect("ws connect");
+
+        // Frame #1: the backfilled #commit.
+        let bytes = next_binary_frame(&mut ws).await;
+        let (header, body) = decode_two(&bytes);
+        assert_eq!(
+            map_get(&header, "op"),
+            Some(&serde_cbor::Value::Integer(1)),
+            "header.op must be 1 (FrameType::Message)"
+        );
+        assert_eq!(
+            map_get(&header, "t"),
+            Some(&serde_cbor::Value::Text("#commit".to_string())),
+            "header.t must be #commit"
+        );
+        assert_eq!(
+            map_get(&body, "repo"),
+            Some(&serde_cbor::Value::Text(TEST_REPO_DID.to_string())),
+            "body.repo must equal the inserted DID"
+        );
+        assert!(
+            map_get(&body, "commit").is_some(),
+            "body must include a commit CID, got {body:?}"
+        );
+        assert_eq!(
+            map_get(&body, "rev"),
+            Some(&serde_cbor::Value::Text(TEST_REPO_REV.to_string())),
+            "body.rev must equal the commit rev"
+        );
+        match map_get(&body, "ops") {
+            Some(serde_cbor::Value::Array(ops)) => {
+                assert!(
+                    !ops.is_empty(),
+                    "body.ops must include at least one operation"
+                );
+                let op = &ops[0];
+                let serde_cbor::Value::Map(op_map) = op else {
+                    panic!("expected ops[0] to be a map, got {op:?}");
+                };
+                let has_path = op_map
+                    .iter()
+                    .any(|(k, _)| matches!(k, serde_cbor::Value::Text(t) if t == "path"));
+                let has_action = op_map
+                    .iter()
+                    .any(|(k, _)| matches!(k, serde_cbor::Value::Text(t) if t == "action"));
+                assert!(has_path && has_action, "ops[0] must have path+action");
+            }
+            other => panic!("body.ops must be a CBOR array, got {other:?}"),
+        }
+
+        // The broadcast sentinel should have received the commit envelope
+        // produced by the apalis worker; this verifies the producer/worker
+        // are wired to the SAME jobs DB.
+        let envelope = tokio::time::timeout(Duration::from_secs(5), bcast_rx.recv())
+            .await
+            .expect("broadcast envelope must arrive within 5s")
+            .expect("broadcast channel closed");
+        assert!(
+            envelope.contains("\"commit\""),
+            "expected commit envelope, got {envelope}"
+        );
+
+        // Now insert an identity event LIVE, AFTER the WS is connected and
+        // (implicitly) subscribed to the broadcast — the handler should
+        // pick it up via the live broadcast path. Same read+clone pattern
+        // as the commit insert above to avoid holding the lock across
+        // `.await`.
+        {
+            let mut sequencer_clone = shared_seq.sequencer.read().expect("sequencer lock").clone();
+            sequencer_clone
+                .sequence_identity_evt(
+                    TEST_IDENTITY_DID.to_string(),
+                    Some(TEST_IDENTITY_HANDLE.to_string()),
+                )
+                .await
+                .expect("sequence_identity_evt");
+        }
+
+        // Frame #2: the live #identity.
+        let bytes = next_binary_frame(&mut ws).await;
+        let (header, body) = decode_two(&bytes);
+        assert_eq!(
+            map_get(&header, "op"),
+            Some(&serde_cbor::Value::Integer(1)),
+            "header.op must be 1 (FrameType::Message)"
+        );
+        assert_eq!(
+            map_get(&header, "t"),
+            Some(&serde_cbor::Value::Text("#identity".to_string())),
+            "header.t must be #identity"
+        );
+        assert_eq!(
+            map_get(&body, "did"),
+            Some(&serde_cbor::Value::Text(TEST_IDENTITY_DID.to_string())),
+            "body.did must equal the inserted DID"
+        );
+        assert_eq!(
+            map_get(&body, "handle"),
+            Some(&serde_cbor::Value::Text(TEST_IDENTITY_HANDLE.to_string())),
+            "body.handle must equal the inserted handle"
+        );
+
+        let _ = ws.close(None).await;
+        server.abort();
+        worker.abort();
+    }
+
+    #[tokio::test]
+    async fn subscribe_repos_roundtrip_rejects_future_cursor_with_error_frame() {
+        let dir = camino_tempfile::tempdir().expect("tempdir");
+        let (shared_seq, broadcast, worker) = setup_env(&dir).await;
+
+        let app = build_app(shared_seq.clone(), broadcast.clone());
+        let (addr, server) = spawn_app(app).await;
+
+        // No events have been inserted; the empty sequencer DB reports
+        // `curr() == None` so `curr_ts.unwrap_or(0) == 0`. cursor=99999
+        // is strictly greater than 0, so the FutureCursor branch fires.
+        let url = format!("ws://{addr}/xrpc/com.atproto.sync.subscribeRepos?cursor=99999");
+        let (mut ws, _resp) = tokio_tungstenite::connect_async(&url)
+            .await
+            .expect("ws connect");
+
+        let bytes = next_binary_frame(&mut ws).await;
+        let (header, body) = decode_two(&bytes);
+        assert_eq!(
+            map_get(&header, "op"),
+            Some(&serde_cbor::Value::Integer(-1)),
+            "header.op must be -1 (FrameType::Error)"
+        );
+        assert!(
+            map_get(&header, "t").is_none(),
+            "header.t must be absent on ErrorFrame, got header={header:?}"
+        );
+        assert_eq!(
+            map_get(&body, "error"),
+            Some(&serde_cbor::Value::Text("FutureCursor".to_string())),
+            "body.error must equal \"FutureCursor\""
+        );
+
+        let _ = ws.close(None).await;
+        server.abort();
+        worker.abort();
+    }
+}

@@ -85,4 +85,4 @@ poem = { workspace = true, features = ["test"] }
 metrics = { workspace = true }
 serde_ipld_dagcbor = { workspace = true }
 wiremock = "0.6"
-tokio-tungstenite = "0.24"
+tokio-tungstenite = "0.27"

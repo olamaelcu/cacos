@@ -4,7 +4,7 @@
 use crate::sequencer::Sequencer;
 use secp256k1::{Keypair, Secp256k1, SecretKey};
 use std::env;
-use std::sync::LazyLock;
+use std::sync::{Arc, LazyLock, RwLock};
 
 /// Signs service JWTs and is exposed as the PDS's repo signing key by the
 /// server handlers.
@@ -16,15 +16,26 @@ pub static PDS_REPO_SIGNING_KEYPAIR: LazyLock<Keypair> = LazyLock::new(|| {
 });
 
 /// Shared sequencer handle, mounted as poem state. The subscribe-repos
-/// websocket handler reads this to sequence/commit/emit events.
+/// websocket handler reads this to sequence/commit/emit events. The
+/// `Arc<RwLock<…>>` indirection makes `SharedSequencer: Clone` so it can be
+/// handed to poem's `.data(...)` (which requires `Clone`) and still be
+/// mutated concurrently from tests / background tasks via a second clone.
 pub struct SharedSequencer {
-    pub sequencer: std::sync::RwLock<Sequencer>,
+    pub sequencer: Arc<RwLock<Sequencer>>,
 }
 
 impl SharedSequencer {
     pub fn new(sequencer: Sequencer) -> Self {
         Self {
-            sequencer: std::sync::RwLock::new(sequencer),
+            sequencer: Arc::new(RwLock::new(sequencer)),
+        }
+    }
+}
+
+impl Clone for SharedSequencer {
+    fn clone(&self) -> Self {
+        Self {
+            sequencer: Arc::clone(&self.sequencer),
         }
     }
 }
