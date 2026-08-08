@@ -228,6 +228,44 @@ impl RecordReader {
         Ok(())
     }
 
+    pub async fn get_record_takedown_status(
+        &self,
+        uri: &rsky_syntax::aturi::AtUri,
+    ) -> Result<Option<String>> {
+        let row = record::Entity::find_by_id(uri.to_string())
+            .one(&self.db)
+            .await
+            .map_err(|e| {
+                PdsError::internal(
+                    "RecordReader::get_record_takedown_status: find_by_id failed",
+                    anyhow::Error::from(e),
+                )
+            })?;
+        Ok(row.and_then(|m| m.takedown_ref))
+    }
+
+    pub async fn update_record_takedown_status(
+        &self,
+        uri: &rsky_syntax::aturi::AtUri,
+        takedown_ref: Option<String>,
+    ) -> Result<()> {
+        let am = record::ActiveModel {
+            uri: Set(uri.to_string()),
+            takedown_ref: Set(takedown_ref),
+            ..Default::default()
+        };
+        record::Entity::update(am)
+            .exec(&self.db)
+            .await
+            .map_err(|e| {
+                PdsError::internal(
+                    "RecordReader::update_record_takedown_status: update failed",
+                    anyhow::Error::from(e),
+                )
+            })?;
+        Ok(())
+    }
+
     pub async fn remove_backlinks_by_uri(&self, uri: &rsky_syntax::aturi::AtUri) -> Result<()> {
         backlink::Entity::delete_many()
             .filter(backlink::Column::Uri.eq(uri.to_string()))
@@ -436,5 +474,33 @@ mod tests {
                 .await
                 .unwrap()
         );
+    }
+
+    #[tokio::test]
+    async fn takedown_status_roundtrip() {
+        let (_dir, reader, did) = setup().await;
+        let uri = make_uri(&did, "app.bsky.feed.post", "t1");
+        let cid = cid_for(b"v1");
+        reader
+            .index_record(uri.clone(), cid, None, None, "rev-1".into(), None)
+            .await
+            .unwrap();
+
+        assert_eq!(reader.get_record_takedown_status(&uri).await.unwrap(), None);
+
+        reader
+            .update_record_takedown_status(&uri, Some("mod-1".into()))
+            .await
+            .unwrap();
+        assert_eq!(
+            reader.get_record_takedown_status(&uri).await.unwrap(),
+            Some("mod-1".to_string())
+        );
+
+        reader
+            .update_record_takedown_status(&uri, None)
+            .await
+            .unwrap();
+        assert_eq!(reader.get_record_takedown_status(&uri).await.unwrap(), None);
     }
 }
