@@ -20,18 +20,20 @@
 use crate::account::AccountManager;
 use crate::account::helpers::account::{ActorAccount, AvailabilityFlags};
 use crate::account::helpers::auth::CustomClaimObj;
+use crate::account::helpers::auth::{AuthScope, PDS_JWT_KEYPAIR};
 use anyhow::{Result, bail};
 use base64ct::{Base64UrlUnpadded, Encoding};
 use jwt_simple::prelude::*;
 use rsky_crypto::verify::verify_signature_digest;
 use rsky_oauth::dpop::DpopRequest;
 use rsky_oauth::{OAuthProvider, VerifiedAccess};
-use secp256k1::{Keypair, Secp256k1, SecretKey};
+#[cfg(test)]
+use secp256k1::Secp256k1;
 use sha2::{Digest, Sha256};
 use std::cell::RefCell;
 use std::env;
 use std::str;
-use std::sync::{Arc, LazyLock, OnceLock};
+use std::sync::{Arc, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 use thiserror::Error;
 
@@ -114,50 +116,6 @@ pub(crate) fn is_expired_jwt(err: &anyhow::Error) -> bool {
         err.downcast_ref::<jwt_simple::JWTError>(),
         Some(jwt_simple::JWTError::TokenHasExpired)
     )
-}
-
-/// Canonical ES256K signing key for access/refresh/service JWTs, from
-/// `PDS_JWT_KEY_K256_PRIVATE_KEY_HEX`. Owned HERE; Plan 05's account
-/// helpers import this static rather than re-define one.
-pub static PDS_JWT_KEYPAIR: LazyLock<ES256kKeyPair> = LazyLock::new(|| {
-    let secp = Secp256k1::new();
-    let private_key = env::var("PDS_JWT_KEY_K256_PRIVATE_KEY_HEX").unwrap();
-    let secret_key = SecretKey::from_slice(&hex::decode(private_key.as_bytes()).unwrap()).unwrap();
-    let jwt_key = Keypair::from_secret_key(&secp, &secret_key);
-    ES256kKeyPair::from_bytes(jwt_key.secret_bytes().as_slice()).unwrap()
-});
-
-#[derive(PartialEq, Clone, Debug)]
-pub enum AuthScope {
-    Access,
-    Refresh,
-    AppPass,
-    AppPassPrivileged,
-    SignupQueued,
-}
-
-impl AuthScope {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            AuthScope::Access => "com.atproto.access",
-            AuthScope::Refresh => "com.atproto.refresh",
-            AuthScope::AppPass => "com.atproto.appPass",
-            AuthScope::AppPassPrivileged => "com.atproto.appPassPrivileged",
-            AuthScope::SignupQueued => "com.atproto.signupQueued",
-        }
-    }
-
-    #[allow(clippy::should_implement_trait)]
-    pub fn from_str(scope: &str) -> Result<Self> {
-        match scope {
-            "com.atproto.access" => Ok(AuthScope::Access),
-            "com.atproto.refresh" => Ok(AuthScope::Refresh),
-            "com.atproto.appPass" => Ok(AuthScope::AppPass),
-            "com.atproto.appPassPrivileged" => Ok(AuthScope::AppPassPrivileged),
-            "com.atproto.signupQueued" => Ok(AuthScope::SignupQueued),
-            _ => bail!("Invalid AuthScope: `{scope:?}` is not a valid auth scope"),
-        }
-    }
 }
 
 #[derive(Clone, Debug)]
