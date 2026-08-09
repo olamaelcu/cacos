@@ -793,8 +793,11 @@ dependencies = [
  "camino-tempfile",
  "chrono",
  "cid",
+ "data-encoding",
+ "email_address",
  "futures",
  "hex",
+ "indexmap 2.14.0",
  "ipld-core",
  "jwt-simple",
  "lru",
@@ -824,6 +827,7 @@ dependencies = [
  "serde_repr",
  "sha2 0.10.9",
  "sqlx 0.8.6",
+ "tempfile",
  "thiserror 2.0.19",
  "time",
  "tokio",
@@ -1619,6 +1623,15 @@ dependencies = [
  "sec1",
  "subtle",
  "zeroize",
+]
+
+[[package]]
+name = "email_address"
+version = "0.2.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e079f19b08ca6239f47f8ba8509c11cf3ea30095831f7fed61441475edd8c449"
+dependencies = [
+ "serde",
 ]
 
 [[package]]
@@ -2648,6 +2661,8 @@ checksum = "d466e9454f08e4a911e14806c24e16fba1b4c121d1ea474396f396069cf949d9"
 dependencies = [
  "equivalent",
  "hashbrown 0.17.1",
+ "serde",
+ "serde_core",
 ]
 
 [[package]]
