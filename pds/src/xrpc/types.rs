@@ -74,7 +74,7 @@ impl SharedStateFromEnv {
             )
             .expect("build shared blobstore"),
         );
-        let plc_client: Arc<dyn PlcClient> = Arc::new(crate::plc::MockPlcClient);
+        let plc_client: Arc<dyn PlcClient> = Arc::new(crate::plc::MockPlcClient::default());
 
         crate::auth::auth_verifier::register_auth_dependencies(
             Arc::new(account_manager.clone()),

@@ -1,100 +1,198 @@
-//! PLC (did:plc) directory client.
-//!
-//! Task 1 ships a minimal trait surface plus a no-op `MockPlcClient` so the
-//! rest of the XRPC layer can register an `Arc<dyn PlcClient>` in
-//! [`crate::xrpc::SharedState`] without taking a hard dependency on the
-//! full PLC HTTP client. Task 18 replaces the trait body with a real
-//! reqwest-backed `PlcClientImpl` and a richer mock with canned
-//! responses.
+pub mod operations;
+pub mod types;
 
-use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
-use std::sync::Arc;
+use crate::plc::operations::update_handle_op;
+use crate::plc::types::{CompatibleOp, CompatibleOpOrTombstone, DocumentData, OpOrTombstone};
+use anyhow::{bail, Result};
+use rsky_common::encode_uri_component;
+use secp256k1::SecretKey;
+use serde::de::DeserializeOwned;
 
-/// Minimal projection of a DID document returned by the PLC directory.
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
-pub struct PlcDocumentData {
-    /// The DID whose document is being described.
+pub static APP_USER_AGENT: &str = concat!(
+    "cacos-pds/",
+    env!("CARGO_PKG_VERSION"),
+);
+
+#[async_trait::async_trait]
+pub trait PlcClient: Send + Sync {
+    async fn send_operation(&self, did: &str, op: &OpOrTombstone) -> Result<()>;
+    async fn get_document_data(&self, did: &str) -> Result<DocumentData>;
+    async fn get_last_op(&self, did: &str) -> Result<CompatibleOpOrTombstone>;
+    async fn update_handle(&self, did: &str, signer: &SecretKey, handle: &str) -> Result<()>;
+}
+
+/// Reqwest-backed PLC client (port of rsky's plc::Client).
+pub struct PlcClientImpl {
+    pub url: String,
+}
+
+impl PlcClientImpl {
+    pub fn new(url: String) -> Self {
+        Self { url }
+    }
+
+    fn post_op_url(&self, did: &str) -> String {
+        format!("{0}/{1}", self.url, encode_uri_component(&did.to_string()))
+    }
+
+    async fn make_get_req<T: DeserializeOwned>(
+        &self,
+        url: String,
+        params: Option<Vec<(&str, String)>>,
+    ) -> Result<T> {
+        let client = reqwest::Client::builder().user_agent(APP_USER_AGENT).build()?;
+        let mut builder = client
+            .get(url)
+            .header("Connection", "Keep-Alive")
+            .header("Keep-Alive", "timeout=5, max=1000");
+        if let Some(params) = params {
+            builder = builder.query(&params);
+        }
+        let res = builder.send().await?;
+        Ok(res.json().await?)
+    }
+}
+
+#[async_trait::async_trait]
+impl PlcClient for PlcClientImpl {
+    async fn send_operation(&self, did: &str, op: &OpOrTombstone) -> Result<()> {
+        let client = reqwest::Client::builder().user_agent(APP_USER_AGENT).build()?;
+        let response = client
+            .post(self.post_op_url(did))
+            .json(op)
+            .header("Connection", "Keep-Alive")
+            .header("Keep-Alive", "timeout=5, max=1000")
+            .send()
+            .await?;
+        match response.error_for_status_ref() {
+            Ok(_) => Ok(()),
+            Err(_) => bail!(response.text().await?),
+        }
+    }
+
+    async fn get_document_data(&self, did: &str) -> Result<DocumentData> {
+        match self
+            .make_get_req(
+                format!(
+                    "{0}/{1}/data",
+                    self.url,
+                    encode_uri_component(&did.to_string())
+                ),
+                None,
+            )
+            .await
+        {
+            Ok(res) => Ok(res),
+            Err(error) => bail!(error.to_string()),
+        }
+    }
+
+    async fn get_last_op(&self, did: &str) -> Result<CompatibleOpOrTombstone> {
+        match self
+            .make_get_req(
+                format!(
+                    "{0}/{1}/log/last",
+                    self.url,
+                    encode_uri_component(&did.to_string())
+                ),
+                None,
+            )
+            .await
+        {
+            Ok(res) => Ok(res),
+            Err(error) => bail!(error.to_string()),
+        }
+    }
+
+    async fn update_handle(&self, did: &str, signer: &SecretKey, handle: &str) -> Result<()> {
+        let last_op: CompatibleOp = match self.get_last_op(did).await? {
+            CompatibleOpOrTombstone::CreateOpV1(last_op) => CompatibleOp::CreateOpV1(last_op),
+            CompatibleOpOrTombstone::Operation(last_op) => CompatibleOp::Operation(last_op),
+            CompatibleOpOrTombstone::Tombstone(_) => {
+                bail!("Cannot apply op to tombstone")
+            }
+        };
+        let op = update_handle_op(last_op, signer, handle.to_owned()).await?;
+        self.send_operation(did, &OpOrTombstone::Operation(op)).await
+    }
+}
+
+/// Hermetic mock used by tests. `get_document_data` returns a document whose
+/// `atproto_pds` endpoint matches the test public URL and whose signing key
+/// and rotation key are hardcoded placeholders. `get_last_op` returns a
+/// canned signed create operation built from a hardcoded secret key so the
+/// mock works without `PDS_PLC_ROTATION_KEYPAIR` (added in Task 5).
+pub struct MockPlcClient {
     pub did: String,
 }
 
-/// Last-op pointer returned by the PLC directory's log endpoint.
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
-pub struct PlcLastOp {
-    /// The serialized last operation (CID + payload, opaque to the PDS).
-    pub operation: serde_json::Value,
+impl Default for MockPlcClient {
+    fn default() -> Self {
+        Self {
+            did: "did:plc:mock".to_string(),
+        }
+    }
 }
 
-/// Result of a PLC operation submission.
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
-pub struct PlcOperationResponse {
-    /// Whether the directory accepted the operation.
-    pub success: bool,
-}
-
-/// Trait surface for the PLC directory. All methods are async; tests
-/// inject [`MockPlcClient`], production swaps in `PlcClientImpl`.
-#[async_trait]
-pub trait PlcClient: Send + Sync {
-    /// Send a signed `plcOperation` to the directory. Returns the
-    /// directory's acknowledgement.
-    async fn send_operation(
-        &self,
-        did: &str,
-        operation: serde_json::Value,
-    ) -> anyhow::Result<PlcOperationResponse>;
-
-    /// Fetch the current DID document for `did`.
-    async fn get_document_data(&self, did: &str) -> anyhow::Result<PlcDocumentData>;
-
-    /// Fetch the last operation applied to `did` (used during handle
-    /// resolution and identity event sequencing).
-    async fn get_last_op(&self, did: &str) -> anyhow::Result<PlcLastOp>;
-
-    /// Submit a handle update operation for `did`.
-    async fn update_handle(
-        &self,
-        did: &str,
-        handle: &str,
-    ) -> anyhow::Result<PlcOperationResponse>;
-}
-
-/// No-op PLC client. Every method returns `Ok(())` with a default-shaped
-/// response. Used in tests where the handler under test never exercises
-/// PLC.
-#[derive(Debug, Default, Clone)]
-pub struct MockPlcClient;
-
-#[async_trait]
+#[async_trait::async_trait]
 impl PlcClient for MockPlcClient {
-    async fn send_operation(
-        &self,
-        _did: &str,
-        _operation: serde_json::Value,
-    ) -> anyhow::Result<PlcOperationResponse> {
-        Ok(PlcOperationResponse { success: true })
+    async fn send_operation(&self, _did: &str, _op: &OpOrTombstone) -> Result<()> {
+        Ok(())
     }
 
-    async fn get_document_data(&self, did: &str) -> anyhow::Result<PlcDocumentData> {
-        Ok(PlcDocumentData { did: did.to_string() })
-    }
-
-    async fn get_last_op(&self, did: &str) -> anyhow::Result<PlcLastOp> {
-        Ok(PlcLastOp {
-            operation: serde_json::json!({ "did": did }),
+    async fn get_document_data(&self, _did: &str) -> Result<DocumentData> {
+        use std::collections::BTreeMap;
+        let hostname = std::env::var("PDS_HOSTNAME").unwrap_or("localhost".to_owned());
+        let port = std::env::var("PDS_PORT")
+            .ok()
+            .and_then(|p| p.parse::<usize>().ok())
+            .unwrap_or(2583);
+        let public_url = if hostname == "localhost" {
+            format!("http://localhost:{port}")
+        } else {
+            format!("https://{hostname}")
+        };
+        Ok(DocumentData {
+            did: self.did.clone(),
+            rotation_keys: vec!["did:key:zRotationKeyPlaceholder".to_string()],
+            verification_methods: BTreeMap::from([(
+                "atproto".to_string(),
+                "did:key:zSigningKeyPlaceholder".to_string(),
+            )]),
+            also_known_as: vec![],
+            services: BTreeMap::from([(
+                "atproto_pds".to_string(),
+                types::Service {
+                    r#type: "AtprotoPersonalDataServer".to_string(),
+                    endpoint: public_url,
+                },
+            )]),
         })
     }
 
-    async fn update_handle(
-        &self,
-        _did: &str,
-        _handle: &str,
-    ) -> anyhow::Result<PlcOperationResponse> {
-        Ok(PlcOperationResponse { success: true })
+    async fn get_last_op(&self, _did: &str) -> Result<CompatibleOpOrTombstone> {
+        use crate::plc::operations::create_op;
+        use crate::plc::operations::CreateAtprotoOpInput;
+        let secret_key = secp256k1::SecretKey::from_slice(
+            &hex::decode("1111111111111111111111111111111111111111111111111111111111111111")
+                .unwrap(),
+        )
+        .unwrap();
+        let (_did_plc, op) = create_op(
+            CreateAtprotoOpInput {
+                signing_key: "did:key:zQ3shXkXxRqVnGX6fYqPqL4h6F5TpCxYhZJcMvBtNwRpKsUdEiF"
+                    .to_string(),
+                handle: "mock.test".to_string(),
+                pds: "https://mock.pds".to_string(),
+                rotation_keys: vec![],
+            },
+            secret_key,
+        )
+        .await?;
+        Ok(CompatibleOpOrTombstone::Operation(op))
     }
-}
 
-/// Convenience constructor for tests.
-pub fn mock() -> Arc<dyn PlcClient> {
-    Arc::new(MockPlcClient)
+    async fn update_handle(&self, _did: &str, _signer: &SecretKey, _handle: &str) -> Result<()> {
+        Ok(())
+    }
 }

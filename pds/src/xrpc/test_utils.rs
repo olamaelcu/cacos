@@ -129,7 +129,7 @@ pub async fn test_state() -> (SharedState, Vec<tempfile::TempDir>) {
         OpenDALBlobStore::new_disk(blob_dir.path(), "shared")
             .expect("build blobstore"),
     );
-    let plc_client: Arc<dyn crate::plc::PlcClient> = Arc::new(MockPlcClient);
+    let plc_client: Arc<dyn crate::plc::PlcClient> = Arc::new(MockPlcClient::default());
 
     // Plan 06: account-status checks inside validate_access_token need
     // the registered AccountManager.
