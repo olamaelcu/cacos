@@ -43,6 +43,10 @@ hex = "0.4"
 secp256k1 = { version = "0.28", features = ["global-context", "rand"] }
 rand = "0.8"
 
+# --- plc client port (Plan 08 task 18) ---
+indexmap = { version = "2", features = ["serde"] }
+data-encoding = "2"
+
 # --- auth helper (Plan 05 task 5) ---
 base64-url = "2.0.2"
 jwt-simple = { version = "0.12.9", default-features = false, features = ["pure-rust"] }
@@ -50,6 +54,9 @@ jwt-simple = { version = "0.12.9", default-features = false, features = ["pure-r
 # --- passwords / app passwords (Plan 05 task 2) ---
 argon2 = "0.5.3"
 base64ct = "1.6.0"
+
+# --- email validation (Plan 08 task 7) ---
+email_address = "0.2"
 
 # --- observability (Plan 02) ---
 metrics = { workspace = true }
@@ -78,6 +85,9 @@ sqlx_0_8 = { workspace = true }
 async-stream = "0.3"
 ipld-core = { workspace = true }
 ulid = { workspace = true }
+
+# --- temp paths (test_utils runs in lib) ---
+tempfile = "3"
 
 [dev-dependencies]
 camino-tempfile = { workspace = true }
