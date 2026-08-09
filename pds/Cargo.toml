@@ -55,6 +55,9 @@ jwt-simple = { version = "0.12.9", default-features = false, features = ["pure-r
 argon2 = "0.5.3"
 base64ct = "1.6.0"
 
+# --- email validation (Plan 08 task 7) ---
+email_address = "0.2"
+
 # --- observability (Plan 02) ---
 metrics = { workspace = true }
 metrics-exporter-prometheus = { workspace = true }
