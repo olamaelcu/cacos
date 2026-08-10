@@ -827,6 +827,7 @@ dependencies = [
  "serde_repr",
  "sha2 0.10.9",
  "sqlx 0.8.6",
+ "subtle",
  "tempfile",
  "thiserror 2.0.19",
  "time",

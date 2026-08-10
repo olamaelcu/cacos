@@ -2,11 +2,13 @@
 //! via raw `Statement::from_sql_and_values` SQL.
 
 pub mod account;
+pub mod admin_tokens;
 pub mod auth;
 pub mod email_token;
 pub mod invite;
 pub mod password;
 pub mod repo;
+pub mod secrets;
 
 use sea_orm::{DatabaseBackend, Statement, Value};
 

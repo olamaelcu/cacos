@@ -24,13 +24,42 @@ use rsky_oauth::store::DeviceData;
 use rsky_oauth::{OAuthError, OAuthProvider, OAuthProviderConfig};
 use sea_orm::DatabaseConnection;
 use sha2::{Digest, Sha256};
-use std::sync::Arc;
+use std::collections::HashSet;
+use std::sync::{Arc, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
+use subtle::ConstantTimeEq;
 
 /// Stub that Task 6 replaces with the real SSRF-hardened fetcher.
 pub use fetcher::HttpClientMetadataFetcher;
 
 pub const DEVICE_COOKIE: &str = "device-id";
+
+/// Lazily-built `HashSet<String>` of `PDS_OAUTH_TRUSTED_CLIENTS` values,
+/// used by `is_trusted_oauth_client` for constant-time membership checks.
+fn trusted_clients_set() -> &'static HashSet<String> {
+    static SET: OnceLock<HashSet<String>> = OnceLock::new();
+    SET.get_or_init(|| {
+        std::env::var("PDS_OAUTH_TRUSTED_CLIENTS")
+            .ok()
+            .map(|raw| {
+                raw.split(',')
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty())
+                    .collect()
+            })
+            .unwrap_or_default()
+    })
+}
+
+/// Returns `true` when `candidate` is in the configured
+/// `PDS_OAUTH_TRUSTED_CLIENTS` set. Uses `subtle::ConstantTimeEq` so the
+/// comparison does not leak length or content via timing.
+pub fn is_trusted_oauth_client(candidate: &str) -> bool {
+    let candidate_bytes = candidate.as_bytes();
+    trusted_clients_set()
+        .iter()
+        .any(|registered| registered.as_bytes().ct_eq(candidate_bytes).into())
+}
 
 /// Shared OAuth provider handle, mounted as poem state. Plan 08 reads this
 /// from the request to validate DPoP-bound access tokens.
@@ -66,6 +95,10 @@ impl SharedOAuthProvider {
                     .collect()
             })
             .unwrap_or_default();
+        // Touch the lazy-cached set so it is materialised alongside the
+        // provider (avoids a cold-start miss in callers using
+        // `is_trusted_oauth_client`).
+        let _ = trusted_clients_set();
         let provider = OAuthProvider::new(OAuthProviderConfig {
             issuer,
             audience,

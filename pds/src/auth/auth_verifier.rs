@@ -670,6 +670,7 @@ async fn validate_access_token_inner(
 
 /// Basic-auth admin token guard.
 pub async fn verify_admin_token(auth_header: Option<&str>) -> Result<AccessOutput, AuthError> {
+    use subtle::ConstantTimeEq;
     match parse_basic_auth(auth_header.unwrap_or_default()) {
         None => Err(AuthError::AuthRequired("AuthMissing".to_string())),
         Some(parsed) => {
@@ -677,7 +678,13 @@ pub async fn verify_admin_token(auth_header: Option<&str>) -> Result<AccessOutpu
                 tracing::error!("admin password is not configured");
                 return Err(AuthError::AuthRequired("BadAuth".to_string()));
             };
-            if parsed.username != "admin" || parsed.password != admin_password {
+            let user_ok: bool = parsed.username.as_bytes().ct_eq(b"admin").into();
+            let pass_ok: bool = parsed
+                .password
+                .as_bytes()
+                .ct_eq(admin_password.as_bytes())
+                .into();
+            if !user_ok || !pass_ok {
                 Err(AuthError::AuthRequired("BadAuth".to_string()))
             } else {
                 Ok(AccessOutput {

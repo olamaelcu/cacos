@@ -90,6 +90,9 @@ ulid = { workspace = true }
 # --- temp paths (test_utils runs in lib) ---
 tempfile = "3"
 
+# --- constant-time comparisons (admin auth + secret comparison hardening) ---
+subtle = "2"
+
 [dev-dependencies]
 camino-tempfile = { workspace = true }
 poem = { workspace = true, features = ["test"] }
