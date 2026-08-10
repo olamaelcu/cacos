@@ -34,6 +34,7 @@ pub(crate) fn placeholders(len: usize) -> String {
 use crate::observability::metrics::{
     ACTOR_CACHE_HITS_TOTAL, ACTOR_CACHE_MISSES_TOTAL, COMMITS_TOTAL,
 };
+use crate::observability::timing::timed;
 
 #[derive(Clone, Debug)]
 pub struct SqlRepoReader {
@@ -90,6 +91,13 @@ impl SqlRepoReader {
     /// Multi-cid variant. Splits into cached vs missing, queries missing via
     /// `is_in` in batches of 500, populates the cache.
     async fn get_blocks_impl(&self, cids: Vec<Cid>) -> Result<BlocksAndMissing> {
+        timed("actor_get_blocks", async {
+            self.get_blocks_inner(cids).await
+        })
+        .await
+    }
+
+    async fn get_blocks_inner(&self, cids: Vec<Cid>) -> Result<BlocksAndMissing> {
         let cached = {
             let mut cache_guard = self.cache.write().await;
             cache_guard.get_many(cids).map_err(|e| {
@@ -311,6 +319,13 @@ impl SqlRepoReader {
     }
 
     async fn put_many_impl(&self, to_put: BlockMap, rev: String) -> Result<()> {
+        timed("actor_blocks_put", async {
+            self.put_many_inner(to_put, rev).await
+        })
+        .await
+    }
+
+    async fn put_many_inner(&self, to_put: BlockMap, rev: String) -> Result<()> {
         let entries: Vec<(String, Vec<u8>)> = to_put
             .map
             .iter()
@@ -340,6 +355,18 @@ impl SqlRepoReader {
     }
 
     async fn update_root_impl(
+        &self,
+        cid: lexicon_cid::Cid,
+        rev: String,
+        is_create: Option<bool>,
+    ) -> Result<()> {
+        timed("actor_root_write", async {
+            self.update_root_inner(cid, rev, is_create).await
+        })
+        .await
+    }
+
+    async fn update_root_inner(
         &self,
         cid: lexicon_cid::Cid,
         rev: String,
@@ -395,6 +422,44 @@ impl SqlRepoReader {
         commit: rsky_repo::types::CommitData,
         is_create: Option<bool>,
     ) -> Result<()> {
+        // The whole commit (root write + block inserts + block deletes) runs
+        // inside a single sea-orm transaction. We wrap the I/O with a
+        // single `actor_apply_commit` stage histogram observation so the
+        // atomic boundary stays intact; finer-grained labels would have to
+        // live inside the transaction callback, where they would not be
+        //   able to escape the SeaORM transaction-error path cleanly.
+        let commit_for_stage = commit.clone();
+        timed("actor_apply_commit", async move {
+            self.apply_commit_inner(commit_for_stage, is_create).await
+        })
+        .await?;
+
+        // Cache eviction only happens AFTER the commit succeeds, so a
+        // rolled-back commit leaves the cache intact. Wrap it as a separate
+        // stage so dashboards can tell the eviction latency apart from the
+        // commit latency.
+        let cid_keys: Vec<String> = commit
+            .removed_cids
+            .to_list()
+            .iter()
+            .map(|c| c.to_string())
+            .collect();
+        timed("actor_cache_evict", async {
+            let mut cache_guard = self.cache.write().await;
+            for key in cid_keys {
+                cache_guard.map.remove(&key);
+            }
+        })
+        .await;
+
+        Ok(())
+    }
+
+    async fn apply_commit_inner(
+        &self,
+        commit: rsky_repo::types::CommitData,
+        is_create: Option<bool>,
+    ) -> Result<()> {
         let now_str = self.now.clone();
         let did = self.did.clone();
         let is_create = is_create.unwrap_or(false);
@@ -425,6 +490,7 @@ impl SqlRepoReader {
         self.db
             .transaction_async::<_, (), PdsError>(async move |txn| {
                 let did = migration::types::did::Did::new(did);
+                let root_start = std::time::Instant::now();
                 if is_create {
                     let am = repo_root::ActiveModel {
                         did: sea_orm::Set(did),
@@ -452,7 +518,13 @@ impl SqlRepoReader {
                         )
                     })?;
                 }
+                metrics::histogram!(
+                    crate::observability::metrics::TIMING_STAGE_SECONDS,
+                    "stage" => "actor_root_write"
+                )
+                .record(root_start.elapsed().as_secs_f64());
                 for (cid_str, content) in &blocks {
+                    let block_start = std::time::Instant::now();
                     let size = content.len() as i64;
                     let am = repo_block::ActiveModel {
                         cid: sea_orm::Set(cid_str.clone()),
@@ -470,8 +542,14 @@ impl SqlRepoReader {
                                 anyhow::Error::from(e),
                             )
                         })?;
+                    metrics::histogram!(
+                        crate::observability::metrics::TIMING_STAGE_SECONDS,
+                        "stage" => "actor_blocks_put"
+                    )
+                    .record(block_start.elapsed().as_secs_f64());
                 }
                 for batch in removed.chunks(500) {
+                    let del_start = std::time::Instant::now();
                     repo_block::Entity::delete_many()
                         .filter(repo_block::Column::Cid.is_in(batch.to_vec()))
                         .exec(txn)
@@ -482,6 +560,11 @@ impl SqlRepoReader {
                                 anyhow::Error::from(e),
                             )
                         })?;
+                    metrics::histogram!(
+                        crate::observability::metrics::TIMING_STAGE_SECONDS,
+                        "stage" => "actor_blocks_delete"
+                    )
+                    .record(del_start.elapsed().as_secs_f64());
                 }
                 metrics::counter!(COMMITS_TOTAL).increment(1);
                 Ok(())
@@ -865,6 +948,81 @@ mod tests {
         assert!(
             out.contains("cacos_actor_cache_misses_total"),
             "cache misses counter missing:\n{out}"
+        );
+    }
+
+    /// Stage histogram samples fire for `actor_apply_commit`,
+    /// `actor_cache_evict`, and `actor_blocks_put` (when the commit
+    /// touches blocks). `actor_root_write` is recorded when callers
+    /// invoke `update_root` directly; `apply_commit` does the root
+    /// insert/update inline so the transaction boundary stays
+    /// intact.
+    #[tokio::test]
+    async fn commit_records_stage_timings() {
+        crate::observability::metrics::init_metrics();
+        let (_dir, reader) = test_reader().await;
+        let root_cid = cid_for(b"root-stage");
+        reader
+            .update_root(root_cid, "rev-stage".to_owned(), Some(true))
+            .await
+            .unwrap();
+
+        let added = b"staged".to_vec();
+        let added_cid = cid_for(&added);
+        let mut new_blocks = BlockMap::new();
+        new_blocks.set(added_cid, added.clone());
+        let commit = rsky_repo::types::CommitData {
+            cid: added_cid,
+            rev: "rev-stage2".to_owned(),
+            since: Some("rev-stage".to_owned()),
+            prev: Some(root_cid),
+            new_blocks,
+            relevant_blocks: BlockMap::new(),
+            removed_cids: CidSet::new(None),
+        };
+        reader.apply_commit(commit, None).await.unwrap();
+
+        let snapshot = crate::observability::metrics::render();
+        assert!(
+            snapshot.contains("cacos_timing_seconds_count{stage=\"actor_apply_commit\"}"),
+            "expected actor_apply_commit stage sample: {snapshot}"
+        );
+        assert!(
+            snapshot.contains("cacos_timing_seconds_count{stage=\"actor_root_write\"}"),
+            "expected actor_root_write stage sample: {snapshot}"
+        );
+        assert!(
+            snapshot.contains("cacos_timing_seconds_count{stage=\"actor_blocks_put\"}"),
+            "expected actor_blocks_put stage sample: {snapshot}"
+        );
+        assert!(
+            snapshot.contains("cacos_timing_seconds_count{stage=\"actor_cache_evict\"}"),
+            "expected actor_cache_evict stage sample: {snapshot}"
+        );
+        assert!(
+            snapshot.contains("cacos_commits_total"),
+            "expected COMMITS_TOTAL counter: {snapshot}"
+        );
+    }
+
+    /// `get_blocks` records the `actor_get_blocks` stage sample on both
+    /// the cache-hit path and the cache-miss path.
+    #[tokio::test]
+    async fn get_blocks_records_actor_get_blocks_timing() {
+        crate::observability::metrics::init_metrics();
+        let (_dir, reader) = test_reader().await;
+        let bytes = b"get-blocks-staged".to_vec();
+        let cid = seed_block(&reader, &bytes, "rev-1").await;
+        let _ = reader.get_blocks(vec![cid]).await.unwrap();
+        let _ = reader.get_blocks(vec![cid]).await.unwrap();
+        let snapshot = crate::observability::metrics::render();
+        assert!(
+            snapshot.contains("cacos_timing_seconds_count{stage=\"actor_get_blocks\"}"),
+            "expected actor_get_blocks stage sample: {snapshot}"
+        );
+        assert!(
+            snapshot.contains("cacos_actor_cache_hits_total"),
+            "expected cache hits count: {snapshot}"
         );
     }
 

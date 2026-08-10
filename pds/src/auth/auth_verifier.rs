@@ -24,6 +24,7 @@ use crate::account::helpers::auth::{AuthScope, PDS_JWT_KEYPAIR};
 use anyhow::{Result, bail};
 use base64ct::{Base64UrlUnpadded, Encoding};
 use jwt_simple::prelude::*;
+use std::sync::RwLock;
 use rsky_crypto::verify::verify_signature_digest;
 use rsky_oauth::dpop::DpopRequest;
 use rsky_oauth::{OAuthProvider, VerifiedAccess};
@@ -43,8 +44,8 @@ const INFINITY: u64 = u64::MAX;
 /// the identity plan; returns `InternalServerError` until then.
 pub type SigningKeyResolver = Box<dyn Fn(String, bool) -> Result<String> + Send + Sync>;
 
-static OAUTH_PROVIDER: OnceLock<Arc<OAuthProvider>> = OnceLock::new();
-static ACCOUNT_MANAGER: OnceLock<Arc<AccountManager>> = OnceLock::new();
+static OAUTH_PROVIDER: RwLock<Option<Arc<OAuthProvider>>> = RwLock::new(None);
+static ACCOUNT_MANAGER: RwLock<Option<Arc<AccountManager>>> = RwLock::new(None);
 static SIGNING_KEY_RESOLVER: OnceLock<SigningKeyResolver> = OnceLock::new();
 
 /// Register the shared OAuth provider (for DPoP-bound access-token
@@ -55,10 +56,27 @@ pub fn register_auth_dependencies(
     account_manager: Arc<AccountManager>,
     provider: Option<Arc<OAuthProvider>>,
 ) {
-    if let Some(provider) = provider {
-        let _ = OAUTH_PROVIDER.set(provider);
+    if let Some(provider) = provider
+        && let Ok(mut g) = OAUTH_PROVIDER.write()
+    {
+        *g = Some(provider);
     }
-    let _ = ACCOUNT_MANAGER.set(account_manager);
+    if let Ok(mut g) = ACCOUNT_MANAGER.write() {
+        *g = Some(account_manager);
+    }
+}
+
+/// Test-only: clear the registered OAuth provider and AccountManager so
+/// a fresh registration can take their place. Production code should
+/// never call this.
+#[doc(hidden)]
+pub fn _reset_auth_dependencies_for_tests() {
+    if let Ok(mut g) = OAUTH_PROVIDER.write() {
+        *g = None;
+    }
+    if let Ok(mut g) = ACCOUNT_MANAGER.write() {
+        *g = None;
+    }
 }
 
 /// Register the did -> signing-key resolver used by `verify_user_did_token`
@@ -427,7 +445,11 @@ pub fn check_account_status(
 /// Fetches the account projection for [`check_account_status`] from the
 /// registered `AccountManager`.
 pub async fn fetch_account_status(did: &str) -> Result<Option<AccountStatus>, AuthError> {
-    let Some(account_manager) = ACCOUNT_MANAGER.get() else {
+    let account_manager = ACCOUNT_MANAGER
+        .read()
+        .unwrap_or_else(|e| e.into_inner())
+        .clone();
+    let Some(account_manager) = account_manager else {
         return Err(AuthError::InternalServerError(
             "AccountManager is not registered".to_string(),
         ));
@@ -489,7 +511,11 @@ pub async fn validate_dpop_access_token(
     scopes: Vec<AuthScope>,
     opts: Option<ValidateAccessTokenOpts>,
 ) -> Result<AccessOutput, AuthError> {
-    let Some(provider) = OAUTH_PROVIDER.get() else {
+    let provider = OAUTH_PROVIDER
+        .read()
+        .unwrap_or_else(|e| e.into_inner())
+        .clone();
+    let Some(provider) = provider else {
         return Err(AuthError::InternalServerError(
             "OAuth provider is not configured".to_string(),
         ));
@@ -563,6 +589,17 @@ pub async fn validate_dpop_access_token(
 /// the DPoP branch when the `Authorization` header carries the `DPoP`
 /// scheme, otherwise verifies a legacy bearer JWT against `PDS_SERVICE_DID`.
 pub async fn validate_access_token(
+    auth_header: Option<&str>,
+    scopes: Vec<AuthScope>,
+    opts: Option<ValidateAccessTokenOpts>,
+) -> Result<AccessOutput, AuthError> {
+    crate::observability::timing::timed("auth", async {
+        validate_access_token_inner(auth_header, scopes, opts).await
+    })
+    .await
+}
+
+async fn validate_access_token_inner(
     auth_header: Option<&str>,
     scopes: Vec<AuthScope>,
     opts: Option<ValidateAccessTokenOpts>,
@@ -1225,6 +1262,25 @@ mod tests {
         let err = validate_bearer_token(&token, vec![AuthScope::Access], Some(verify_options()))
             .unwrap_err();
         assert!(is_expired_jwt(&err));
+    }
+
+    #[tokio::test]
+    #[allow(non_snake_case)]
+    async fn validate_access_token_records_auth_stage_timing() {
+        crate::observability::metrics::init_metrics();
+        setup_env();
+        let token = sign_token(
+            AuthScope::Access,
+            StdDuration::from_secs(60),
+            "did:plc:alice",
+        );
+        let header = format!("Bearer {token}");
+        let _ = validate_access_token(Some(&header), vec![AuthScope::Access], None).await;
+        let snapshot = crate::observability::metrics::render();
+        assert!(
+            snapshot.contains("cacos_timing_seconds_count{stage=\"auth\"}"),
+            "expected auth stage sample: {snapshot}"
+        );
     }
 
     #[tokio::test]

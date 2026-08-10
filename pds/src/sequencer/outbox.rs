@@ -5,6 +5,8 @@
 //! channel and the Stream interface. The consumer `next()`s on a unbuffered
 //! mpsc sender that we feed from the broadcast on a small background task.
 
+use crate::observability::metrics::OUTBOX_BUFFER_LAG;
+use crate::observability::timing::timed;
 use crate::sequencer::Sequencer;
 use crate::sequencer::apalis_worker::SharedBroadcast;
 use crate::sequencer::events::SeqEvt;
@@ -39,6 +41,11 @@ pub struct Outbox {
     pub sequencer: Sequencer,
     pub backfill_cursor: Option<i64>,
     pub broadcast: SharedBroadcast,
+    /// Max seq observed on the broadcast channel for the current
+    /// subscription. Distinct from `last_seen` (which advances only when
+    /// the stream yields an event to the consumer); the gauge is
+    /// `max(0, max_observed - last_seen)`.
+    pub max_observed: i64,
 }
 
 impl Outbox {
@@ -54,23 +61,48 @@ impl Outbox {
             sequencer,
             backfill_cursor: None,
             broadcast,
+            max_observed: -1,
         }
     }
 
+    /// Record the highest seq we have seen on the broadcast channel and
+    /// refresh the `cacos_outbox_buffer_lag` gauge. The gauge is
+    /// `max(0, max_observed - last_seen)` where `last_seen` is the
+    /// consumer's current progress.
+    fn observe_max(&mut self, seq: i64) {
+        if seq > self.max_observed {
+            self.max_observed = seq;
+        }
+        let lag = std::cmp::max(0, self.max_observed - self.last_seen);
+        metrics::gauge!(OUTBOX_BUFFER_LAG).set(lag as f64);
+    }
+
     pub async fn events(&mut self, backfill_cursor: Option<i64>) -> OutboxStream {
+        let mut seqs: Vec<i64> = Vec::new();
         let mut evts: Vec<SeqEvt> = Vec::new();
-        if let Some(cursor) = backfill_cursor {
-            self.backfill_cursor = Some(cursor);
-            let mut stream = self.get_backfill(cursor).await;
-            while let Some(evt) = stream.next().await {
-                match evt {
-                    Ok(e) => evts.push(e),
-                    Err(err) => {
-                        tracing::warn!("outbox backfill error: {err}");
-                        break;
+        {
+            timed("outbox_events", async {
+                if let Some(cursor) = backfill_cursor {
+                    self.backfill_cursor = Some(cursor);
+                    let mut stream = self.get_backfill(cursor).await;
+                    while let Some(evt) = stream.next().await {
+                        match evt {
+                            Ok(e) => {
+                                seqs.push(e.seq());
+                                evts.push(e);
+                            }
+                            Err(err) => {
+                                tracing::warn!("outbox backfill error: {err}");
+                                break;
+                            }
+                        }
                     }
                 }
-            }
+            })
+            .await;
+        }
+        for seq in &seqs {
+            self.observe_max(*seq);
         }
 
         let mut guard = self.caught_up.lock().await;
@@ -172,6 +204,10 @@ impl Stream for OutboxStream {
                     *g = seq;
                 }
             });
+            // The backfill iterator already populated `Outbox::max_observed`
+            // — refresh the gauge here so the consumer advance is also
+            // reflected.
+            metrics::gauge!(OUTBOX_BUFFER_LAG).set(0.0);
             return Poll::Ready(Some(Ok(evt)));
         }
         match me.rx.poll_recv(cx) {
@@ -317,5 +353,39 @@ mod tests {
             .unwrap()
             .unwrap();
         assert!(evt.seq() > 0);
+    }
+
+    #[tokio::test]
+    async fn outbox_lag_gauge_populated_from_backfill() {
+        use crate::observability::metrics::OUTBOX_BUFFER_LAG;
+        crate::observability::metrics::init_metrics();
+        let (mut seq, _db) = test_sequencer().await;
+        let did = "did:plc:lagtest";
+        insert_envelope(&mut seq, did, "identity", event_body(did, "identity")).await;
+        tokio::time::sleep(Duration::from_millis(2)).await;
+        insert_envelope(&mut seq, did, "account", event_body(did, "account")).await;
+
+        let broadcast = SharedBroadcast::new(16);
+        let mut outbox = Outbox::new(seq.clone(), broadcast.clone(), None);
+        let mut stream = outbox.events(Some(0)).await;
+        // Drain the backfill so last_seen catches up to the largest seq.
+        let _ = tokio::time::timeout(Duration::from_secs(2), stream.next())
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        let _ = tokio::time::timeout(Duration::from_secs(2), stream.next())
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+
+        let snapshot = crate::observability::metrics::render();
+        // After the consumer has caught up, the gauge should be zero.
+        let needle = format!("{} 0", OUTBOX_BUFFER_LAG);
+        assert!(
+            snapshot.contains(&needle),
+            "expected outbox lag to be 0 in: {snapshot}"
+        );
     }
 }

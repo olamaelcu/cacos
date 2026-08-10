@@ -18,6 +18,8 @@ pub mod ws_frames;
 use crate::db::entities::repo_seq;
 use crate::db::types::db_id::DbId;
 use crate::error::PdsError;
+
+use crate::observability::timing::timed;
 use crate::sequencer::apalis_worker::{SeqEventJob, enqueue_seq_event_job};
 use crate::sequencer::crawlers::Crawlers;
 use crate::sequencer::events::{
@@ -134,6 +136,16 @@ impl Sequencer {
     }
 
     pub async fn request_seq_range(
+        &self,
+        opts: RequestSeqRangeOpts,
+    ) -> Result<Vec<repo_seq::Model>> {
+        timed("seq_poll", async {
+            self.request_seq_range_inner(opts).await
+        })
+        .await
+    }
+
+    async fn request_seq_range_inner(
         &self,
         opts: RequestSeqRangeOpts,
     ) -> Result<Vec<repo_seq::Model>> {
@@ -469,6 +481,39 @@ mod tests {
         assert_eq!(rows.len(), 2);
         assert_eq!(rows[0].event_type, "identity");
         assert_eq!(rows[1].event_type, "account");
+    }
+
+    #[tokio::test]
+    async fn request_seq_range_records_seq_poll_timing() {
+        crate::observability::metrics::init_metrics();
+        let (mut seq, _db) = test_sequencer().await;
+        let did = Did::from("did:plc:seqpoll".to_string());
+        let evt = RepoSeqNew::new(
+            did.clone(),
+            "identity".to_string(),
+            serde_ipld_dagcbor::to_vec(&events::IdentityEvt {
+                did: "did:plc:seqpoll".to_string(),
+                handle: Some("alice.test".to_string()),
+            })
+            .unwrap(),
+            now_offset(),
+        );
+        seq.sequence_evt(evt).await.unwrap();
+        let _ = seq
+            .request_seq_range(RequestSeqRangeOpts {
+                earliest_seq: None,
+                latest_seq: None,
+                earliest_time: None,
+                limit: Some(10),
+            })
+            .await
+            .unwrap();
+        let snapshot = crate::observability::metrics::render();
+        let needle = "cacos_timing_seconds_count{stage=\"seq_poll\"}";
+        assert!(
+            snapshot.contains(needle),
+            "expected seq_poll stage sample: {snapshot}"
+        );
     }
 
     #[tokio::test]

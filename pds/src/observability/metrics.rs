@@ -22,6 +22,9 @@ pub const OUTBOX_BUFFER_LAG: &str = "cacos_outbox_buffer_lag";
 pub const TIMING_P50_SECONDS: &str = "cacos_timing_p50_seconds";
 pub const TIMING_P90_SECONDS: &str = "cacos_timing_p90_seconds";
 pub const TIMING_P99_SECONDS: &str = "cacos_timing_p99_seconds";
+pub const TIMING_P999_SECONDS: &str = "cacos_timing_p999_seconds";
+pub const TIMING_MAX_SECONDS: &str = "cacos_timing_max_seconds";
+pub const TIMING_STAGE_SECONDS: &str = "cacos_timing_seconds";
 pub const HTTP_REQUEST_DURATION_SECONDS: &str = "cacos_http_request_duration_seconds";
 pub const SEQUENCER_POLL_INTERVAL_SECONDS: &str = "cacos_sequencer_poll_interval_seconds";
 pub const BLOB_PUT_BYTES: &str = "cacos_blob_put_bytes";
@@ -74,6 +77,21 @@ pub fn describe() {
         Unit::Seconds,
         "p99 inter-event timing (seconds)"
     );
+    describe_gauge!(
+        TIMING_P999_SECONDS,
+        Unit::Seconds,
+        "p999 inter-event timing (seconds)"
+    );
+    describe_gauge!(
+        TIMING_MAX_SECONDS,
+        Unit::Seconds,
+        "max inter-event timing (seconds)"
+    );
+    describe_histogram!(
+        TIMING_STAGE_SECONDS,
+        Unit::Seconds,
+        "Stage timing histogram, labeled by stage"
+    );
     describe_histogram!(
         HTTP_REQUEST_DURATION_SECONDS,
         Unit::Seconds,
@@ -114,11 +132,32 @@ pub fn describe() {
 static METRICS_HANDLE: RwLock<Option<PrometheusHandle>> = RwLock::new(None);
 
 /// Build the Prometheus recorder, install it globally, and keep a render handle.
-/// Safe to call more than once (the previous global recorder is replaced).
+/// Safe to call more than once (the previous global recorder is reused).
 pub fn init_metrics() {
+    // Fast path: a recorder is already installed and its handle cached.
+    if METRICS_HANDLE
+        .read()
+        .expect("metrics handle lock poisoned")
+        .is_some()
+    {
+        return;
+    }
+    // Slow path: build a recorder, attempt to install it globally, and
+    // only cache the handle if our recorder actually won the global
+    // recorder slot. This guards against a race where two callers both
+    // pass the fast-path check and one of them would otherwise overwrite
+    // the global recorder with a recorder that is then dropped — leaving
+    // METRICS_HANDLE pointing at the dropped recorder.
     let recorder = PrometheusBuilder::new().build_recorder();
     let handle = recorder.handle();
-    drop(metrics::set_global_recorder(recorder));
+    if metrics::set_global_recorder(recorder).is_err() {
+        // Another caller beat us to the global recorder. Drop our
+        // recorder (which `set_global_recorder` already discarded) and
+        // return without touching METRICS_HANDLE. The integration
+        // tests share a single cached handle via a `OnceLock` at the
+        // test entry point, so they never hit this branch in practice.
+        return;
+    }
     *METRICS_HANDLE
         .write()
         .expect("metrics handle lock poisoned") = Some(handle);
@@ -172,5 +211,51 @@ mod tests {
             describe();
         });
         let _out = handle.render(); // must not panic
+    }
+
+    #[test]
+    fn metrics_registered_with_help_text() {
+        let recorder = PrometheusBuilder::new().build_recorder();
+        let handle = recorder.handle();
+        with_local_recorder(&recorder, || {
+            describe();
+            metrics::gauge!(TIMING_P999_SECONDS).set(0.1);
+            metrics::gauge!(TIMING_MAX_SECONDS).set(0.2);
+            metrics::histogram!(TIMING_STAGE_SECONDS, "stage" => "test").record(0.05);
+        });
+        let out = handle.render();
+        assert!(
+            out.contains("# HELP cacos_timing_p999_seconds"),
+            "missing p999 HELP: {out}"
+        );
+        assert!(
+            out.contains("# HELP cacos_timing_max_seconds"),
+            "missing max HELP: {out}"
+        );
+        assert!(
+            out.contains("# HELP cacos_timing_seconds"),
+            "missing stage histogram HELP: {out}"
+        );
+        assert!(
+            out.contains("cacos_timing_p999_seconds 0.1"),
+            "missing p999 sample: {out}"
+        );
+        assert!(
+            out.contains("cacos_timing_max_seconds 0.2"),
+            "missing max sample: {out}"
+        );
+    }
+
+    #[test]
+    fn timing_metric_names_keep_cacos_prefix() {
+        assert!(TIMING_P50_SECONDS.starts_with("cacos_"));
+        assert!(TIMING_P90_SECONDS.starts_with("cacos_"));
+        assert!(TIMING_P99_SECONDS.starts_with("cacos_"));
+        assert!(TIMING_P999_SECONDS.starts_with("cacos_"));
+        assert!(TIMING_MAX_SECONDS.starts_with("cacos_"));
+        assert!(TIMING_STAGE_SECONDS.starts_with("cacos_"));
+        assert_eq!(TIMING_P999_SECONDS, "cacos_timing_p999_seconds");
+        assert_eq!(TIMING_MAX_SECONDS, "cacos_timing_max_seconds");
+        assert_eq!(TIMING_STAGE_SECONDS, "cacos_timing_seconds");
     }
 }

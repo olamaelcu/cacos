@@ -66,6 +66,7 @@ poem = { workspace = true, features = ["cookie"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 tracing-timing = { workspace = true }
+tracing-unwrap = { workspace = true }
 
 # --- encoding primitives used by blobstore ---
 bytes = "1"
