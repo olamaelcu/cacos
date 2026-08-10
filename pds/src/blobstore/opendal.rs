@@ -45,6 +45,7 @@ use rand::RngCore;
 
 use crate::blobstore::{BlobNotFoundError, BlobStore, BoxedBlobStream};
 use crate::observability::metrics::{BLOB_GET_BYTES, BLOB_OPS_TOTAL, BLOB_PUT_BYTES};
+use crate::observability::timing::timed;
 
 /// Chunk size for `delete_many` error counting. OpenDAL batches deletes
 /// server-side for S3; for local FS each call is one syscall.
@@ -199,16 +200,20 @@ impl BlobStore for OpenDALBlobStore {
     type Stream = BoxedBlobStream;
 
     fn put_temp(&self, bytes: Vec<u8>) -> BoxFuture<'_, Result<String>> {
+        let bytes_len = bytes.len();
         Box::pin(async move {
-            counter_op("put_temp");
-            let key = Self::tmp_key();
-            let path = self.tmp_path(&key);
-            self.op
-                .write(&path, bytes.clone())
-                .await
-                .map_err(map_not_found)?;
-            histogram_put_bytes(bytes.len());
-            Ok(key)
+            timed("blob_put", async {
+                counter_op("put_temp");
+                let key = Self::tmp_key();
+                let path = self.tmp_path(&key);
+                self.op
+                    .write(&path, bytes)
+                    .await
+                    .map_err(map_not_found)?;
+                histogram_put_bytes(bytes_len);
+                Ok(key)
+            })
+            .await
         })
     }
 
@@ -235,15 +240,19 @@ impl BlobStore for OpenDALBlobStore {
     }
 
     fn put_permanent(&self, cid: Cid, bytes: Vec<u8>) -> BoxFuture<'_, Result<()>> {
+        let bytes_len = bytes.len();
         Box::pin(async move {
-            counter_op("put_permanent");
-            let path = self.stored_path(cid);
-            self.op
-                .write(&path, bytes.clone())
-                .await
-                .map_err(map_not_found)?;
-            histogram_put_bytes(bytes.len());
-            Ok(())
+            timed("blob_put", async {
+                counter_op("put_permanent");
+                let path = self.stored_path(cid);
+                self.op
+                    .write(&path, bytes)
+                    .await
+                    .map_err(map_not_found)?;
+                histogram_put_bytes(bytes_len);
+                Ok(())
+            })
+            .await
         })
     }
 
@@ -269,43 +278,49 @@ impl BlobStore for OpenDALBlobStore {
 
     fn get_bytes(&self, cid: Cid) -> BoxFuture<'_, Result<Vec<u8>>> {
         Box::pin(async move {
-            counter_op("get_bytes");
-            let path = self.stored_path(cid);
-            let buffer = self.op.read(&path).await.map_err(map_not_found)?;
-            let bytes = buffer.to_vec();
-            histogram_get_bytes(bytes.len());
-            Ok(bytes)
+            timed("blob_get", async {
+                counter_op("get_bytes");
+                let path = self.stored_path(cid);
+                let buffer = self.op.read(&path).await.map_err(map_not_found)?;
+                let bytes = buffer.to_vec();
+                histogram_get_bytes(bytes.len());
+                Ok(bytes)
+            })
+            .await
         })
     }
 
     fn get_stream(&self, cid: Cid) -> BoxFuture<'_, Result<Self::Stream>> {
         Box::pin(async move {
-            counter_op("get_stream");
-            let path = self.stored_path(cid);
-            let reader = self.op.reader(&path).await.map_err(map_not_found)?;
-            // Convert the OpenDAL reader to a futures::AsyncRead over the
-            // entire byte range. The result implements futures::AsyncRead;
-            // we wrap a poll_fn around poll_read to get a Stream<Bytes>.
-            let mut async_reader = reader
-                .into_futures_async_read(..)
-                .await
-                .map_err(map_not_found)?;
-            let stream = futures::stream::poll_fn(move |cx| {
-                let mut buf = [0u8; 8 * 1024];
-                let pinned = Pin::new(&mut async_reader);
-                match AsyncRead::poll_read(pinned, cx, &mut buf) {
-                    Poll::Ready(Ok(0)) => Poll::Ready(None),
-                    Poll::Ready(Ok(n)) => Poll::Ready(Some(Ok(Bytes::copy_from_slice(&buf[..n])))),
-                    Poll::Ready(Err(err)) => Poll::Ready(Some(Err(anyhow::Error::from(err)))),
-                    Poll::Pending => Poll::Pending,
-                }
-            });
-            // Count bytes as the caller drains the stream; we can't know the
-            // size up-front without an extra stat call.
-            let stream = stream.inspect_ok(|chunk| {
-                histogram_get_bytes(chunk.len());
-            });
-            Ok(stream.boxed())
+            timed("blob_get", async {
+                counter_op("get_stream");
+                let path = self.stored_path(cid);
+                let reader = self.op.reader(&path).await.map_err(map_not_found)?;
+                // Convert the OpenDAL reader to a futures::AsyncRead over the
+                // entire byte range. The result implements futures::AsyncRead;
+                // we wrap a poll_fn around poll_read to get a Stream<Bytes>.
+                let mut async_reader = reader
+                    .into_futures_async_read(..)
+                    .await
+                    .map_err(map_not_found)?;
+                let stream = futures::stream::poll_fn(move |cx| {
+                    let mut buf = [0u8; 8 * 1024];
+                    let pinned = Pin::new(&mut async_reader);
+                    match AsyncRead::poll_read(pinned, cx, &mut buf) {
+                        Poll::Ready(Ok(0)) => Poll::Ready(None),
+                        Poll::Ready(Ok(n)) => Poll::Ready(Some(Ok(Bytes::copy_from_slice(&buf[..n])))),
+                        Poll::Ready(Err(err)) => Poll::Ready(Some(Err(anyhow::Error::from(err)))),
+                        Poll::Pending => Poll::Pending,
+                    }
+                });
+                // Count bytes as the caller drains the stream; we can't know the
+                // size up-front without an extra stat call.
+                let stream = stream.inspect_ok(|chunk| {
+                    histogram_get_bytes(chunk.len());
+                });
+                Ok(stream.boxed())
+            })
+            .await
         })
     }
 
@@ -561,6 +576,34 @@ mod tests {
         assert!(
             err.downcast_ref::<BlobNotFoundError>().is_some(),
             "expected BlobNotFoundError, got {err:?}"
+        );
+    }
+
+    /// `put_permanent` and `get_bytes` both record into the `blob_put` /
+    /// `blob_get` stage histogram. The byte + op counters must still
+    /// fire.
+    #[tokio::test]
+    async fn put_and_get_record_blob_stage_timing() {
+        crate::observability::metrics::init_metrics();
+        let (_dir, op) = fs_op();
+        let store = OpenDALBlobStore::new(op, DID_A.to_owned());
+        let bytes = b"timing me".to_vec();
+        let cid = cid_for(&bytes);
+        store.put_permanent(cid, bytes.clone()).await.unwrap();
+        let _ = store.get_bytes(cid).await.unwrap();
+
+        let snapshot = crate::observability::metrics::render();
+        assert!(
+            snapshot.contains("cacos_timing_seconds_count{stage=\"blob_put\"}"),
+            "expected blob_put stage sample: {snapshot}"
+        );
+        assert!(
+            snapshot.contains("cacos_timing_seconds_count{stage=\"blob_get\"}"),
+            "expected blob_get stage sample: {snapshot}"
+        );
+        assert!(
+            snapshot.contains("cacos_blob_ops_total"),
+            "expected BLOB_OPS_TOTAL counter: {snapshot}"
         );
     }
 }
