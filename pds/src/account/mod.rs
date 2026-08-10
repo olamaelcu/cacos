@@ -191,6 +191,24 @@ impl AccountManager {
         account::get_account_admin_status(did, &self.db).await
     }
 
+    /// Whether `did`'s PLC document has already been rewritten to drop the
+    /// shared server-wide rotation key.
+    pub async fn is_plc_rotation_keys_migrated(&self, did: &str) -> Result<bool> {
+        account::is_plc_rotation_keys_migrated(did, &self.db).await
+    }
+
+    /// Records that `did`'s PLC document now lists only its per-DID
+    /// rotation key.
+    pub async fn mark_plc_rotation_keys_migrated(&self, did: &str) -> Result<()> {
+        account::mark_plc_rotation_keys_migrated(did, &self.db).await
+    }
+
+    /// DIDs still listing the shared server rotation key in their PLC
+    /// document — the work list for `migrate plc-rotation-keys`.
+    pub async fn list_unmigrated_plc_rotation_key_dids(&self) -> Result<Vec<String>> {
+        account::list_unmigrated_plc_rotation_key_dids(&self.db).await
+    }
+
     pub async fn update_repo_root(&self, did: String, cid: Cid, rev: String) -> Result<()> {
         repo::update_root(did, cid, rev, &self.db).await
     }

@@ -16,6 +16,7 @@ use crate::m20260801_000003_did_doc;
 use crate::m20260801_000004_actor;
 use crate::m20260801_000005_actor_space;
 use crate::m20260801_000006_account_lockout;
+use crate::m20260801_000007_plc_rotation_keys_migrated;
 
 /// Account database: 15 tables.
 pub struct AccountMigrator;
@@ -26,6 +27,7 @@ impl MigratorTrait for AccountMigrator {
         vec![
             Box::new(m20260801_000001_account::Migration),
             Box::new(m20260801_000006_account_lockout::Migration),
+            Box::new(m20260801_000007_plc_rotation_keys_migrated::Migration),
         ]
     }
 

@@ -29,10 +29,8 @@ use zeroize::Zeroize;
 pub static PDS_JWT_KEYPAIR: LazyLock<ES256kKeyPair> = LazyLock::new(|| {
     let secp = secp256k1::Secp256k1::new();
     let private_key = env::var("PDS_JWT_KEY_K256_PRIVATE_KEY_HEX").unwrap();
-    let mut secret_bytes =
-        SecretBox::new(Box::new(hex::decode(private_key.as_bytes()).unwrap()));
-    let secret_key =
-        secp256k1::SecretKey::from_slice(secret_bytes.expose_secret()).unwrap();
+    let mut secret_bytes = SecretBox::new(Box::new(hex::decode(private_key.as_bytes()).unwrap()));
+    let secret_key = secp256k1::SecretKey::from_slice(secret_bytes.expose_secret()).unwrap();
     let jwt_key = secp256k1::Keypair::from_secret_key(&secp, &secret_key);
     secret_bytes.expose_secret_mut().zeroize();
     ES256kKeyPair::from_bytes(jwt_key.secret_bytes().as_slice()).unwrap()

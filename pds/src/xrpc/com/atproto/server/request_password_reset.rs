@@ -51,9 +51,7 @@ async fn inner_request_password_reset(
                     }
                 }
                 Err(err) => {
-                    tracing::error!(
-                        "create_email_token(ResetPassword) failed for {did}: {err:?}"
-                    );
+                    tracing::error!("create_email_token(ResetPassword) failed for {did}: {err:?}");
                 }
             }
         });

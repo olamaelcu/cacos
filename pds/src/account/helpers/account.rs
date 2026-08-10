@@ -475,6 +475,52 @@ pub async fn clear_account_lockout(did: &str, db: &DatabaseConnection) -> Result
     Ok(())
 }
 
+/// Whether this DID's PLC document has already been rewritten to drop the
+/// shared server-wide rotation key. Unknown DIDs read as not migrated.
+pub async fn is_plc_rotation_keys_migrated(did: &str, db: &DatabaseConnection) -> Result<bool> {
+    let row: Option<QueryResult> = db
+        .query_one_raw(sql(
+            "SELECT \"plcRotationKeysMigrated\" FROM actor WHERE did = ?1",
+            vec![Value::from(did.to_owned())],
+        ))
+        .await?;
+    let Some(row) = row else {
+        return Ok(false);
+    };
+    // Stored as SQLite INTEGER 0/1; read as i32 so a NULL-tolerant
+    // fallback is possible on rows written before the column existed.
+    let flag: Option<i32> = row.try_get_by_index(0).ok().flatten();
+    Ok(flag.unwrap_or(0) != 0)
+}
+
+/// Records that `did`'s PLC document no longer lists the shared server
+/// rotation key. The `migrate plc-rotation-keys` pass skips marked rows.
+pub async fn mark_plc_rotation_keys_migrated(did: &str, db: &DatabaseConnection) -> Result<()> {
+    db.execute_raw(sql(
+        "UPDATE actor SET \"plcRotationKeysMigrated\" = 1 WHERE did = ?1",
+        vec![Value::from(did.to_owned())],
+    ))
+    .await?;
+    Ok(())
+}
+
+/// DIDs whose PLC document still lists the shared server rotation key, in
+/// stable `createdAt`/`did` order so an interrupted migration resumes
+/// deterministically.
+pub async fn list_unmigrated_plc_rotation_key_dids(db: &DatabaseConnection) -> Result<Vec<String>> {
+    let rows = db
+        .query_all_raw(sql(
+            "SELECT did FROM actor \
+             WHERE COALESCE(\"plcRotationKeysMigrated\", 0) = 0 \
+             ORDER BY \"createdAt\", did",
+            vec![],
+        ))
+        .await?;
+    rows.iter()
+        .map(|row| row.try_get_by_index::<String>(0).map_err(Into::into))
+        .collect()
+}
+
 pub async fn get_account_admin_status(
     did: &str,
     db: &DatabaseConnection,

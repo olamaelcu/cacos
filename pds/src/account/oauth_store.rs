@@ -161,6 +161,24 @@ impl PdsOAuthStore {
             .await
             .map_err(server_error)
     }
+
+    /// Records that `did`'s PLC document has been rewritten to drop the
+    /// shared server rotation key. Used by the `migrate plc-rotation-keys`
+    /// command to checkpoint progress so an interrupted pass resumes
+    /// where it stopped.
+    pub async fn mark_plc_rotation_keys_migrated(&self, did: &str) -> Result<(), OAuthError> {
+        crate::account::helpers::account::mark_plc_rotation_keys_migrated(did, &self.db)
+            .await
+            .map_err(server_error)
+    }
+
+    /// Whether `did`'s PLC document has already been rewritten to drop
+    /// the shared server rotation key. Unknown DIDs read as not migrated.
+    pub async fn is_plc_rotation_keys_migrated(&self, did: &str) -> Result<bool, OAuthError> {
+        crate::account::helpers::account::is_plc_rotation_keys_migrated(did, &self.db)
+            .await
+            .map_err(server_error)
+    }
 }
 
 fn unix_now_secs() -> i64 {

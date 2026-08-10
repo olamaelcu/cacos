@@ -15,7 +15,6 @@ use crate::plc::operations::{CreateAtprotoOpInput, create_op};
 use crate::plc::types::{OpOrTombstone, Operation};
 use crate::sequencer::events::sync_evt_data_from_commit;
 use crate::xrpc::auth_extractors::UserDidAuthOptional;
-use crate::xrpc::com::atproto::server::PDS_PLC_ROTATION_KEYPAIR;
 use crate::xrpc::types::SharedIdResolver;
 use crate::xrpc::{ApiError, ApiResult, SharedState};
 use email_address::EmailAddress;
@@ -23,6 +22,7 @@ use poem::web::{Data, Json};
 use rsky_common::env::env_bool;
 use rsky_crypto::utils::encode_did_key;
 use rsky_lexicon::com::atproto::server::{CreateAccountInput, CreateAccountOutput};
+use secp256k1::{Keypair, Secp256k1};
 use std::env;
 
 #[derive(Debug, serde::Deserialize, serde::Serialize, Clone)]
@@ -36,6 +36,16 @@ pub struct TransformedCreateAccountInput {
     pub deactivated: bool,
 }
 
+/// Validated inputs plus the per-DID PLC rotation key minted for a
+/// PDS-created `did:plc`.
+///
+/// The keypair is deliberately kept out of [`TransformedCreateAccountInput`]
+/// so secret material never rides along on a `Debug`/`Serialize` type.
+pub struct ValidatedCreateAccount {
+    pub input: TransformedCreateAccountInput,
+    pub plc_rotation_key: Option<Keypair>,
+}
+
 async fn inner_create_account(
     body: CreateAccountInput,
     auth: UserDidAuthOptional,
@@ -47,14 +57,18 @@ async fn inner_create_account(
         Some(access) if access.credentials.is_some() => access.credentials.unwrap().iss,
         _ => None,
     };
-    let TransformedCreateAccountInput {
-        email,
-        handle,
-        did,
-        invite_code,
-        password,
-        deactivated,
-        plc_op,
+    let ValidatedCreateAccount {
+        input:
+            TransformedCreateAccountInput {
+                email,
+                handle,
+                did,
+                invite_code,
+                password,
+                deactivated,
+                plc_op,
+            },
+        plc_rotation_key,
     } = validate_inputs_for_local_pds(state, body, requester).await?;
 
     // Create new actor repo
@@ -65,6 +79,35 @@ async fn inner_create_account(
     {
         tracing::error!("Failed to create actor store\n{error:?}");
         return Err(ApiError::RuntimeError);
+    }
+
+    // Persist the per-DID PLC rotation key before the genesis operation is
+    // submitted. The op below lists this key as the DID's only rotation
+    // key, so losing it after submission would leave the DID document
+    // permanently unmanageable — hence a hard failure rather than a warning.
+    match &plc_rotation_key {
+        Some(keypair) => {
+            if let Err(error) = state
+                .actor_store
+                .store_rotation_keypair(&did, keypair)
+                .await
+            {
+                tracing::error!("Failed to persist per-DID PLC rotation key\n{error:?}");
+                state
+                    .actor_store
+                    .destroy(&did, state.blobstore.clone())
+                    .await
+                    .map_err(|_| ApiError::RuntimeError)?;
+                return Err(ApiError::RuntimeError);
+            }
+        }
+        // Imported DID: this PDS did not mint the document, so a rotation
+        // key is convenience only. Best-effort.
+        None => {
+            if let Err(error) = state.actor_store.create_rotation_keypair(&did).await {
+                tracing::warn!("Failed to create per-DID PLC rotation key\n{error:?}");
+            }
+        }
     }
     let commit = {
         let actor_txn = match state
@@ -253,11 +296,12 @@ pub async fn validate_inputs_for_local_pds(
     state: &SharedState,
     input: CreateAccountInput,
     requester: Option<String>,
-) -> Result<TransformedCreateAccountInput, ApiError> {
+) -> Result<ValidatedCreateAccount, ApiError> {
     let did: String;
     let plc_op;
     let deactivated: bool;
     let email: String;
+    let plc_rotation_key;
 
     if input.plc_op.is_some() {
         return Err(ApiError::InvalidRequest(
@@ -337,34 +381,56 @@ pub async fn validate_inputs_for_local_pds(
             did = input_did;
             plc_op = None;
             deactivated = true;
+            plc_rotation_key = None;
         }
         None => {
             let res = format_did_and_plc_op(input).await?;
             did = res.0;
             plc_op = Some(res.1);
+            plc_rotation_key = Some(res.2);
             deactivated = false;
         }
     };
 
-    Ok(TransformedCreateAccountInput {
-        email,
-        handle,
-        did,
-        invite_code,
-        password,
-        plc_op,
-        deactivated,
+    Ok(ValidatedCreateAccount {
+        input: TransformedCreateAccountInput {
+            email,
+            handle,
+            did,
+            invite_code,
+            password,
+            plc_op,
+            deactivated,
+        },
+        plc_rotation_key,
     })
 }
 
-async fn format_did_and_plc_op(input: CreateAccountInput) -> Result<(String, Operation), ApiError> {
+/// Builds the genesis PLC operation and derives the `did:plc` from it.
+///
+/// The returned keypair is this DID's own rotation key and is the only
+/// rotation key in the operation (besides an optional caller-supplied
+/// recovery key). It is generated here rather than read back from the
+/// actor store because a `did:plc` is the hash of the very operation this
+/// key signs — the key necessarily predates the DID it gets filed under.
+/// `inner_create_account` persists it once the DID is known.
+///
+/// Deliberately no longer uses the shared `PDS_PLC_ROTATION_KEYPAIR`: a
+/// single server-wide key in every DID document means one key compromise
+/// takes over every account the PDS ever created.
+async fn format_did_and_plc_op(
+    input: CreateAccountInput,
+) -> Result<(String, Operation, Keypair), ApiError> {
     let mut rotation_keys: Vec<String> = Vec::new();
 
     if let Some(recovery_key) = &input.recovery_key {
         rotation_keys.push(recovery_key.clone());
     }
 
-    rotation_keys.push(encode_did_key(&PDS_PLC_ROTATION_KEYPAIR.public_key()));
+    let secp = Secp256k1::new();
+    let (secret_key, public_key) = secp.generate_keypair(&mut rand::thread_rng());
+    let rotation_keypair = Keypair::from_secret_key(&secp, &secret_key);
+    rotation_keys.push(encode_did_key(&public_key));
 
     let create_op_input = CreateAtprotoOpInput {
         signing_key: encode_did_key(&PDS_REPO_SIGNING_KEYPAIR.public_key()),
@@ -375,7 +441,7 @@ async fn format_did_and_plc_op(input: CreateAccountInput) -> Result<(String, Ope
         ),
         rotation_keys,
     };
-    let response = match create_op(create_op_input, PDS_PLC_ROTATION_KEYPAIR.secret_key()).await {
+    let response = match create_op(create_op_input, secret_key).await {
         Ok(res) => res,
         Err(error) => {
             tracing::error!("{error}");
@@ -383,7 +449,7 @@ async fn format_did_and_plc_op(input: CreateAccountInput) -> Result<(String, Ope
         }
     };
 
-    Ok(response)
+    Ok((response.0, response.1, rotation_keypair))
 }
 
 use crate::xrpc::com::atproto::server::safe_resolve_did_doc;

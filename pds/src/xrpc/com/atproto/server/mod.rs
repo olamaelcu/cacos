@@ -24,6 +24,7 @@ pub mod reset_password;
 pub mod revoke_app_password;
 pub mod update_email;
 
+use crate::actor_store::ActorStore;
 use crate::context::PDS_REPO_SIGNING_KEYPAIR;
 use crate::plc::PlcClient;
 use crate::xrpc::types::SharedIdResolver;
@@ -40,8 +41,7 @@ use zeroize::Zeroize;
 pub static PDS_PLC_ROTATION_KEYPAIR: LazyLock<Keypair> = LazyLock::new(|| {
     let secp = Secp256k1::new();
     let private_key = env::var("PDS_PLC_ROTATION_KEY_K256_PRIVATE_KEY_HEX").unwrap();
-    let mut secret_bytes =
-        SecretBox::new(Box::new(hex::decode(private_key.as_bytes()).unwrap()));
+    let mut secret_bytes = SecretBox::new(Box::new(hex::decode(private_key.as_bytes()).unwrap()));
     let secret_key = SecretKey::from_slice(secret_bytes.expose_secret()).unwrap();
     let keypair = Keypair::from_secret_key(&secp, &secret_key);
     secret_bytes.expose_secret_mut().zeroize();
@@ -53,6 +53,21 @@ pub struct AssertionContents {
     pub signing_key: Option<String>,
     pub pds_endpoint: Option<String>,
     pub rotation_keys: Option<Vec<String>>,
+    /// `did:key` of this DID's own rotation key, when the PDS holds one.
+    /// `None` for actors that predate per-DID rotation keys — those are
+    /// still governed by the shared server key until the
+    /// `migrate plc-rotation-keys` pass rewrites their document.
+    pub per_did_rotation_key: Option<String>,
+}
+
+/// `did:key` of the shared server-wide rotation key, or `None` once a
+/// deployment has finished migrating and stops configuring one.
+///
+/// Wraps [`PDS_PLC_ROTATION_KEYPAIR`], which panics on a missing env var.
+pub fn global_plc_rotation_key_did() -> Option<String> {
+    env::var("PDS_PLC_ROTATION_KEY_K256_PRIVATE_KEY_HEX")
+        .ok()
+        .map(|_| encode_did_key(&PDS_PLC_ROTATION_KEYPAIR.public_key()))
 }
 
 /// Formatted xxxxx-xxxxx
@@ -123,6 +138,17 @@ pub async fn assert_valid_did_documents_for_service(
     did: String,
     plc: &dyn PlcClient,
 ) -> Result<()> {
+    assert_valid_did_documents_for_service_with_store(did, plc, None).await
+}
+
+/// As [`assert_valid_did_documents_for_service`], but resolves the DID's own
+/// rotation key from `actor_store` so a document that has already dropped
+/// the shared server key still validates.
+pub async fn assert_valid_did_documents_for_service_with_store(
+    did: String,
+    plc: &dyn PlcClient,
+    actor_store: Option<&ActorStore>,
+) -> Result<()> {
     if did.starts_with("did:plc") {
         let resolved = plc.get_document_data(&did).await?;
         let pds_endpoint = resolved
@@ -130,10 +156,19 @@ pub async fn assert_valid_did_documents_for_service(
             .get("atproto_pds")
             .map(|service| service.endpoint.clone());
         let signing_key = resolved.verification_methods.get("atproto").cloned();
+        let per_did_rotation_key = match actor_store {
+            Some(store) => store
+                .rotation_keypair(&did)
+                .await
+                .ok()
+                .map(|keypair| encode_did_key(&keypair.public_key())),
+            None => None,
+        };
         assert_valid_doc_contents(AssertionContents {
             pds_endpoint,
             signing_key,
             rotation_keys: Some(resolved.rotation_keys),
+            per_did_rotation_key,
         })
         .await?;
     } else {
@@ -147,13 +182,21 @@ pub async fn assert_valid_doc_contents(contents: AssertionContents) -> Result<()
         signing_key,
         pds_endpoint,
         rotation_keys,
+        per_did_rotation_key,
     } = contents;
-    let plc_rotation_key = encode_did_key(&PDS_PLC_ROTATION_KEYPAIR.public_key());
 
-    if let Some(rotation_keys) = rotation_keys
-        && !rotation_keys.contains(&plc_rotation_key)
-    {
-        bail!("Server rotation key not included in PLC DID data")
+    // A document is manageable if it lists a rotation key this PDS holds:
+    // the account's own key once it has one, or the shared server key for
+    // actors not yet migrated off it.
+    if let Some(rotation_keys) = rotation_keys {
+        let has_per_did = per_did_rotation_key
+            .as_ref()
+            .is_some_and(|key| rotation_keys.contains(key));
+        let has_global =
+            global_plc_rotation_key_did().is_some_and(|key| rotation_keys.contains(&key));
+        if !has_per_did && !has_global {
+            bail!("No rotation key controlled by this PDS is included in PLC DID data")
+        }
     }
     let port = std::env::var("PDS_PORT")
         .ok()

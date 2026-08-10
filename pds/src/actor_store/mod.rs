@@ -140,6 +140,10 @@ pub struct ActorLocation {
     pub directory: PathBuf,
     pub db_location: PathBuf,
     pub key_location: PathBuf,
+    /// Per-DID PLC rotation key, a sibling of `key_location`. Absent for
+    /// actors created before per-DID rotation keys landed; the
+    /// `migrate rotation-keys` backfill seeds those from the global key.
+    pub rotation_key_location: PathBuf,
 }
 
 /// Service managing per-actor sqlite stores under a root directory.
@@ -169,10 +173,12 @@ impl ActorStore {
         let directory = self.directory.join(&did_hash[0..2]).join(did);
         let db_location = directory.join("store.sqlite");
         let key_location = directory.join("key");
+        let rotation_key_location = directory.join("rotation_key");
         Ok(ActorLocation {
             directory,
             db_location,
             key_location,
+            rotation_key_location,
         })
     }
 
@@ -194,6 +200,114 @@ impl ActorStore {
             Some(keypair) => Ok(keypair),
             None => Err(PdsError::NotFound(format!("keypair for {did}"))),
         }
+    }
+
+    /// Per-DID PLC rotation keypair.
+    ///
+    /// `NotFound` means the actor predates per-DID rotation keys: the
+    /// global `PDS_PLC_ROTATION_KEYPAIR` still governs that DID until
+    /// `migrate rotation-keys` backfills it.
+    pub async fn rotation_keypair(&self, did: &str) -> Result<Keypair> {
+        let location = self.get_location(did)?;
+        match load_key(&location.rotation_key_location).await? {
+            Some(keypair) => Ok(keypair),
+            None => Err(PdsError::NotFound(format!("rotation keypair for {did}"))),
+        }
+    }
+
+    /// Generates and persists a fresh secp256k1 rotation keypair for `did`.
+    /// Idempotent: an already-present key is returned untouched, so a
+    /// re-run never invalidates a DID document that already lists it.
+    pub async fn create_rotation_keypair(&self, did: &str) -> Result<Keypair> {
+        let location = self.get_location(did)?;
+        if let Some(existing) = load_key(&location.rotation_key_location).await? {
+            return Ok(existing);
+        }
+        let secp = Secp256k1::new();
+        let (secret_key, _public_key) = secp.generate_keypair(&mut rand::thread_rng());
+        let keypair = Keypair::from_secret_key(&secp, &secret_key);
+        self.store_rotation_keypair(did, &keypair).await?;
+        Ok(keypair)
+    }
+
+    /// Persists `keypair` as the per-DID rotation key, replacing any
+    /// existing one.
+    ///
+    /// Account creation needs this separately from
+    /// [`ActorStore::create_rotation_keypair`]: a `did:plc` is the hash of
+    /// the genesis operation that its own rotation key signs, so the key
+    /// has to exist before the DID it is filed under does. The
+    /// `migrate rotation-keys` backfill uses it to seed legacy actors from
+    /// the global key.
+    pub async fn store_rotation_keypair(&self, did: &str, keypair: &Keypair) -> Result<()> {
+        let location = self.get_location(did)?;
+        tokio::fs::create_dir_all(&location.directory)
+            .await
+            .map_err(|e| {
+                PdsError::internal(
+                    "ActorStore::store_rotation_keypair: create_dir_all failed",
+                    anyhow::Error::from(e),
+                )
+            })?;
+        tokio::fs::write(&location.rotation_key_location, keypair.secret_bytes())
+            .await
+            .map_err(|e| {
+                PdsError::internal(
+                    "ActorStore::store_rotation_keypair: write failed",
+                    anyhow::Error::from(e),
+                )
+            })
+    }
+
+    /// Removes the per-DID rotation key, if present.
+    pub async fn clear_rotation_keypair(&self, did: &str) -> Result<()> {
+        let location = self.get_location(did)?;
+        match tokio::fs::remove_file(&location.rotation_key_location).await {
+            Ok(()) => Ok(()),
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(err) => Err(PdsError::internal(
+                "ActorStore::clear_rotation_keypair: remove_file failed",
+                anyhow::Error::from(err),
+            )),
+        }
+    }
+
+    /// Returns `true` if a per-DID rotation key file exists for `did`.
+    /// Used by the `migrate rotation-keys` backfill to skip actors that
+    /// already have a key, and by tests to assert key persistence.
+    pub fn has_rotation_keypair(&self, did: &str) -> bool {
+        match self.get_location(did) {
+            Ok(location) => location.rotation_key_location.exists(),
+            Err(_) => false,
+        }
+    }
+
+    /// Writes `secret_bytes` as the per-DID rotation key for `did`,
+    /// creating the actor directory if needed. Used by the
+    /// `migrate rotation-keys` backfill to seed legacy actors from the
+    /// shared `PDS_PLC_ROTATION_KEYPAIR`.
+    pub async fn write_rotation_key_from_bytes(
+        &self,
+        did: &str,
+        secret_bytes: &[u8],
+    ) -> Result<()> {
+        let location = self.get_location(did)?;
+        tokio::fs::create_dir_all(&location.directory)
+            .await
+            .map_err(|e| {
+                PdsError::internal(
+                    "ActorStore::write_rotation_key_from_bytes: create_dir_all failed",
+                    anyhow::Error::from(e),
+                )
+            })?;
+        tokio::fs::write(&location.rotation_key_location, secret_bytes)
+            .await
+            .map_err(|e| {
+                PdsError::internal(
+                    "ActorStore::write_rotation_key_from_bytes: write failed",
+                    anyhow::Error::from(e),
+                )
+            })
     }
 
     fn did_lock(&self, did: &str) -> Arc<tokio::sync::Mutex<()>> {
