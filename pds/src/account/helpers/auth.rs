@@ -15,11 +15,13 @@ use rsky_common::time::MINUTE;
 use rsky_common::{RFC3339_VARIANT, get_random_str, json_to_b64url};
 use sea_orm::{ConnectionTrait, DatabaseConnection, QueryResult, Value};
 use secp256k1::Message;
+use secrecy::{ExposeSecret, ExposeSecretMut, SecretBox};
 use sha2::{Digest, Sha256};
 use std::env;
 use std::sync::LazyLock;
 use std::time::SystemTime;
 use thiserror::Error;
+use zeroize::Zeroize;
 
 /// Canonical ES256K signing key for access/refresh/service JWTs, from
 /// `PDS_JWT_KEY_K256_PRIVATE_KEY_HEX`. Owned HERE; Plan 06's auth_verifier
@@ -27,9 +29,12 @@ use thiserror::Error;
 pub static PDS_JWT_KEYPAIR: LazyLock<ES256kKeyPair> = LazyLock::new(|| {
     let secp = secp256k1::Secp256k1::new();
     let private_key = env::var("PDS_JWT_KEY_K256_PRIVATE_KEY_HEX").unwrap();
+    let mut secret_bytes =
+        SecretBox::new(Box::new(hex::decode(private_key.as_bytes()).unwrap()));
     let secret_key =
-        secp256k1::SecretKey::from_slice(&hex::decode(private_key.as_bytes()).unwrap()).unwrap();
+        secp256k1::SecretKey::from_slice(secret_bytes.expose_secret()).unwrap();
     let jwt_key = secp256k1::Keypair::from_secret_key(&secp, &secret_key);
+    secret_bytes.expose_secret_mut().zeroize();
     ES256kKeyPair::from_bytes(jwt_key.secret_bytes().as_slice()).unwrap()
 });
 

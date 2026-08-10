@@ -32,14 +32,20 @@ use rand::Rng;
 use rsky_crypto::utils::encode_did_key;
 use rsky_identity::types::DidDocument;
 use secp256k1::{Keypair, Secp256k1, SecretKey};
+use secrecy::{ExposeSecret, ExposeSecretMut, SecretBox};
 use std::env;
 use std::sync::LazyLock;
+use zeroize::Zeroize;
 
 pub static PDS_PLC_ROTATION_KEYPAIR: LazyLock<Keypair> = LazyLock::new(|| {
     let secp = Secp256k1::new();
     let private_key = env::var("PDS_PLC_ROTATION_KEY_K256_PRIVATE_KEY_HEX").unwrap();
-    let secret_key = SecretKey::from_slice(&hex::decode(private_key.as_bytes()).unwrap()).unwrap();
-    Keypair::from_secret_key(&secp, &secret_key)
+    let mut secret_bytes =
+        SecretBox::new(Box::new(hex::decode(private_key.as_bytes()).unwrap()));
+    let secret_key = SecretKey::from_slice(secret_bytes.expose_secret()).unwrap();
+    let keypair = Keypair::from_secret_key(&secp, &secret_key);
+    secret_bytes.expose_secret_mut().zeroize();
+    keypair
 });
 
 #[derive(Debug, serde::Deserialize, serde::Serialize)]

@@ -98,6 +98,11 @@ tempfile = "3"
 # --- constant-time comparisons (admin auth + secret comparison hardening) ---
 subtle = "2"
 
+# --- at-rest hygiene for key material (PDS_JWT_KEYPAIR, PDS_REPO_SIGNING_KEYPAIR,
+#     PDS_PLC_ROTATION_KEYPAIR, PDS_DPOP_SECRET) ---
+secrecy = "0.10"
+zeroize = "1"
+
 # --- rate limiting (per-IP token bucket for sensitive endpoints) ---
 governor = "0.6"
 

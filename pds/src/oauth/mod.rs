@@ -23,11 +23,13 @@ use rsky_oauth::jwk::{EcCurve, Jwk};
 use rsky_oauth::store::DeviceData;
 use rsky_oauth::{OAuthError, OAuthProvider, OAuthProviderConfig};
 use sea_orm::DatabaseConnection;
+use secrecy::{ExposeSecret, ExposeSecretMut, SecretBox};
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::sync::{Arc, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 use subtle::ConstantTimeEq;
+use zeroize::Zeroize;
 
 /// Stub that Task 6 replaces with the real SSRF-hardened fetcher.
 pub use fetcher::HttpClientMetadataFetcher;
@@ -81,7 +83,10 @@ impl SharedOAuthProvider {
                     .expect("PDS_DPOP_SECRET must be hex")
                     .try_into()
                     .expect("PDS_DPOP_SECRET must be 32 bytes");
-                DpopNonce::new(secret, DEFAULT_ROTATION_INTERVAL)
+                let mut secret_box = SecretBox::new(Box::new(secret));
+                let nonce = DpopNonce::new(*secret_box.expose_secret(), DEFAULT_ROTATION_INTERVAL);
+                secret_box.expose_secret_mut().zeroize();
+                nonce
             }
             Err(_) => DpopNonce::new_random(DEFAULT_ROTATION_INTERVAL),
         }
