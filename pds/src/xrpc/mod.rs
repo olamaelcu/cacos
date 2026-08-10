@@ -10,6 +10,7 @@
 pub mod app;
 pub mod auth_extractors;
 pub mod com;
+pub mod cors;
 pub mod error;
 pub mod health;
 pub mod metrics;
@@ -28,6 +29,7 @@ use crate::config::ServerConfig;
 use crate::context::SharedSequencer;
 use crate::plc::PlcClient;
 use crate::sequencer::apalis_worker::SharedBroadcast;
+use cors::CorsPolicy;
 use poem::http::Method;
 use poem::middleware::{Cors, Middleware};
 use poem::{EndpointExt, Route};
@@ -59,8 +61,9 @@ pub struct SharedState {
 pub async fn build_app_with_state(
     state: SharedState,
 ) -> impl poem::Endpoint<Output = poem::Response> {
+    let cors_policy = CorsPolicy::from_env(&state.config.service.public_url);
     let cors = Cors::new()
-        .allow_origins_fn(|_| true)
+        .allow_origins_fn(move |origin| cors_policy.allows(Some(origin)))
         .allow_methods([
             Method::POST,
             Method::GET,
@@ -119,8 +122,13 @@ pub async fn build_app_with_state(
                 None
             }
         };
-        if let Some(app) = oauth_app {
-            base = base.nest_no_strip("/", app);
+        let provider = oauth_app.as_ref().map(|b| Arc::clone(&b.provider));
+        crate::auth::auth_verifier::register_auth_dependencies(
+            Arc::new(state.account_manager.clone()),
+            provider,
+        );
+        if let Some(b) = oauth_app {
+            base = base.nest_no_strip("/", b.endpoint);
         }
     }
 

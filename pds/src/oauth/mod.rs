@@ -36,6 +36,52 @@ pub use fetcher::HttpClientMetadataFetcher;
 
 pub const DEVICE_COOKIE: &str = "device-id";
 
+/// Build the OAuth route set plus a handle to the [`OAuthProvider`] so the
+/// XRPC bootstrap can register it for DPoP-bound access-token validation.
+///
+/// `endpoint` is generic over the concrete route type returned by
+/// [`build_oauth_app`] because `poem::Endpoint` is not dyn-compatible.
+/// Callers consume the struct inline (do not store it in a `Box<dyn>` or
+/// similar trait object) — the type is inferred at the use site.
+pub struct OAuthBootstrap<E> {
+    pub endpoint: E,
+    pub provider: Arc<rsky_oauth::OAuthProvider>,
+}
+
+/// The handle to the most recently registered OAuth provider. Set inside
+/// [`bootstrap_oauth_app`]; consumed by integration tests that need to
+/// drive the full PAR → token flow against the same provider instance
+/// the resource server has registered for DPoP-bound access-token
+/// validation. Cleared via `_reset_auth_dependencies_for_tests` /
+/// [`_reset_registered_provider_for_tests`].
+static REGISTERED_PROVIDER: OnceLock<Arc<OAuthProvider>> = OnceLock::new();
+
+/// Test-only: read the most recently registered OAuth provider so an
+/// integration test can mint DPoP-bound access tokens against the same
+/// store the resource server validates against.
+#[doc(hidden)]
+pub fn registered_provider() -> Option<Arc<OAuthProvider>> {
+    REGISTERED_PROVIDER.get().cloned()
+}
+
+/// the browser binds it to the host (no Domain attribute, Path=/,
+/// Secure). On plain HTTP we fall back to the legacy `device-id` name
+/// because `__Host-` requires Secure.
+pub fn device_cookie_name(public_url: &str) -> &'static str {
+    if public_url.starts_with("https://") {
+        "__Host-device-id"
+    } else {
+        DEVICE_COOKIE
+    }
+}
+
+/// Whether the device cookie should be marked Secure. Aligned with
+/// [`device_cookie_name`]: HTTPS deployments set Secure; plain HTTP
+/// cannot, because Secure cookies never ride on a non-TLS origin.
+pub fn device_cookie_secure(public_url: &str) -> bool {
+    public_url.starts_with("https://")
+}
+
 /// Lazily-built `HashSet<String>` of `PDS_OAUTH_TRUSTED_CLIENTS` values,
 /// used by `is_trusted_oauth_client` for constant-time membership checks.
 fn trusted_clients_set() -> &'static HashSet<String> {
@@ -141,9 +187,7 @@ pub fn bootstrap_oauth_app(
     account_manager: crate::account::AccountManager,
     actor_store: std::sync::Arc<crate::actor_store::ActorStore>,
     plc_client: std::sync::Arc<dyn crate::plc::PlcClient>,
-) -> Option<impl poem::Endpoint<Output = poem::Response>> {
-    use std::sync::Arc;
-
+) -> Option<OAuthBootstrap<impl poem::Endpoint<Output = poem::Response>>> {
     if std::env::var("PDS_JWT_KEY_K256_PRIVATE_KEY_HEX").is_err() {
         return None;
     }
@@ -154,6 +198,10 @@ pub fn bootstrap_oauth_app(
         std::env::var("PDS_SERVICE_DID").unwrap_or_else(|_| "did:web:localhost".to_string());
 
     let shared = SharedOAuthProvider::new(account_db.clone(), issuer, audience);
+    let provider = Arc::clone(&shared.provider);
+    // Publish to the module-level handle so tests can mint tokens against
+    // the same provider the resource server registered.
+    let _ = REGISTERED_PROVIDER.set(Arc::clone(&provider));
     let remote_config = crate::config::OAuthRemoteConfig::from_env();
     let remote_create_account: Arc<dyn remote_create_account::RemoteCreateAccount> =
         Arc::new(remote_create_account::ActorStoreRemoteCreateAccount::new(
@@ -161,13 +209,14 @@ pub fn bootstrap_oauth_app(
             actor_store,
             plc_client,
         ));
-    Some(build_oauth_app(
+    let endpoint = build_oauth_app(
         shared,
         account_db,
         remote_config,
         public_url,
         remote_create_account,
-    ))
+    );
+    Some(OAuthBootstrap { endpoint, provider })
 }
 
 /// Builds the full OAuth route set (provider routes + authorize redirect +
@@ -246,8 +295,9 @@ pub async fn ensure_device_session(
     user_agent: Option<&str>,
     ip_address: &str,
     now: u64,
+    public_url: &str,
 ) -> Result<DeviceSession, OAuthError> {
-    if let Some(cookie) = jar.get(DEVICE_COOKIE) {
+    if let Some(cookie) = jar.get(device_cookie_name(public_url)) {
         let value = cookie.value_str().to_string();
         if let Some((device_id, session_id)) = value.split_once('.')
             && let Some(device) = store.read_device(device_id).await?
@@ -274,10 +324,14 @@ pub async fn ensure_device_session(
         .await?;
     let value = format!("{device_id}.{session_id}");
     let csrf = csrf_token(&value);
-    let mut cookie = Cookie::new_with_str(DEVICE_COOKIE, value);
+    let mut cookie = Cookie::new_with_str(device_cookie_name(public_url), value);
     cookie.set_http_only(true);
     cookie.set_same_site(SameSite::Lax);
-    cookie.set_path("/oauth".to_string());
+    // `__Host-` cookies (RFC 6265bis) must use Path=/ and Secure, with no
+    // Domain attribute. The Plain-HTTP fallback also uses Path=/ so the
+    // cookie rides on the same path the user agent already had.
+    cookie.set_path("/".to_string());
+    cookie.set_secure(device_cookie_secure(public_url));
     jar.add(cookie);
     Ok(DeviceSession { device_id, csrf })
 }
@@ -330,6 +384,21 @@ mod tests {
         assert!(!csrf_token("cookie-1").contains("cookie-1"));
     }
 
+    #[test]
+    fn device_cookie_uses_host_prefix_and_secure_when_https() {
+        assert_eq!(
+            device_cookie_name("https://pds.example"),
+            "__Host-device-id"
+        );
+        assert!(device_cookie_secure("https://pds.example"));
+    }
+
+    #[test]
+    fn device_cookie_uses_legacy_name_and_insecure_when_http() {
+        assert_eq!(device_cookie_name("http://localhost:2583"), "device-id");
+        assert!(!device_cookie_secure("http://localhost:2583"));
+    }
+
     fn memory_provider() -> Arc<OAuthProvider> {
         let store = Arc::new(MemoryOAuthStore::new());
         store.add_account(
@@ -372,12 +441,13 @@ mod tests {
             Some("agent"),
             "127.0.0.1",
             now,
+            "https://pds.test",
         )
         .await
         .unwrap();
         assert!(session.device_id.starts_with("dev-"));
         let cookie = jar
-            .get(DEVICE_COOKIE)
+            .get(device_cookie_name("https://pds.test"))
             .expect("cookie set")
             .value_str()
             .to_string();
@@ -390,6 +460,7 @@ mod tests {
             Some("agent"),
             "127.0.0.1",
             now,
+            "https://pds.test",
         )
         .await
         .unwrap();
@@ -397,15 +468,25 @@ mod tests {
         assert_eq!(session2.csrf, session.csrf);
 
         let jar2 = CookieJar::default();
-        let mut tampered = Cookie::new_with_str(DEVICE_COOKIE, "dev-tampered.ses-tampered");
+        let mut tampered = Cookie::new_with_str(
+            device_cookie_name("https://pds.test"),
+            "dev-tampered.ses-tampered",
+        );
         tampered.set_http_only(true);
         tampered.set_same_site(SameSite::Lax);
-        tampered.set_path("/oauth".to_string());
+        tampered.set_path("/".to_string());
+        tampered.set_secure(true);
         jar2.add(tampered);
-        let session3 =
-            ensure_device_session(provider.store().as_ref(), &jar2, None, "127.0.0.1", now)
-                .await
-                .unwrap();
+        let session3 = ensure_device_session(
+            provider.store().as_ref(),
+            &jar2,
+            None,
+            "127.0.0.1",
+            now,
+            "https://pds.test",
+        )
+        .await
+        .unwrap();
         assert_ne!(session3.device_id, session.device_id);
     }
 }
