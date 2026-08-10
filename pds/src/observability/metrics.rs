@@ -134,6 +134,13 @@ static METRICS_HANDLE: RwLock<Option<PrometheusHandle>> = RwLock::new(None);
 /// Build the Prometheus recorder, install it globally, and keep a render handle.
 /// Safe to call more than once (the previous global recorder is replaced).
 pub fn init_metrics() {
+    let already_initialized = METRICS_HANDLE
+        .read()
+        .expect("metrics handle lock poisoned")
+        .is_some();
+    if already_initialized {
+        return;
+    }
     let recorder = PrometheusBuilder::new().build_recorder();
     let handle = recorder.handle();
     drop(metrics::set_global_recorder(recorder));
