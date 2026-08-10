@@ -13,6 +13,7 @@ pub mod com;
 pub mod error;
 pub mod health;
 pub mod metrics;
+pub mod rate_limit;
 #[cfg(any(test, feature = "test-utils"))]
 pub mod test_utils;
 pub mod types;
@@ -28,7 +29,7 @@ use crate::context::SharedSequencer;
 use crate::plc::PlcClient;
 use crate::sequencer::apalis_worker::SharedBroadcast;
 use poem::http::Method;
-use poem::middleware::Cors;
+use poem::middleware::{Cors, Middleware};
 use poem::{EndpointExt, Route};
 use rsky_identity::IdResolver;
 use std::sync::Arc;
@@ -77,7 +78,7 @@ pub async fn build_app_with_state(
     // unmatched paths get the XRPC `{error,message}` shape.
     let mut xrpc_routes = Route::new();
     xrpc_routes = com::atproto::sync::routes(xrpc_routes);
-    xrpc_routes = com::atproto::server::routes(xrpc_routes);
+    xrpc_routes = wire_server_routes_with_rate_limits(xrpc_routes);
     xrpc_routes = com::atproto::repo::routes(xrpc_routes);
     xrpc_routes = com::atproto::identity::routes(xrpc_routes);
     xrpc_routes = com::atproto::admin::routes(xrpc_routes);
@@ -136,6 +137,150 @@ pub async fn build_app() -> impl poem::Endpoint<Output = poem::Response> {
     let cfg = crate::config::env_to_cfg();
     let state = types::SharedStateFromEnv::from_env(&cfg).await;
     build_app_with_state(state).await
+}
+
+fn env_limit(name: &str, default: u32) -> u32 {
+    std::env::var(name)
+        .ok()
+        .and_then(|s| s.parse::<u32>().ok())
+        .unwrap_or(default)
+}
+
+fn wire_server_routes_with_rate_limits(route: poem::Route) -> poem::Route {
+    use poem::{get, post};
+    use rate_limit::{RouteRateLimit, ip_limiter};
+
+    // Defaults match the cacos-pds cacos-pds-OAuth security plan. A value of
+    // 0 disables the per-route limiter.
+    let create_session_limiter =
+        ip_limiter(env_limit("PDS_RATELIMIT_CREATE_SESSION_PER_MINUTE", 10));
+    let create_account_limiter =
+        ip_limiter(env_limit("PDS_RATELIMIT_CREATE_ACCOUNT_PER_MINUTE", 10));
+    let password_reset_limiter =
+        ip_limiter(env_limit("PDS_RATELIMIT_PASSWORD_RESET_PER_MINUTE", 5));
+    let email_ops_limiter = ip_limiter(env_limit("PDS_RATELIMIT_EMAIL_OPS_PER_MINUTE", 5));
+
+    let rl = |l: std::sync::Arc<rate_limit::IpRateLimiter>| RouteRateLimit { limiter: l };
+
+    route
+        .at(
+            "/createSession",
+            post(
+                rl(create_session_limiter)
+                    .transform(com::atproto::server::create_session::create_session),
+            ),
+        )
+        .at(
+            "/refreshSession",
+            post(com::atproto::server::refresh_session::refresh_session),
+        )
+        .at(
+            "/deleteSession",
+            post(com::atproto::server::delete_session::delete_session),
+        )
+        .at(
+            "/getSession",
+            get(com::atproto::server::get_session::get_session),
+        )
+        .at(
+            "/createAccount",
+            post(
+                rl(create_account_limiter)
+                    .transform(com::atproto::server::create_account::server_create_account),
+            ),
+        )
+        .at(
+            "/activateAccount",
+            post(com::atproto::server::activate_account::activate_account),
+        )
+        .at(
+            "/deactivateAccount",
+            post(com::atproto::server::deactivate_account::deactivate_account),
+        )
+        .at(
+            "/deleteAccount",
+            post(com::atproto::server::delete_account::delete_account),
+        )
+        .at(
+            "/checkAccountStatus",
+            get(com::atproto::server::check_account_status::check_account_status),
+        )
+        .at(
+            "/confirmEmail",
+            post(com::atproto::server::confirm_email::confirm_email),
+        )
+        .at(
+            "/updateEmail",
+            post(com::atproto::server::update_email::update_email),
+        )
+        .at(
+            "/requestEmailConfirmation",
+            post(rl(email_ops_limiter.clone()).transform(
+                com::atproto::server::request_email_confirmation::request_email_confirmation,
+            )),
+        )
+        .at(
+            "/requestEmailUpdate",
+            post(
+                rl(email_ops_limiter)
+                    .transform(com::atproto::server::request_email_update::request_email_update),
+            ),
+        )
+        .at(
+            "/requestPasswordReset",
+            post(
+                rl(password_reset_limiter.clone()).transform(
+                    com::atproto::server::request_password_reset::request_password_reset,
+                ),
+            ),
+        )
+        .at(
+            "/resetPassword",
+            post(
+                rl(password_reset_limiter)
+                    .transform(com::atproto::server::reset_password::reset_password),
+            ),
+        )
+        .at(
+            "/requestAccountDelete",
+            post(com::atproto::server::request_account_delete::request_account_delete),
+        )
+        .at(
+            "/createAppPassword",
+            post(com::atproto::server::create_app_password::create_app_password),
+        )
+        .at(
+            "/listAppPasswords",
+            get(com::atproto::server::list_app_passwords::list_app_passwords),
+        )
+        .at(
+            "/revokeAppPassword",
+            post(com::atproto::server::revoke_app_password::revoke_app_password),
+        )
+        .at(
+            "/createInviteCode",
+            post(com::atproto::server::create_invite_code::create_invite_code),
+        )
+        .at(
+            "/createInviteCodes",
+            post(com::atproto::server::create_invite_codes::create_invite_codes),
+        )
+        .at(
+            "/getAccountInviteCodes",
+            get(com::atproto::server::get_account_invite_codes::get_account_invite_codes),
+        )
+        .at(
+            "/describeServer",
+            get(com::atproto::server::describe_server::describe_server),
+        )
+        .at(
+            "/getServiceAuth",
+            get(com::atproto::server::get_service_auth::get_service_auth),
+        )
+        .at(
+            "/reserveSigningKey",
+            post(com::atproto::server::reserve_signing_key::reserve_signing_key),
+        )
 }
 
 /// Catch-all for unmatched /xrpc paths, rendering the XRPC

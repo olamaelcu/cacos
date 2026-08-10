@@ -15,6 +15,7 @@ use crate::m20260801_000002_repo_seq;
 use crate::m20260801_000003_did_doc;
 use crate::m20260801_000004_actor;
 use crate::m20260801_000005_actor_space;
+use crate::m20260801_000006_account_lockout;
 
 /// Account database: 15 tables.
 pub struct AccountMigrator;
@@ -22,7 +23,10 @@ pub struct AccountMigrator;
 #[async_trait::async_trait]
 impl MigratorTrait for AccountMigrator {
     fn migrations() -> Vec<Box<dyn MigrationTrait>> {
-        vec![Box::new(m20260801_000001_account::Migration)]
+        vec![
+            Box::new(m20260801_000001_account::Migration),
+            Box::new(m20260801_000006_account_lockout::Migration),
+        ]
     }
 
     fn migration_table_name() -> DynIden {

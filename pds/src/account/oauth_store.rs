@@ -126,6 +126,47 @@ impl PdsOAuthStore {
     pub fn db(&self) -> &sea_orm::DatabaseConnection {
         &self.db
     }
+
+    /// Returns `true` if `did` exists and is currently locked out. An expired
+    /// lockout (locked_until <= now) is treated as unlocked.
+    pub async fn is_account_locked(&self, did: &str) -> Result<bool, OAuthError> {
+        let (_, locked_until) =
+            crate::account::helpers::account::get_account_lockout_state(did, &self.db)
+                .await
+                .map_err(server_error)?;
+        match locked_until {
+            None => Ok(false),
+            Some(until) => Ok(until > unix_now_secs()),
+        }
+    }
+
+    /// Stamp the lockout deadline (unix seconds) for `did`.
+    pub async fn lock_account(&self, did: &str, until_unix: i64) -> Result<(), OAuthError> {
+        crate::account::helpers::account::set_account_locked_until(did, until_unix, &self.db)
+            .await
+            .map_err(server_error)
+    }
+
+    /// Increment the failed-login counter for `did`.
+    pub async fn record_failed_login(&self, did: &str) -> Result<(), OAuthError> {
+        crate::account::helpers::account::increment_failed_login_count(did, &self.db)
+            .await
+            .map_err(server_error)?;
+        Ok(())
+    }
+
+    /// Clear the failed-login counter and any lockout deadline for `did`.
+    pub async fn clear_failed_logins(&self, did: &str) -> Result<(), OAuthError> {
+        crate::account::helpers::account::clear_account_lockout(did, &self.db)
+            .await
+            .map_err(server_error)
+    }
+}
+
+fn unix_now_secs() -> i64 {
+    let system_time = std::time::SystemTime::now();
+    let dt: OffsetDateTime = system_time.into();
+    dt.unix_timestamp()
 }
 
 #[async_trait::async_trait]
@@ -428,9 +469,25 @@ impl OAuthStore for PdsOAuthStore {
         let Some(actor) = found else {
             return Ok(None);
         };
+        if self.is_account_locked(&actor.did).await? {
+            return Ok(None);
+        }
         let valid = verify_account_password(&actor.did, &password_str.to_string(), &self.db)
             .await
             .map_err(server_error)?;
+        if valid {
+            self.clear_failed_logins(&actor.did).await?;
+        } else {
+            self.record_failed_login(&actor.did).await?;
+            let (count, _) =
+                crate::account::helpers::account::get_account_lockout_state(&actor.did, &self.db)
+                    .await
+                    .map_err(server_error)?;
+            if count >= 5 {
+                let until = unix_now_secs() + 900;
+                self.lock_account(&actor.did, until).await?;
+            }
+        }
         Ok(valid.then(|| actor_to_account_info(actor)))
     }
 

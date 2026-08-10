@@ -16,6 +16,8 @@ use thiserror::Error;
 pub enum AccountHelperError {
     #[error("UserAlreadyExistsError")]
     UserAlreadyExistsError,
+    #[error("AccountLockedError")]
+    AccountLocked,
 }
 
 pub struct AvailabilityFlags {
@@ -393,6 +395,81 @@ pub async fn set_email_confirmed_at(
     db.execute_raw(sql(
         "UPDATE account SET \"emailConfirmedAt\" = ?1 WHERE did = ?2",
         vec![Value::from(email_confirmed_at), Value::from(did.to_owned())],
+    ))
+    .await?;
+    Ok(())
+}
+
+/// Count email_token rows for the given email address.
+pub async fn count_email_tokens_for_email(email: &str, db: &DatabaseConnection) -> Result<i64> {
+    let row: Option<QueryResult> = db
+        .query_one_raw(sql(
+            "SELECT COUNT(*) FROM email_token WHERE token = ?1",
+            vec![Value::from(email.to_owned())],
+        ))
+        .await?;
+    let Some(row) = row else {
+        return Ok(0);
+    };
+    Ok(row.try_get_by_index(0)?)
+}
+
+/// Read the per-account failed-login counter and lockout deadline.
+/// Returns `(failed_count, locked_until_unix_or_none)`.
+pub async fn get_account_lockout_state(
+    did: &str,
+    db: &DatabaseConnection,
+) -> Result<(i32, Option<i64>)> {
+    let row: Option<QueryResult> = db
+        .query_one_raw(sql(
+            "SELECT \"failedLoginCount\", \"lockedUntil\" FROM account WHERE did = ?1",
+            vec![Value::from(did.to_owned())],
+        ))
+        .await?;
+    let Some(row) = row else {
+        return Ok((0, None));
+    };
+    let count: i32 = row.try_get_by_index(0).unwrap_or(0);
+    let locked_until: Option<i64> = row.try_get_by_index(1).ok().flatten();
+    Ok((count, locked_until))
+}
+
+/// Atomically increment the failed-login counter and return the new value.
+pub async fn increment_failed_login_count(did: &str, db: &DatabaseConnection) -> Result<i32> {
+    let row: Option<QueryResult> = db
+        .query_one_raw(sql(
+            "UPDATE account SET \"failedLoginCount\" = \"failedLoginCount\" + 1 \
+             WHERE did = ?1 RETURNING \"failedLoginCount\"",
+            vec![Value::from(did.to_owned())],
+        ))
+        .await?;
+    let Some(row) = row else {
+        return Ok(0);
+    };
+    let count: i32 = row.try_get_by_index(0)?;
+    Ok(count)
+}
+
+/// Stamp the account's lockout deadline (unix seconds).
+pub async fn set_account_locked_until(
+    did: &str,
+    until_unix: i64,
+    db: &DatabaseConnection,
+) -> Result<()> {
+    db.execute_raw(sql(
+        "UPDATE account SET \"lockedUntil\" = ?1 WHERE did = ?2",
+        vec![Value::from(until_unix), Value::from(did.to_owned())],
+    ))
+    .await?;
+    Ok(())
+}
+
+/// Clear both the failed-login counter and any active lockout deadline.
+pub async fn clear_account_lockout(did: &str, db: &DatabaseConnection) -> Result<()> {
+    db.execute_raw(sql(
+        "UPDATE account SET \"failedLoginCount\" = 0, \"lockedUntil\" = NULL \
+         WHERE did = ?1",
+        vec![Value::from(did.to_owned())],
     ))
     .await?;
     Ok(())

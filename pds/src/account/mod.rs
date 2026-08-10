@@ -46,6 +46,13 @@ fn format_micros(micros: i64) -> Result<String> {
     Ok(format!("{}", dt.format(RFC3339_VARIANT)))
 }
 
+/// Current wall-clock time as unix seconds. Used by lockout bookkeeping.
+fn unix_now_secs() -> i64 {
+    let system_time = SystemTime::now();
+    let dt: DateTime<UtcOffset> = system_time.into();
+    dt.timestamp()
+}
+
 /// Helps with readability when calling create_account()
 pub struct CreateAccountOpts {
     pub did: String,
@@ -254,6 +261,11 @@ impl AccountManager {
         did: String,
         app_password_name: Option<String>,
     ) -> Result<(String, String)> {
+        if self.is_account_locked(&did).await? {
+            return Err(anyhow::Error::new(
+                account::AccountHelperError::AccountLocked,
+            ));
+        }
         let scope = if app_password_name.is_none() {
             AuthScope::Access
         } else {
@@ -407,6 +419,48 @@ impl AccountManager {
         password_str: &str,
     ) -> Result<Option<String>> {
         password::verify_app_password(did, password_str, &self.db).await
+    }
+
+    /// Returns `true` if `did` exists and is currently locked out. An expired
+    /// lockout (locked_until <= now) is treated as unlocked.
+    pub async fn is_account_locked(&self, did: &str) -> Result<bool> {
+        let (_, locked_until) = account::get_account_lockout_state(did, &self.db).await?;
+        match locked_until {
+            None => Ok(false),
+            Some(until) => Ok(until > unix_now_secs()),
+        }
+    }
+
+    /// Stamp the lockout deadline (unix seconds) for `did`.
+    pub async fn lock_account(&self, did: &str, until_unix: i64) -> Result<()> {
+        account::set_account_locked_until(did, until_unix, &self.db).await
+    }
+
+    /// Increment the failed-login counter; returns the new value. If the
+    /// account does not exist the count is 0 (no-op).
+    pub async fn record_failed_login(&self, did: &str) -> Result<()> {
+        account::increment_failed_login_count(did, &self.db).await?;
+        Ok(())
+    }
+
+    /// Increment the failed-login counter and apply the lockout policy if
+    /// the threshold (5 attempts) is reached. Returns `true` if the account
+    /// is now locked, `false` otherwise.
+    pub async fn record_failed_login_with_lockout(&self, did: &str) -> Result<bool> {
+        account::increment_failed_login_count(did, &self.db).await?;
+        let (count, _) = account::get_account_lockout_state(did, &self.db).await?;
+        if count >= 5 {
+            let until = unix_now_secs() + 900;
+            account::set_account_locked_until(did, until, &self.db).await?;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    /// Clear the failed-login counter and any lockout deadline.
+    pub async fn clear_failed_logins(&self, did: &str) -> Result<()> {
+        account::clear_account_lockout(did, &self.db).await
     }
 
     pub async fn reset_password(&self, opts: ResetPasswordOpts) -> Result<()> {

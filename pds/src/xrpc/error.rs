@@ -35,6 +35,8 @@ pub enum ApiError {
     AuthRequiredError(String),
     /// Error passed through from an upstream service: status code, error, message
     UpstreamResponse(u16, String, String),
+    /// Account is temporarily locked due to too many failed login attempts.
+    RateLimitExceeded,
 }
 
 /// JSON body shape for every XRPC error response.
@@ -186,6 +188,13 @@ impl ApiError {
             ApiError::UpstreamResponse(status, error, message) => (
                 StatusCode::from_u16(status).unwrap_or(StatusCode::BAD_GATEWAY),
                 ErrorBody { error, message },
+            ),
+            ApiError::RateLimitExceeded => (
+                StatusCode::TOO_MANY_REQUESTS,
+                ErrorBody {
+                    error: "RateLimitExceeded".to_string(),
+                    message: "account temporarily locked".to_string(),
+                },
             ),
             ApiError::RecordNotFound => (
                 StatusCode::NOT_FOUND,

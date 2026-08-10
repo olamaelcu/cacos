@@ -19,3 +19,4 @@ pub mod m20260801_000002_repo_seq;
 pub mod m20260801_000003_did_doc;
 pub mod m20260801_000004_actor;
 pub mod m20260801_000005_actor_space;
+pub mod m20260801_000006_account_lockout;

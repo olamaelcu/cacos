@@ -13,6 +13,9 @@ async fn inner_request_password_reset(
     let RequestPasswordResetInput { email } = body;
     let email = email.to_lowercase();
 
+    // Enumeration defense: always return Ok(()) and never leak whether the
+    // account exists. When the account exists we schedule the mailer
+    // fire-and-forget so the request returns immediately.
     let account = state
         .account_manager
         .get_account_by_email(
@@ -25,31 +28,37 @@ async fn inner_request_password_reset(
         .await
         .map_err(|_| ApiError::RuntimeError)?;
 
-    if let Some(account) = account {
-        if let Some(email) = account.email {
-            let token = state
-                .account_manager
-                .create_email_token(&account.did, EmailTokenPurpose::ResetPassword)
+    if let Some(account) = account
+        && let Some(account_email) = account.email
+    {
+        let manager = state.account_manager.clone();
+        let did = account.did.clone();
+        let identifier = account.handle.unwrap_or_else(|| account_email.clone());
+        let account_email_clone = account_email.clone();
+        tokio::spawn(async move {
+            match manager
+                .create_email_token(&did, EmailTokenPurpose::ResetPassword)
                 .await
-                .map_err(|_| ApiError::RuntimeError)?;
-            mailer::send_reset_password(
-                email.clone(),
-                IdentifierAndTokenParams {
-                    identifier: account.handle.unwrap_or(email),
-                    token,
-                },
-            )
-            .await
-            .map_err(|_| ApiError::RuntimeError)?;
-            Ok(())
-        } else {
-            Err(ApiError::InvalidRequest(
-                "Account does not have an email address".to_string(),
-            ))
-        }
-    } else {
-        Err(ApiError::InvalidRequest("Account not found".to_string()))
+            {
+                Ok(token) => {
+                    if let Err(err) = mailer::send_reset_password(
+                        account_email_clone,
+                        IdentifierAndTokenParams { identifier, token },
+                    )
+                    .await
+                    {
+                        tracing::error!("mailer::send_reset_password failed: {err:?}");
+                    }
+                }
+                Err(err) => {
+                    tracing::error!(
+                        "create_email_token(ResetPassword) failed for {did}: {err:?}"
+                    );
+                }
+            }
+        });
     }
+    Ok(())
 }
 
 /// POST /xrpc/com.atproto.server.requestPasswordReset
@@ -58,7 +67,7 @@ pub async fn request_password_reset(
     body: Json<RequestPasswordResetInput>,
     state: Data<&SharedState>,
 ) -> ApiResult<()> {
-    match inner_request_password_reset(body.0, &state).await {
+    match inner_request_password_reset(body.0, state.0).await {
         Ok(_) => Ok(()),
         Err(error) => {
             tracing::error!("{error:?}");

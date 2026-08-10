@@ -4,6 +4,16 @@ use poem::web::{Data, Json};
 use rsky_lexicon::com::atproto::server::{CreateSessionInput, CreateSessionOutput};
 use rsky_syntax::handle::INVALID_HANDLE;
 
+fn api_error_from_account_error(e: anyhow::Error) -> ApiError {
+    use crate::account::helpers::account::AccountHelperError;
+    if let Some(AccountHelperError::AccountLocked) = e.downcast_ref::<AccountHelperError>() {
+        ApiError::RateLimitExceeded
+    } else {
+        tracing::error!("{e:?}");
+        ApiError::RuntimeError
+    }
+}
+
 async fn inner_create_session(
     body: CreateSessionInput,
     state: &SharedState,
@@ -27,6 +37,15 @@ async fn inner_create_session(
         state.account_manager.get_account(&identifier, flags).await
     };
     if let Ok(Some(user)) = user {
+        // Per-account lockout check before touching the password verifier.
+        if state
+            .account_manager
+            .is_account_locked(&user.did)
+            .await
+            .map_err(api_error_from_account_error)?
+        {
+            return Err(ApiError::RateLimitExceeded);
+        }
         let mut app_password_name: Option<String> = None;
 
         let valid_account_pass = match state
@@ -55,9 +74,24 @@ async fn inner_create_session(
                 }
             }
             if app_password_name.is_none() {
+                // Record one failed-login regardless of how many verifiers ran.
+                // The current attempt still surfaces as InvalidLogin (400);
+                // the next attempt will hit the lockout check at the top of
+                // this handler once the counter crosses the threshold.
+                state
+                    .account_manager
+                    .record_failed_login_with_lockout(&user.did)
+                    .await
+                    .map_err(api_error_from_account_error)?;
                 return Err(ApiError::InvalidLogin);
             }
         }
+        // Successful credential check clears the failed-login counter.
+        state
+            .account_manager
+            .clear_failed_logins(&user.did)
+            .await
+            .map_err(api_error_from_account_error)?;
         if user.takedown_ref.is_some() {
             return Err(ApiError::AccountTakendown);
         }
@@ -70,10 +104,7 @@ async fn inner_create_session(
             Ok(res) => {
                 (access_jwt, refresh_jwt) = res;
             }
-            Err(e) => {
-                tracing::error!("{e:?}");
-                return Err(ApiError::RuntimeError);
-            }
+            Err(e) => return Err(api_error_from_account_error(e)),
         }
         Ok(CreateSessionOutput {
             did: user.did,
