@@ -10,6 +10,7 @@
 //! fan-out. The on-disk schema matches what apalis-sql would create.
 
 use crate::observability::metrics::{SEQ_EVENTS_TOTAL, SEQUENCER_POLL_INTERVAL_SECONDS};
+use crate::observability::timing::timed;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -87,12 +88,15 @@ pub async fn run_seq_event_job(
     job: SeqEventJob,
     broadcast: &SharedBroadcast,
 ) -> anyhow::Result<()> {
-    let start = Instant::now();
-    broadcast.publish(&job.envelope);
-    metrics::counter!(SEQ_EVENTS_TOTAL).increment(1);
-    metrics::histogram!(SEQUENCER_POLL_INTERVAL_SECONDS, "kind" => "publish")
-        .record(start.elapsed().as_secs_f64());
-    Ok(())
+    timed("seq_publish", async {
+        let start = Instant::now();
+        broadcast.publish(&job.envelope);
+        metrics::counter!(SEQ_EVENTS_TOTAL).increment(1);
+        metrics::histogram!(SEQUENCER_POLL_INTERVAL_SECONDS, "kind" => "publish")
+            .record(start.elapsed().as_secs_f64());
+        Ok(())
+    })
+    .await
 }
 
 /// Push a job into the backing SQLite queue. The worker task drains the
@@ -175,6 +179,7 @@ mod tests {
 
     #[tokio::test]
     async fn run_seq_event_job_publishes_envelope_to_broadcast() {
+        crate::observability::metrics::init_metrics();
         let dir = Utf8TempDir::new().unwrap();
         let db_path = dir.path().join("sequencer.sqlite").to_string();
         let pool = connect_jobs_db(&db_path).await.unwrap();
@@ -188,6 +193,15 @@ mod tests {
         run_seq_event_job(job.clone(), &broadcast).await.unwrap();
         let received = rx.recv().await.unwrap();
         assert_eq!(received, job.envelope);
+        let snapshot = crate::observability::metrics::render();
+        assert!(
+            snapshot.contains("cacos_seq_events_total"),
+            "expected SEQ_EVENTS_TOTAL counter: {snapshot}"
+        );
+        assert!(
+            snapshot.contains("cacos_timing_seconds_count{stage=\"seq_publish\"}"),
+            "expected seq_publish stage sample: {snapshot}"
+        );
         let _ = pool;
     }
 
