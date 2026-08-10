@@ -9,7 +9,6 @@ use cacos_pds::auth::auth_verifier::_reset_auth_dependencies_for_tests;
 use cacos_pds::auth::auth_verifier::register_auth_dependencies;
 use cacos_pds::observability::metrics as obs_metrics;
 use cacos_pds::observability::metrics::TIMING_STAGE_SECONDS;
-use cacos_pds::observability::metrics::init_metrics;
 use cacos_pds::xrpc::build_app_with_state;
 use cacos_pds::xrpc::test_utils::{create_test_account, test_state};
 use cacos_pds::xrpc::SharedState;
@@ -17,7 +16,7 @@ use cacos_pds::context::PDS_REPO_SIGNING_KEYPAIR;
 use poem::http::StatusCode;
 use poem::test::TestClient;
 use serde_json::{Value, json};
-use std::sync::{Mutex, OnceLock};
+use std::sync::OnceLock;
 
 /// Process-wide shared `SharedState`. Built once per test process so
 /// that parallel tests all reference the same account database
@@ -26,6 +25,7 @@ use std::sync::{Mutex, OnceLock};
 fn shared_state() -> &'static (SharedState, Vec<tempfile::TempDir>) {
     static STATE: OnceLock<(SharedState, Vec<tempfile::TempDir>)> = OnceLock::new();
     STATE.get_or_init(|| {
+        obs_metrics::init_metrics();
         let (state, dirs) = futures::executor::block_on(test_state());
         (state, dirs)
     })
@@ -116,10 +116,10 @@ fn assert_label_set_is_bounded(dodgy_substrings: &[&str]) {
 #[tokio::test(flavor = "multi_thread")]
 async fn create_record_writes_and_emits_seq_event() {
     // no lock needed: shared state + reset/register global per test
-    init_metrics();
+    // init_metrics is invoked once by shared_state()
     let state = setup_env().await;
     let did = "did:plc:writer".to_string();
-    let access = setup_repo_account(&state, &did, "writer.test").await;
+    let access = setup_repo_account(state, &did, "writer.test").await;
     let app = build_app_with_state(state.clone()).await;
     let cli = TestClient::new(app);
 
@@ -172,7 +172,7 @@ async fn put_record_updates_existing_post() {
     // no lock needed: shared state + reset/register global per test
     let state = setup_env().await;
     let did = "did:plc:upd".to_string();
-    let access = setup_repo_account(&state, &did, "upd.test").await;
+    let access = setup_repo_account(state, &did, "upd.test").await;
     let app = build_app_with_state(state.clone()).await;
     let cli = TestClient::new(app);
 
@@ -214,7 +214,7 @@ async fn apply_writes_dispatches_multiple_actions() {
     // no lock needed: shared state + reset/register global per test
     let state = setup_env().await;
     let did = "did:plc:batch".to_string();
-    let access = setup_repo_account(&state, &did, "batch.test").await;
+    let access = setup_repo_account(state, &did, "batch.test").await;
     let app = build_app_with_state(state.clone()).await;
     let cli = TestClient::new(app);
 
@@ -245,10 +245,10 @@ async fn apply_writes_dispatches_multiple_actions() {
 #[tokio::test(flavor = "multi_thread")]
 async fn upload_blob_stores_and_returns_ref() {
     // no lock needed: shared state + reset/register global per test
-    init_metrics();
+    // init_metrics is invoked once by shared_state()
     let state = setup_env().await;
     let did = "did:plc:blob".to_string();
-    let access = setup_repo_account(&state, &did, "blob.test").await;
+    let access = setup_repo_account(state, &did, "blob.test").await;
     let app = build_app_with_state(state.clone()).await;
     let cli = TestClient::new(app);
 
@@ -277,11 +277,16 @@ async fn upload_blob_stores_and_returns_ref() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn upload_blob_metrics_render_works() {
-    init_metrics();
+    // init_metrics is invoked once by shared_state(). Touch the shared
+    // state here so the recorder is set even if this test happens to run
+    // first in the parallel test shuffle.
+    let _ = setup_env().await;
     metrics::counter!("cacos_test_increment").increment(1);
     let snapshot = obs_metrics::render();
-    eprintln!("render snapshot: {snapshot}");
-    assert!(snapshot.contains("cacos_test_increment"));
+    assert!(
+        snapshot.contains("cacos_test_increment"),
+        "expected counter increment in: {snapshot}"
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -289,7 +294,7 @@ async fn delete_record_removes_post() {
     // no lock needed: shared state + reset/register global per test
     let state = setup_env().await;
     let did = "did:plc:del".to_string();
-    let access = setup_repo_account(&state, &did, "del.test").await;
+    let access = setup_repo_account(state, &did, "del.test").await;
     let app = build_app_with_state(state.clone()).await;
     let cli = TestClient::new(app);
 
@@ -327,7 +332,7 @@ async fn describe_repo_returns_collections() {
     // no lock needed: shared state + reset/register global per test
     let state = setup_env().await;
     let did = "did:plc:desc".to_string();
-    let access = setup_repo_account(&state, &did, "desc.test").await;
+    let access = setup_repo_account(state, &did, "desc.test").await;
     let app = build_app_with_state(state.clone()).await;
     let cli = TestClient::new(app);
 

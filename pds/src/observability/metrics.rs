@@ -132,18 +132,32 @@ pub fn describe() {
 static METRICS_HANDLE: RwLock<Option<PrometheusHandle>> = RwLock::new(None);
 
 /// Build the Prometheus recorder, install it globally, and keep a render handle.
-/// Safe to call more than once (the previous global recorder is replaced).
+/// Safe to call more than once (the previous global recorder is reused).
 pub fn init_metrics() {
-    let already_initialized = METRICS_HANDLE
+    // Fast path: a recorder is already installed and its handle cached.
+    if METRICS_HANDLE
         .read()
         .expect("metrics handle lock poisoned")
-        .is_some();
-    if already_initialized {
+        .is_some()
+    {
         return;
     }
+    // Slow path: build a recorder, attempt to install it globally, and
+    // only cache the handle if our recorder actually won the global
+    // recorder slot. This guards against a race where two callers both
+    // pass the fast-path check and one of them would otherwise overwrite
+    // the global recorder with a recorder that is then dropped — leaving
+    // METRICS_HANDLE pointing at the dropped recorder.
     let recorder = PrometheusBuilder::new().build_recorder();
     let handle = recorder.handle();
-    drop(metrics::set_global_recorder(recorder));
+    if metrics::set_global_recorder(recorder).is_err() {
+        // Another caller beat us to the global recorder. Drop our
+        // recorder (which `set_global_recorder` already discarded) and
+        // return without touching METRICS_HANDLE. The integration
+        // tests share a single cached handle via a `OnceLock` at the
+        // test entry point, so they never hit this branch in practice.
+        return;
+    }
     *METRICS_HANDLE
         .write()
         .expect("metrics handle lock poisoned") = Some(handle);

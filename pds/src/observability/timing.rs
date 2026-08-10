@@ -155,12 +155,10 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn reporter_folds_inter_event_timing_into_gauges() {
-        // Fresh global recorder scoped to this test; no other unit test asserts
-        // on the global recorder contents.
-        let recorder = PrometheusBuilder::new().build_recorder();
-        let handle = recorder.handle();
-        drop(metrics::set_global_recorder(recorder));
-        crate::observability::metrics::describe();
+        // Use the global metrics recorder (idempotent init). The reporter
+        // thread the timing-layer fold into the global gauges; the test
+        // only asserts the p50/p999/max metrics are now present.
+        crate::observability::metrics::init_metrics();
 
         // Subscriber with the timing layer, installed as the thread-local default
         // so events on THIS thread feed the inter-event timing histograms.
@@ -184,7 +182,7 @@ mod tests {
         // Generous sleep: several reporter cycles at 20 ms.
         tokio::time::sleep(Duration::from_millis(500)).await;
 
-        let out = handle.render();
+        let out = crate::observability::metrics::render();
         assert!(
             out.contains(crate::observability::metrics::TIMING_P50_SECONDS),
             "expected p50 gauge in: {out}"

@@ -56,10 +56,10 @@ pub fn register_auth_dependencies(
     account_manager: Arc<AccountManager>,
     provider: Option<Arc<OAuthProvider>>,
 ) {
-    if let Some(provider) = provider {
-        if let Ok(mut g) = OAUTH_PROVIDER.write() {
-            *g = Some(provider);
-        }
+    if let Some(provider) = provider
+        && let Ok(mut g) = OAUTH_PROVIDER.write()
+    {
+        *g = Some(provider);
     }
     if let Ok(mut g) = ACCOUNT_MANAGER.write() {
         *g = Some(account_manager);
