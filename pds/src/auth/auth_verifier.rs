@@ -593,6 +593,17 @@ pub async fn validate_access_token(
     scopes: Vec<AuthScope>,
     opts: Option<ValidateAccessTokenOpts>,
 ) -> Result<AccessOutput, AuthError> {
+    crate::observability::timing::timed("auth", async {
+        validate_access_token_inner(auth_header, scopes, opts).await
+    })
+    .await
+}
+
+async fn validate_access_token_inner(
+    auth_header: Option<&str>,
+    scopes: Vec<AuthScope>,
+    opts: Option<ValidateAccessTokenOpts>,
+) -> Result<AccessOutput, AuthError> {
     if let Some(token) = dpop_token_from_req(auth_header) {
         return validate_dpop_access_token(token, scopes, opts).await;
     }
@@ -1251,6 +1262,25 @@ mod tests {
         let err = validate_bearer_token(&token, vec![AuthScope::Access], Some(verify_options()))
             .unwrap_err();
         assert!(is_expired_jwt(&err));
+    }
+
+    #[tokio::test]
+    #[allow(non_snake_case)]
+    async fn validate_access_token_records_auth_stage_timing() {
+        crate::observability::metrics::init_metrics();
+        setup_env();
+        let token = sign_token(
+            AuthScope::Access,
+            StdDuration::from_secs(60),
+            "did:plc:alice",
+        );
+        let header = format!("Bearer {token}");
+        let _ = validate_access_token(Some(&header), vec![AuthScope::Access], None).await;
+        let snapshot = crate::observability::metrics::render();
+        assert!(
+            snapshot.contains("cacos_timing_seconds_count{stage=\"auth\"}"),
+            "expected auth stage sample: {snapshot}"
+        );
     }
 
     #[tokio::test]
