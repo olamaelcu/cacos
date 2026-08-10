@@ -7,10 +7,10 @@
 //! (`rsky` crate's `src/well_known.rs`).
 
 use crate::xrpc::{ApiResult, SharedState};
-use poem::http::StatusCode;
-use poem::web::Data;
 use poem::Request;
 use poem::Response;
+use poem::http::StatusCode;
+use poem::web::Data;
 
 /// `/.well-known/atproto-did`: maps the Host header to a handle and answers
 /// with the account DID, or 404 "User not found".
@@ -21,7 +21,7 @@ pub async fn well_known(state: Data<&SharedState>, req: &Request) -> ApiResult<R
         None => {
             return Ok(Response::builder()
                 .status(StatusCode::INTERNAL_SERVER_ERROR)
-                .finish())
+                .finish());
         }
     };
     let supported_handle = state

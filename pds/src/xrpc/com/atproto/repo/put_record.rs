@@ -10,7 +10,9 @@ use poem::web::{Data, Json};
 use rsky_lexicon::com::atproto::repo::{PutRecordInput, PutRecordOutput};
 use rsky_repo::types::{PreparedWrite, WriteOpAction};
 
-fn requester_did(auth: &crate::xrpc::auth_extractors::AccessStandardIncludeChecks) -> ApiResult<String> {
+fn requester_did(
+    auth: &crate::xrpc::auth_extractors::AccessStandardIncludeChecks,
+) -> ApiResult<String> {
     auth.access
         .credentials
         .as_ref()
@@ -26,10 +28,8 @@ async fn inner_put_record(
     let did = requester_did(&auth)?;
     let validate = body.validate.unwrap_or(true);
 
-    let record: rsky_repo::types::RepoRecord =
-        serde_json::from_value(body.record.clone()).map_err(|e| {
-            ApiError::InvalidRequest(format!("Record did not deserialize: {e}"))
-        })?;
+    let record: rsky_repo::types::RepoRecord = serde_json::from_value(body.record.clone())
+        .map_err(|e| ApiError::InvalidRequest(format!("Record did not deserialize: {e}")))?;
     let record = set_collection_name(&body.collection, record, validate)
         .map_err(|e| ApiError::InvalidRequest(format!("{e}")))?;
 
@@ -69,9 +69,11 @@ async fn inner_put_record(
     .await
     .map_err(|_| ApiError::RuntimeError)?;
 
-    let commit = timed("repo_write", async { transactor.process_writes(vec![write], swap_cid).await })
-        .await
-        .map_err(|_| ApiError::RuntimeError)?;
+    let commit = timed("repo_write", async {
+        transactor.process_writes(vec![write], swap_cid).await
+    })
+    .await
+    .map_err(|_| ApiError::RuntimeError)?;
 
     let mut seq = state
         .sequencer

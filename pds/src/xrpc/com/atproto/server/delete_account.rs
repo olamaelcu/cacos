@@ -1,7 +1,7 @@
 //! `com.atproto.server.deleteAccount` handler.
 
-use crate::account::helpers::account::{AccountStatus, AvailabilityFlags};
 use crate::account::EmailTokenPurpose;
+use crate::account::helpers::account::{AccountStatus, AvailabilityFlags};
 use crate::xrpc::auth_extractors::AdminToken;
 use crate::xrpc::{ApiError, ApiResult, SharedState};
 use poem::web::{Data, Json};

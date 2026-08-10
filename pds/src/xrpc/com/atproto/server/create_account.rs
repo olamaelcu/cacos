@@ -7,11 +7,11 @@
 //! through the injected [`PlcClient`] instead of a directly-constructed
 //! `plc::Client`, and account creation runs through the shared state.
 
-use crate::account::helpers::account::AccountStatus;
 use crate::account::CreateAccountOpts;
+use crate::account::helpers::account::AccountStatus;
 use crate::context::PDS_REPO_SIGNING_KEYPAIR;
-use crate::handle::{normalize_and_validate_handle, HandleValidationOpts};
-use crate::plc::operations::{create_op, CreateAtprotoOpInput};
+use crate::handle::{HandleValidationOpts, normalize_and_validate_handle};
+use crate::plc::operations::{CreateAtprotoOpInput, create_op};
 use crate::plc::types::{OpOrTombstone, Operation};
 use crate::sequencer::events::sync_evt_data_from_commit;
 use crate::xrpc::auth_extractors::UserDidAuthOptional;
@@ -67,7 +67,10 @@ async fn inner_create_account(
         return Err(ApiError::RuntimeError);
     }
     let commit = {
-        let actor_txn = match state.actor_store.transact(did.clone(), state.blobstore.clone()).await
+        let actor_txn = match state
+            .actor_store
+            .transact(did.clone(), state.blobstore.clone())
+            .await
         {
             Ok(actor_txn) => actor_txn,
             Err(error) => {
@@ -160,8 +163,8 @@ async fn inner_create_account(
     }
 
     if !deactivated {
-        let sync_data = sync_evt_data_from_commit(commit.clone())
-            .map_err(|_| ApiError::RuntimeError)?;
+        let sync_data =
+            sync_evt_data_from_commit(commit.clone()).map_err(|_| ApiError::RuntimeError)?;
         let mut sequencer_clone = state
             .sequencer
             .sequencer

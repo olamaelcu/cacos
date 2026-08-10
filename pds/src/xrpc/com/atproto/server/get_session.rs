@@ -13,9 +13,9 @@ pub async fn get_session(
     let credentials = auth.access.credentials.ok_or(ApiError::InvalidRequest(
         "Missing credentials on access token".to_string(),
     ))?;
-    let did = credentials
-        .did
-        .ok_or(ApiError::InvalidRequest("Missing did on access token".to_string()))?;
+    let did = credentials.did.ok_or(ApiError::InvalidRequest(
+        "Missing did on access token".to_string(),
+    ))?;
     match state.account_manager.get_account(&did, None).await {
         Ok(Some(user)) => Ok(Json(GetSessionOutput {
             handle: user.handle.unwrap_or(INVALID_HANDLE.to_string()),

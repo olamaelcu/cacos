@@ -1,5 +1,5 @@
-use crate::account::helpers::account::AvailabilityFlags;
 use crate::account::EmailTokenPurpose;
+use crate::account::helpers::account::AvailabilityFlags;
 use crate::mailer;
 use crate::mailer::TokenParam;
 use crate::xrpc::auth_extractors::AccessFull;
@@ -45,10 +45,7 @@ async fn inner_request_account_delete(
 
 /// POST /xrpc/com.atproto.server.requestAccountDelete
 #[poem::handler]
-pub async fn request_account_delete(
-    auth: AccessFull,
-    state: Data<&SharedState>,
-) -> ApiResult<()> {
+pub async fn request_account_delete(auth: AccessFull, state: Data<&SharedState>) -> ApiResult<()> {
     match inner_request_account_delete(auth, &state).await {
         Ok(_) => Ok(()),
         Err(error) => {

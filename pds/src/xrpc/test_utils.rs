@@ -125,18 +125,13 @@ pub async fn test_state() -> (SharedState, Vec<tempfile::TempDir>) {
     };
 
     let actor_store = Arc::new(ActorStore::new(&config.actor_store));
-    let blobstore: Arc<dyn BlobStore<Stream = BoxedBlobStream>> = Arc::new(
-        OpenDALBlobStore::new_disk(blob_dir.path(), "shared")
-            .expect("build blobstore"),
-    );
+    let blobstore: Arc<dyn BlobStore<Stream = BoxedBlobStream>> =
+        Arc::new(OpenDALBlobStore::new_disk(blob_dir.path(), "shared").expect("build blobstore"));
     let plc_client: Arc<dyn crate::plc::PlcClient> = Arc::new(MockPlcClient::default());
 
     // Plan 06: account-status checks inside validate_access_token need
     // the registered AccountManager.
-    crate::auth::auth_verifier::register_auth_dependencies(
-        Arc::new(account_manager.clone()),
-        None,
-    );
+    crate::auth::auth_verifier::register_auth_dependencies(Arc::new(account_manager.clone()), None);
 
     let state = SharedState {
         account_manager,
@@ -153,11 +148,7 @@ pub async fn test_state() -> (SharedState, Vec<tempfile::TempDir>) {
 
 /// Creates an account directly through the AccountManager and returns its
 /// (access_jwt, refresh_jwt) — the same tokens `createSession` would issue.
-pub async fn create_test_account(
-    state: &SharedState,
-    did: &str,
-    handle: &str,
-) -> (String, String) {
+pub async fn create_test_account(state: &SharedState, did: &str, handle: &str) -> (String, String) {
     state
         .account_manager
         .create_account(crate::account::CreateAccountOpts {

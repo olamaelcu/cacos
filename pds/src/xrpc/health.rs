@@ -5,9 +5,9 @@
 //! Kubernetes `livenessProbe`).
 
 use crate::xrpc::{ApiResult, SharedState};
+use poem::Response;
 use poem::http::StatusCode;
 use poem::web::Data;
-use poem::Response;
 use sea_orm::ConnectionTrait;
 use serde::Serialize;
 
@@ -20,7 +20,11 @@ pub struct ServerVersion {
 /// failure.
 #[poem::handler]
 pub async fn health(state: Data<&SharedState>) -> ApiResult<Response> {
-    let ok = state.account_manager.db.execute_unprepared("SELECT 1").await;
+    let ok = state
+        .account_manager
+        .db
+        .execute_unprepared("SELECT 1")
+        .await;
     match ok {
         Ok(_) => {
             let version = std::env::var("PDS_VERSION").unwrap_or_else(|_| "0.0.0-test".into());

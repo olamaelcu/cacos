@@ -4,6 +4,11 @@ name = "cacos-pds"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+# Enables mock PLC / mock remote-create-account implementations and the
+# `xrpc::test_utils` module for downstream integration tests.
+test-utils = []
+
 [dependencies]
 migration = { path = "../migration", package = "cacos-migration" }
 sea-orm = { workspace = true }
@@ -100,3 +105,4 @@ metrics = { workspace = true }
 serde_ipld_dagcbor = { workspace = true }
 wiremock = "0.6"
 tokio-tungstenite = "0.27"
+cacos-pds = { path = ".", features = ["test-utils"] }

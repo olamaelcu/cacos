@@ -17,12 +17,12 @@ use crate::auth::auth_verifier::{
     self, AccessOutput, AuthError, Credentials, DpopRequestContext, ValidateAccessTokenOpts,
 };
 use crate::xrpc::ApiError;
-use poem::error::Error as PoemError;
-use poem::web::FromRequest;
 use poem::IntoResponse;
 use poem::Request;
 use poem::RequestBody;
 use poem::Result;
+use poem::error::Error as PoemError;
+use poem::web::FromRequest;
 
 /// Maps an auth failure to the wire-facing [`ApiError`].
 ///
@@ -274,7 +274,10 @@ pub struct Moderator {
 
 impl<'a> FromRequest<'a> for Moderator {
     async fn from_request(req: &'a Request, _body: &mut RequestBody) -> Result<Self> {
-        if auth_header(req).map(|h| h.starts_with("Bearer ")).unwrap_or(false) {
+        if auth_header(req)
+            .map(|h| h.starts_with("Bearer "))
+            .unwrap_or(false)
+        {
             // Mod-service JWT verification requires the signing-key resolver
             // (Plan 06 register_signing_key_resolver). Until a mod service is
             // configured (PDS_MOD_SERVICE_DID unset), the bearer branch fails
@@ -302,12 +305,16 @@ impl<'a> FromRequest<'a> for OptionalAccessOrAdminToken {
             None => Ok(OptionalAccessOrAdminToken { access: None }),
             Some(h) if h.starts_with("Bearer ") => {
                 match validate_access(req, vec![AuthScope::Access], None).await {
-                    Ok(access) => Ok(OptionalAccessOrAdminToken { access: Some(access) }),
+                    Ok(access) => Ok(OptionalAccessOrAdminToken {
+                        access: Some(access),
+                    }),
                     Err(error) => Err(poem_error(auth_error_to_api_error(&error))),
                 }
             }
             Some(_) => match auth_verifier::verify_admin_token(auth_header(req)).await {
-                Ok(access) => Ok(OptionalAccessOrAdminToken { access: Some(access) }),
+                Ok(access) => Ok(OptionalAccessOrAdminToken {
+                    access: Some(access),
+                }),
                 Err(error) => Err(poem_error(auth_error_to_api_error(&error))),
             },
         }
@@ -321,9 +328,14 @@ pub struct UserDidAuthOptional {
 
 impl<'a> FromRequest<'a> for UserDidAuthOptional {
     async fn from_request(req: &'a Request, _body: &mut RequestBody) -> Result<Self> {
-        if auth_header(req).map(|h| h.starts_with("Bearer ")).unwrap_or(false) {
+        if auth_header(req)
+            .map(|h| h.starts_with("Bearer "))
+            .unwrap_or(false)
+        {
             match auth_verifier::verify_user_did_token(auth_header(req)).await {
-                Ok(access) => Ok(UserDidAuthOptional { access: Some(access) }),
+                Ok(access) => Ok(UserDidAuthOptional {
+                    access: Some(access),
+                }),
                 Err(error) => Err(poem_error(auth_error_to_api_error(&error))),
             }
         } else {
@@ -352,7 +364,7 @@ mod tests {
     use crate::xrpc::test_utils::{create_test_account, test_state};
     use poem::test::TestClient;
     use poem::web::Json;
-    use poem::{get, handler, EndpointExt, Route};
+    use poem::{EndpointExt, Route, get, handler};
 
     #[handler]
     async fn whoami(auth: AccessStandard) -> Json<serde_json::Value> {
@@ -373,11 +385,8 @@ mod tests {
     #[tokio::test]
     async fn valid_access_jwt_passes_access_standard() {
         let (state, _dirs) = test_state().await;
-        let (access, _refresh) =
-            create_test_account(&state, "did:plc:alice", "alice.test").await;
-        let app = Route::new()
-            .at("/whoami", get(whoami))
-            .data(state);
+        let (access, _refresh) = create_test_account(&state, "did:plc:alice", "alice.test").await;
+        let app = Route::new().at("/whoami", get(whoami)).data(state);
         let cli = TestClient::new(app);
         let resp = cli
             .get("/whoami")
@@ -392,8 +401,7 @@ mod tests {
     #[tokio::test]
     async fn refresh_jwt_rejected_by_access_standard() {
         let (state, _dirs) = test_state().await;
-        let (_access, refresh) =
-            create_test_account(&state, "did:plc:bob", "bob.test").await;
+        let (_access, refresh) = create_test_account(&state, "did:plc:bob", "bob.test").await;
         let app = Route::new().at("/whoami", get(whoami)).data(state);
         let cli = TestClient::new(app);
         let resp = cli
@@ -420,8 +428,7 @@ mod tests {
     #[tokio::test]
     async fn app_password_scope_rejected_by_access_full() {
         let (state, _dirs) = test_state().await;
-        let (_access, _refresh) =
-            create_test_account(&state, "did:plc:carol", "carol.test").await;
+        let (_access, _refresh) = create_test_account(&state, "did:plc:carol", "carol.test").await;
         // an app password session has AppPass scope; AccessFull requires Access
         let (app_pass_access, _) = state
             .account_manager
@@ -441,8 +448,7 @@ mod tests {
     #[tokio::test]
     async fn refresh_extractor_accepts_refresh_jwt() {
         let (state, _dirs) = test_state().await;
-        let (_access, refresh) =
-            create_test_account(&state, "did:plc:dan", "dan.test").await;
+        let (_access, refresh) = create_test_account(&state, "did:plc:dan", "dan.test").await;
         let app = Route::new().at("/refresh", get(needs_refresh)).data(state);
         let cli = TestClient::new(app);
         let resp = cli

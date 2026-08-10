@@ -54,7 +54,9 @@ impl SharedStateFromEnv {
         let shared_broadcast = crate::sequencer::apalis_worker::SharedBroadcast::new(1024);
 
         let id_resolver = IdResolver::new(rsky_identity::types::IdentityResolverOpts {
-            timeout: Some(std::time::Duration::from_millis(cfg.identity.resolver_timeout)),
+            timeout: Some(std::time::Duration::from_millis(
+                cfg.identity.resolver_timeout,
+            )),
             plc_url: Some(cfg.identity.plc_url.clone()),
             did_cache: Some(Arc::new(DidSqliteCache::new(
                 did_cache_db,
@@ -74,7 +76,7 @@ impl SharedStateFromEnv {
             )
             .expect("build shared blobstore"),
         );
-        let plc_client: Arc<dyn PlcClient> = Arc::new(crate::plc::MockPlcClient::default());
+        let plc_client: Arc<dyn PlcClient> = crate::plc::plc_client_from_env(cfg);
 
         crate::auth::auth_verifier::register_auth_dependencies(
             Arc::new(account_manager.clone()),

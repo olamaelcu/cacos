@@ -27,7 +27,7 @@ pub mod update_email;
 use crate::context::PDS_REPO_SIGNING_KEYPAIR;
 use crate::plc::PlcClient;
 use crate::xrpc::types::SharedIdResolver;
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use rand::Rng;
 use rsky_crypto::utils::encode_did_key;
 use rsky_identity::types::DidDocument;
@@ -184,10 +184,7 @@ pub fn routes(route: poem::Route) -> poem::Route {
             "/createAccount",
             post(create_account::server_create_account),
         )
-        .at(
-            "/activateAccount",
-            post(activate_account::activate_account),
-        )
+        .at("/activateAccount", post(activate_account::activate_account))
         .at(
             "/deactivateAccount",
             post(deactivate_account::deactivate_account),
@@ -240,14 +237,8 @@ pub fn routes(route: poem::Route) -> poem::Route {
             "/getAccountInviteCodes",
             get(get_account_invite_codes::get_account_invite_codes),
         )
-        .at(
-            "/describeServer",
-            get(describe_server::describe_server),
-        )
-        .at(
-            "/getServiceAuth",
-            get(get_service_auth::get_service_auth),
-        )
+        .at("/describeServer", get(describe_server::describe_server))
+        .at("/getServiceAuth", get(get_service_auth::get_service_auth))
         .at(
             "/reserveSigningKey",
             post(reserve_signing_key::reserve_signing_key),

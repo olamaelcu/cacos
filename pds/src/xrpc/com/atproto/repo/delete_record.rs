@@ -8,7 +8,9 @@ use poem::web::{Data, Json};
 use rsky_lexicon::com::atproto::repo::DeleteRecordInput;
 use rsky_repo::types::PreparedWrite;
 
-fn requester_did(auth: &crate::xrpc::auth_extractors::AccessStandardIncludeChecks) -> ApiResult<String> {
+fn requester_did(
+    auth: &crate::xrpc::auth_extractors::AccessStandardIncludeChecks,
+) -> ApiResult<String> {
     auth.access
         .credentials
         .as_ref()
@@ -49,9 +51,11 @@ async fn inner_delete_record(
     .await
     .map_err(|_| ApiError::RuntimeError)?;
 
-    let commit = timed("repo_write", async { transactor.process_writes(vec![write], swap_cid).await })
-        .await
-        .map_err(|_| ApiError::RuntimeError)?;
+    let commit = timed("repo_write", async {
+        transactor.process_writes(vec![write], swap_cid).await
+    })
+    .await
+    .map_err(|_| ApiError::RuntimeError)?;
 
     let mut seq = state
         .sequencer

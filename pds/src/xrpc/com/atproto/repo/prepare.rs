@@ -49,7 +49,10 @@ pub struct PrepareDeleteOpts {
     pub swap_cid: Option<Cid>,
 }
 
-pub fn blobs_for_write(record: RepoRecord, _validate: bool) -> anyhow::Result<Vec<PreparedBlobRef>> {
+pub fn blobs_for_write(
+    record: RepoRecord,
+    _validate: bool,
+) -> anyhow::Result<Vec<PreparedBlobRef>> {
     let refs = find_blob_refs(Lex::Map(record), None, None);
     for r#ref in refs.clone() {
         if matches!(r#ref.r#ref.original, JsonBlobRef::Untyped(_)) {

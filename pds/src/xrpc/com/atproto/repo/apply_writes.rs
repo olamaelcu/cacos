@@ -18,7 +18,9 @@ use rsky_lexicon::com::atproto::repo::{
 use rsky_lexicon::com::atproto::space::ApplyWritesOutput;
 use rsky_repo::types::{PreparedWrite, RepoRecord};
 
-fn requester_did(auth: &crate::xrpc::auth_extractors::AccessStandardIncludeChecks) -> ApiResult<String> {
+fn requester_did(
+    auth: &crate::xrpc::auth_extractors::AccessStandardIncludeChecks,
+) -> ApiResult<String> {
     auth.access
         .credentials
         .as_ref()

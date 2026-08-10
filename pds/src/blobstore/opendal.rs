@@ -206,10 +206,7 @@ impl BlobStore for OpenDALBlobStore {
                 counter_op("put_temp");
                 let key = Self::tmp_key();
                 let path = self.tmp_path(&key);
-                self.op
-                    .write(&path, bytes)
-                    .await
-                    .map_err(map_not_found)?;
+                self.op.write(&path, bytes).await.map_err(map_not_found)?;
                 histogram_put_bytes(bytes_len);
                 Ok(key)
             })
@@ -245,10 +242,7 @@ impl BlobStore for OpenDALBlobStore {
             timed("blob_put", async {
                 counter_op("put_permanent");
                 let path = self.stored_path(cid);
-                self.op
-                    .write(&path, bytes)
-                    .await
-                    .map_err(map_not_found)?;
+                self.op.write(&path, bytes).await.map_err(map_not_found)?;
                 histogram_put_bytes(bytes_len);
                 Ok(())
             })
@@ -308,7 +302,9 @@ impl BlobStore for OpenDALBlobStore {
                     let pinned = Pin::new(&mut async_reader);
                     match AsyncRead::poll_read(pinned, cx, &mut buf) {
                         Poll::Ready(Ok(0)) => Poll::Ready(None),
-                        Poll::Ready(Ok(n)) => Poll::Ready(Some(Ok(Bytes::copy_from_slice(&buf[..n])))),
+                        Poll::Ready(Ok(n)) => {
+                            Poll::Ready(Some(Ok(Bytes::copy_from_slice(&buf[..n]))))
+                        }
                         Poll::Ready(Err(err)) => Poll::Ready(Some(Err(anyhow::Error::from(err)))),
                         Poll::Pending => Poll::Pending,
                     }
@@ -379,9 +375,10 @@ impl BlobStore for OpenDALBlobStore {
                 format!("quarantine/{did}"),
             ] {
                 if let Err(err) = op.remove_all(&prefix).await
-                    && err.kind() != ErrorKind::NotFound {
-                        return Err(anyhow::Error::from(err));
-                    }
+                    && err.kind() != ErrorKind::NotFound
+                {
+                    return Err(anyhow::Error::from(err));
+                }
             }
             Ok(())
         }))

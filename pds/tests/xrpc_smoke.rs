@@ -3,8 +3,8 @@
 //! Pins the build_app wiring against the live SharedState produced by
 //! [`crate::xrpc::test_utils::test_state`].
 
-use cacos_pds::xrpc::test_utils;
 use cacos_pds::xrpc::build_app_with_state;
+use cacos_pds::xrpc::test_utils;
 use poem::test::TestClient;
 
 #[tokio::test]
@@ -38,7 +38,10 @@ async fn cors_headers_present_on_health_live() {
     let resp = cli.get("/xrpc/_health/live").send().await;
     resp.assert_status_is_ok();
     assert!(
-        resp.0.content_type().unwrap_or_default().starts_with("text/plain"),
+        resp.0
+            .content_type()
+            .unwrap_or_default()
+            .starts_with("text/plain"),
         "content-type must start with text/plain, got {:?}",
         resp.0.content_type()
     );

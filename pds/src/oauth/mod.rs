@@ -133,6 +133,9 @@ pub struct OAuthConfig {
 ///   headless-consent RemoteClient config (see [`crate::config`]).
 pub fn bootstrap_oauth_app(
     account_db: sea_orm::DatabaseConnection,
+    account_manager: crate::account::AccountManager,
+    actor_store: std::sync::Arc<crate::actor_store::ActorStore>,
+    plc_client: std::sync::Arc<dyn crate::plc::PlcClient>,
 ) -> Option<impl poem::Endpoint<Output = poem::Response>> {
     use std::sync::Arc;
 
@@ -148,7 +151,11 @@ pub fn bootstrap_oauth_app(
     let shared = SharedOAuthProvider::new(account_db.clone(), issuer, audience);
     let remote_config = crate::config::OAuthRemoteConfig::from_env();
     let remote_create_account: Arc<dyn remote_create_account::RemoteCreateAccount> =
-        Arc::new(remote_create_account::MockRemoteCreateAccount::default());
+        Arc::new(remote_create_account::ActorStoreRemoteCreateAccount::new(
+            account_manager,
+            actor_store,
+            plc_client,
+        ));
     Some(build_oauth_app(
         shared,
         account_db,

@@ -203,7 +203,9 @@ impl IntoResponse for ApiError {
         let (status, body) = self.body();
         let bytes = match serde_json::to_vec(&body) {
             Ok(bytes) => bytes,
-            Err(_) => br#"{"error":"InternalServerError","message":"Something went wrong"}"#.to_vec(),
+            Err(_) => {
+                br#"{"error":"InternalServerError","message":"Something went wrong"}"#.to_vec()
+            }
         };
         Response::builder()
             .status(status)

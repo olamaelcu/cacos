@@ -26,13 +26,14 @@ pub async fn accepted_mime(mime: String, accepted: Vec<String>) -> bool {
 
 pub async fn verify_blob(blob: &PreparedBlobRef, found: &super::types::BlobRow) -> Result<()> {
     if let Some(max_size) = blob.constraints.max_size
-        && found.size as usize > max_size {
-            bail!(
-                "BlobTooLarge: This file is too large. It is {:?} but the maximum size is {:?}",
-                found.size,
-                max_size
-            )
-        }
+        && found.size as usize > max_size
+    {
+        bail!(
+            "BlobTooLarge: This file is too large. It is {:?} but the maximum size is {:?}",
+            found.size,
+            max_size
+        )
+    }
     if blob.mime_type != found.mime_type {
         bail!(
             "InvalidMimeType: Referenced MimeType does not match stored blob. Expected: {:?}, Got: {:?}",
@@ -41,13 +42,14 @@ pub async fn verify_blob(blob: &PreparedBlobRef, found: &super::types::BlobRow) 
         )
     }
     if let Some(ref accept) = blob.constraints.accept
-        && !accepted_mime(blob.mime_type.clone(), accept.clone()).await {
-            bail!(
-                "Wrong type of file. It is {:?} but it must match {:?}.",
-                blob.mime_type,
-                accept
-            )
-        }
+        && !accepted_mime(blob.mime_type.clone(), accept.clone()).await
+    {
+        bail!(
+            "Wrong type of file. It is {:?} but it must match {:?}.",
+            blob.mime_type,
+            accept
+        )
+    }
     Ok(())
 }
 

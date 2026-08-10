@@ -10,8 +10,8 @@
 
 use std::panic;
 use std::sync::{Arc, Mutex};
-use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::layer::Layer;
+use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::registry::Registry;
 use tracing_unwrap::ResultExt;
 

@@ -1,11 +1,11 @@
-use crate::account::helpers::auth::{create_service_jwt, ServiceJwtParams};
+use crate::account::helpers::auth::{ServiceJwtParams, create_service_jwt};
 use crate::xrpc::auth_extractors::AccessFull;
 use crate::xrpc::{ApiError, ApiResult};
-use anyhow::{bail, Result};
-use chrono::offset::Utc as UtcOffset;
+use anyhow::{Result, bail};
 use chrono::DateTime;
+use chrono::offset::Utc as UtcOffset;
 use poem::web::Json;
-use rsky_common::time::{from_micros_to_utc, HOUR, MINUTE};
+use rsky_common::time::{HOUR, MINUTE, from_micros_to_utc};
 use rsky_lexicon::com::atproto::server::GetServiceAuthOutput;
 use std::time::SystemTime;
 
@@ -63,17 +63,24 @@ pub async fn inner_get_service_auth(
         if diff.num_milliseconds() < 0 {
             bail!("BadExpiration: expiration is in past");
         } else if diff.num_milliseconds() > HOUR as i64 {
-            bail!("BadExpiration: cannot request a token with an expiration more than an hour in the future");
+            bail!(
+                "BadExpiration: cannot request a token with an expiration more than an hour in the future"
+            );
         } else if lxm.is_none() && diff.num_milliseconds() > MINUTE as i64 {
-            bail!("BadExpiration: cannot request a method-less token with an expiration more than a minute in the future");
+            bail!(
+                "BadExpiration: cannot request a method-less token with an expiration more than a minute in the future"
+            );
         }
     }
     if let Some(ref lxm) = lxm {
         if PROTECTED_METHODS.contains(&lxm.as_str()) {
             bail!("cannot request a service auth token for the following protected method: {lxm}");
         }
-        if credentials.is_privileged.unwrap_or(false) && PRIVILEGED_METHODS.contains(&lxm.as_str()) {
-            bail!("insufficient access to request a service auth token for the following method: {lxm}");
+        if credentials.is_privileged.unwrap_or(false) && PRIVILEGED_METHODS.contains(&lxm.as_str())
+        {
+            bail!(
+                "insufficient access to request a service auth token for the following method: {lxm}"
+            );
         }
     }
     create_service_jwt(ServiceJwtParams {

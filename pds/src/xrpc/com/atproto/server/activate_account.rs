@@ -1,7 +1,7 @@
 //! `com.atproto.server.activateAccount` handler.
 
-use crate::account::helpers::account::AvailabilityFlags;
 use crate::account::AccountManager;
+use crate::account::helpers::account::AvailabilityFlags;
 use crate::xrpc::auth_extractors::AccessFull;
 use crate::xrpc::com::atproto::server::assert_valid_did_documents_for_service;
 use crate::xrpc::{ApiError, ApiResult, SharedState};
@@ -87,10 +87,7 @@ async fn inner_activate_account(auth: AccessFull, state: &SharedState) -> Result
 
 /// POST /xrpc/com.atproto.server.activateAccount
 #[poem::handler]
-pub async fn activate_account(
-    auth: AccessFull,
-    state: Data<&SharedState>,
-) -> ApiResult<()> {
+pub async fn activate_account(auth: AccessFull, state: Data<&SharedState>) -> ApiResult<()> {
     match inner_activate_account(auth, state.0).await {
         Ok(_) => Ok(()),
         Err(error) => Err(error),

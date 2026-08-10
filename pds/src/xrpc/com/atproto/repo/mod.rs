@@ -24,8 +24,5 @@ pub fn routes(route: Route) -> Route {
         .at("/deleteRecord", post(delete_record::delete_record))
         .at("/applyWrites", post(apply_writes::apply_writes))
         .at("/uploadBlob", post(upload_blob::upload_blob))
-        .at(
-            "/describeRepo",
-            get(describe_repo::describe_repo),
-        )
+        .at("/describeRepo", get(describe_repo::describe_repo))
 }

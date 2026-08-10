@@ -14,8 +14,8 @@ use tracing_timing::LayerDowncaster;
 use tracing_timing::group::{ByMessage, ByName};
 
 use crate::observability::metrics::{
-    TIMING_MAX_SECONDS, TIMING_P50_SECONDS, TIMING_P90_SECONDS, TIMING_P99_SECONDS, TIMING_P999_SECONDS,
-    TIMING_STAGE_SECONDS,
+    TIMING_MAX_SECONDS, TIMING_P50_SECONDS, TIMING_P90_SECONDS, TIMING_P99_SECONDS,
+    TIMING_P999_SECONDS, TIMING_STAGE_SECONDS,
 };
 
 /// Async helper that records `cacos_timing_seconds{stage="..."}` for the wrapped
@@ -199,7 +199,10 @@ mod tests {
         reporter.shutdown().await;
     }
 
-    fn run_with_local_recorder<F, R>(recorder: &metrics_exporter_prometheus::PrometheusRecorder, f: F) -> R
+    fn run_with_local_recorder<F, R>(
+        recorder: &metrics_exporter_prometheus::PrometheusRecorder,
+        f: F,
+    ) -> R
     where
         F: std::future::Future<Output = R>,
     {
@@ -207,9 +210,7 @@ mod tests {
         // Drive the future with `futures::executor::block_on`, which manages its
         // own single-thread executor and is safe to call from inside a
         // `tokio::test` (it does not nest into the surrounding runtime).
-        metrics::with_local_recorder(recorder, || {
-            futures::executor::block_on(f)
-        })
+        metrics::with_local_recorder(recorder, || futures::executor::block_on(f))
     }
 
     #[tokio::test(flavor = "current_thread")]
@@ -218,9 +219,8 @@ mod tests {
         let handle = recorder.handle();
         crate::observability::metrics::describe();
 
-        let value: i32 = run_with_local_recorder(&recorder, async {
-            timed("test_stage", async { 42 }).await
-        });
+        let value: i32 =
+            run_with_local_recorder(&recorder, async { timed("test_stage", async { 42 }).await });
 
         assert_eq!(value, 42);
         let out = handle.render();
@@ -299,6 +299,10 @@ mod tests {
             total_samples >= 1,
             "expected at least one inter-event sample from timed(), got {total_samples}"
         );
-        assert_eq!(counter.load(Ordering::SeqCst), 1, "inner future should run exactly once");
+        assert_eq!(
+            counter.load(Ordering::SeqCst),
+            1,
+            "inner future should run exactly once"
+        );
     }
 }

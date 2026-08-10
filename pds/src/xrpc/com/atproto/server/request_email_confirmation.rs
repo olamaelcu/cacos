@@ -1,5 +1,5 @@
-use crate::account::helpers::account::AvailabilityFlags;
 use crate::account::EmailTokenPurpose;
+use crate::account::helpers::account::AvailabilityFlags;
 use crate::mailer;
 use crate::mailer::TokenParam;
 use crate::xrpc::auth_extractors::AccessFull;

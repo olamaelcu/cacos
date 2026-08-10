@@ -11,15 +11,12 @@ pub async fn create_app_password(
     state: Data<&SharedState>,
 ) -> ApiResult<Json<CreateAppPasswordOutput>> {
     let CreateAppPasswordInput { name } = body.0;
-    let credentials = auth
-        .access
-        .credentials
-        .ok_or(ApiError::InvalidRequest(
-            "Missing credentials on access token".to_string(),
-        ))?;
-    let did = credentials
-        .did
-        .ok_or(ApiError::InvalidRequest("Missing did on access token".to_string()))?;
+    let credentials = auth.access.credentials.ok_or(ApiError::InvalidRequest(
+        "Missing credentials on access token".to_string(),
+    ))?;
+    let did = credentials.did.ok_or(ApiError::InvalidRequest(
+        "Missing did on access token".to_string(),
+    ))?;
     match state.account_manager.create_app_password(did, name).await {
         Ok(app_password) => Ok(Json(app_password)),
         Err(error) => {

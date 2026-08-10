@@ -90,10 +90,12 @@ async fn reset_password_with_token() {
         .send()
         .await;
     assert_eq!(resp.0.status(), poem::http::StatusCode::OK);
-    assert!(account_manager
-        .verify_account_password("did:plc:d", &"newpass456".to_string())
-        .await
-        .unwrap());
+    assert!(
+        account_manager
+            .verify_account_password("did:plc:d", &"newpass456".to_string())
+            .await
+            .unwrap()
+    );
 }
 
 #[tokio::test]
@@ -136,7 +138,10 @@ async fn update_email_requires_token_for_confirmed_account() {
         .body_json(&json!({ "email": "newf@example.com" }))
         .send()
         .await;
-    assert_eq!(resp.0.status(), poem::http::StatusCode::INTERNAL_SERVER_ERROR);
+    assert_eq!(
+        resp.0.status(),
+        poem::http::StatusCode::INTERNAL_SERVER_ERROR
+    );
     let body: serde_json::Value = resp.0.into_body().into_json().await.unwrap();
     assert_eq!(body["error"], "InternalServerError"); // handler wraps inner errors as RuntimeError
 }

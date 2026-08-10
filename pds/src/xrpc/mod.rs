@@ -13,6 +13,7 @@ pub mod com;
 pub mod error;
 pub mod health;
 pub mod metrics;
+#[cfg(any(test, feature = "test-utils"))]
 pub mod test_utils;
 pub mod types;
 pub mod well_known;
@@ -87,16 +88,17 @@ pub async fn build_app_with_state(
         .at("/_health/live", poem::get(health::health_live))
         .at("/*rest", poem::get(unknown_xrpc_route));
 
-    let mut base = Route::new()
-        .nest("/xrpc", xrpc_routes)
-        .at(
-            "/.well-known/atproto-did",
-            poem::get(well_known::well_known),
-        );
+    let mut base = Route::new().nest("/xrpc", xrpc_routes).at(
+        "/.well-known/atproto-did",
+        poem::get(well_known::well_known),
+    );
     // Mount `/metrics` directly via `.at(...)` (not via `.nest(...)`) so
     // the radix tree doesn't pick up a second `*--poem-rest` catch-all
     // entry that would conflict with the OAuth nest below.
-    base = base.at("/metrics", poem::get(crate::observability::http::metrics_handler));
+    base = base.at(
+        "/metrics",
+        poem::get(crate::observability::http::metrics_handler),
+    );
 
     if std::env::var("PDS_JWT_KEY_K256_PRIVATE_KEY_HEX").is_ok() {
         let db_path =
@@ -105,7 +107,12 @@ pub async fn build_app_with_state(
             .open(camino::Utf8Path::new(&db_path))
             .await
         {
-            Ok(account_db) => crate::oauth::bootstrap_oauth_app(account_db),
+            Ok(account_db) => crate::oauth::bootstrap_oauth_app(
+                account_db,
+                state.account_manager.clone(),
+                state.actor_store.clone(),
+                state.plc_client.clone(),
+            ),
             Err(err) => {
                 tracing::error!(%err, "failed to open account database for OAuth");
                 None

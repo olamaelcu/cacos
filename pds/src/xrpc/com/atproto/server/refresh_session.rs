@@ -9,15 +9,12 @@ async fn inner_refresh_session(
     auth: Refresh,
     state: &SharedState,
 ) -> Result<RefreshSessionOutput, ApiError> {
-    let credentials = auth
-        .access
-        .credentials
-        .ok_or(ApiError::InvalidRequest(
-            "Missing credentials on refresh token".to_string(),
-        ))?;
-    let did = credentials
-        .did
-        .ok_or(ApiError::InvalidRequest("Missing did on refresh token".to_string()))?;
+    let credentials = auth.access.credentials.ok_or(ApiError::InvalidRequest(
+        "Missing credentials on refresh token".to_string(),
+    ))?;
+    let did = credentials.did.ok_or(ApiError::InvalidRequest(
+        "Missing did on refresh token".to_string(),
+    ))?;
     let token_id = credentials.token_id.ok_or(ApiError::InvalidRequest(
         "Missing token id on refresh token".to_string(),
     ))?;

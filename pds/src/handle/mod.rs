@@ -108,11 +108,11 @@ fn ensure_handle_service_constraints(
 
 /// Subset of the git-pinned `olamaelcu/rsky` fork at rev `aee5aec5ad9473d80232beab58ddba25a936298a` (`rsky` crate's `src/handle/reserved.rs` (ATP + common terms).
 pub static RESERVED_SUBDOMAINS: &[&str] = &[
-    "at", "atp", "plc", "pds", "did", "repo", "tid", "nsid", "xrpc", "lex", "lexicon",
-    "bsky", "bluesky", "handle", "www", "admin", "root", "mail", "smtp", "imap", "webmail",
-    "api", "oauth", "status", "help", "support", "docs", "blog", "news", "press", "about",
-    "contact", "login", "signup", "register", "account", "billing", "payments", "privacy",
-    "terms", "security", "abuse", "spam", "legal", "dmca",
+    "at", "atp", "plc", "pds", "did", "repo", "tid", "nsid", "xrpc", "lex", "lexicon", "bsky",
+    "bluesky", "handle", "www", "admin", "root", "mail", "smtp", "imap", "webmail", "api", "oauth",
+    "status", "help", "support", "docs", "blog", "news", "press", "about", "contact", "login",
+    "signup", "register", "account", "billing", "payments", "privacy", "terms", "security",
+    "abuse", "spam", "legal", "dmca",
 ];
 
 #[cfg(test)]
@@ -138,30 +138,34 @@ mod tests {
     #[tokio::test]
     async fn rejects_multi_label_service_handles() {
         let domains = vec![".test".to_string()];
-        assert!(normalize_and_validate_handle(
-            HandleValidationOpts {
-                handle: "a.b.test".to_string(),
-                did: None,
-                allow_reserved: None,
-            },
-            &domains,
-        )
-        .await
-        .is_err());
+        assert!(
+            normalize_and_validate_handle(
+                HandleValidationOpts {
+                    handle: "a.b.test".to_string(),
+                    did: None,
+                    allow_reserved: None,
+                },
+                &domains,
+            )
+            .await
+            .is_err()
+        );
     }
 
     #[tokio::test]
     async fn rejects_reserved_subdomains() {
         let domains = vec![".test".to_string()];
-        assert!(normalize_and_validate_handle(
-            HandleValidationOpts {
-                handle: "admin.test".to_string(),
-                did: None,
-                allow_reserved: None,
-            },
-            &domains,
-        )
-        .await
-        .is_err());
+        assert!(
+            normalize_and_validate_handle(
+                HandleValidationOpts {
+                    handle: "admin.test".to_string(),
+                    did: None,
+                    allow_reserved: None,
+                },
+                &domains,
+            )
+            .await
+            .is_err()
+        );
     }
 }

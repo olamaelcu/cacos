@@ -6,8 +6,7 @@ use serde_json::json;
 #[tokio::test]
 async fn create_session_with_password() {
     let (state, _dirs) = test_state().await;
-    let (_access, _refresh) =
-        create_test_account(&state, "did:plc:alice", "alice.test").await;
+    let (_access, _refresh) = create_test_account(&state, "did:plc:alice", "alice.test").await;
     let app = build_app_with_state(state).await;
     let cli = TestClient::new(app);
     let resp = cli
@@ -26,8 +25,7 @@ async fn create_session_with_password() {
 #[tokio::test]
 async fn create_session_bad_password_is_invalid_login() {
     let (state, _dirs) = test_state().await;
-    let (_access, _refresh) =
-        create_test_account(&state, "did:plc:bob", "bob.test").await;
+    let (_access, _refresh) = create_test_account(&state, "did:plc:bob", "bob.test").await;
     let app = build_app_with_state(state).await;
     let cli = TestClient::new(app);
     let resp = cli
@@ -43,8 +41,7 @@ async fn create_session_bad_password_is_invalid_login() {
 #[tokio::test]
 async fn refresh_session_rotates_token() {
     let (state, _dirs) = test_state().await;
-    let (_access, refresh) =
-        create_test_account(&state, "did:plc:carol", "carol.test").await;
+    let (_access, refresh) = create_test_account(&state, "did:plc:carol", "carol.test").await;
     let app = build_app_with_state(state).await;
     let cli = TestClient::new(app);
     let resp = cli
@@ -62,8 +59,7 @@ async fn refresh_session_rotates_token() {
 #[tokio::test]
 async fn get_session_returns_account() {
     let (state, _dirs) = test_state().await;
-    let (access, _refresh) =
-        create_test_account(&state, "did:plc:dan", "dan.test").await;
+    let (access, _refresh) = create_test_account(&state, "did:plc:dan", "dan.test").await;
     let app = build_app_with_state(state).await;
     let cli = TestClient::new(app);
     let resp = cli
@@ -80,8 +76,7 @@ async fn get_session_returns_account() {
 #[tokio::test]
 async fn delete_session_revokes_refresh_token() {
     let (state, _dirs) = test_state().await;
-    let (_access, refresh) =
-        create_test_account(&state, "did:plc:erin", "erin.test").await;
+    let (_access, refresh) = create_test_account(&state, "did:plc:erin", "erin.test").await;
     let app = build_app_with_state(state).await;
     let cli = TestClient::new(app);
     let resp = cli

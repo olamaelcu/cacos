@@ -44,12 +44,7 @@ fn make_path(slot: &str, collection: &Option<String>) -> String {
     }
 }
 
-fn walk_lex(
-    value: &Lex,
-    slot: &str,
-    collection: &Option<String>,
-    out: &mut Vec<(String, String)>,
-) {
+fn walk_lex(value: &Lex, slot: &str, collection: &Option<String>, out: &mut Vec<(String, String)>) {
     match value {
         Lex::Ipld(ipld) => walk_ipld(ipld, slot, collection, out),
         Lex::Map(m) => walk_map_lex(m, slot, collection, out),
@@ -79,7 +74,12 @@ fn walk_map_lex(
     }
 }
 
-fn walk_ipld(value: &Ipld, slot: &str, collection: &Option<String>, out: &mut Vec<(String, String)>) {
+fn walk_ipld(
+    value: &Ipld,
+    slot: &str,
+    collection: &Option<String>,
+    out: &mut Vec<(String, String)>,
+) {
     match value {
         Ipld::Map(m) => walk_map_ipld(m, slot, collection, out),
         Ipld::List(arr) => {
@@ -291,9 +291,10 @@ impl RecordReader {
             ),
             values,
         );
-        let rows = self.db.query_all_raw(stmt).await.map_err(|e| {
-            PdsError::internal("get_backlink_conflicts", anyhow::Error::from(e))
-        })?;
+        let rows =
+            self.db.query_all_raw(stmt).await.map_err(|e| {
+                PdsError::internal("get_backlink_conflicts", anyhow::Error::from(e))
+            })?;
         let mut out = Vec::new();
         for r in rows.iter() {
             if let Ok(s) = r.try_get_by_index::<String>(0)
@@ -503,9 +504,11 @@ pub async fn get_backlinks(
         format!("SELECT * FROM backlink WHERE \"linkTo\" IN ({target_ph})"),
         values,
     );
-    let rows = reader.db.query_all_raw(stmt).await.map_err(|e| {
-        PdsError::internal("get_backlinks", anyhow::Error::from(e))
-    })?;
+    let rows = reader
+        .db
+        .query_all_raw(stmt)
+        .await
+        .map_err(|e| PdsError::internal("get_backlinks", anyhow::Error::from(e)))?;
     let mut out = Vec::new();
     for r in rows.iter() {
         let uri = r.try_get_by_index::<String>(0).unwrap_or_default();
@@ -774,14 +777,19 @@ mod tests {
             .await
             .unwrap();
         assert!(!conflicts.is_empty(), "expected at least one conflict");
-        assert!(conflicts.iter().any(|u| u.to_string() == target_uri.to_string()));
+        assert!(
+            conflicts
+                .iter()
+                .any(|u| u.to_string() == target_uri.to_string())
+        );
     }
 
     #[tokio::test]
     async fn get_backlink_conflicts_empty_record_returns_no_conflicts() {
         let (_dir, reader, did) = setup().await;
         let uri = make_uri(&did, "app.bsky.feed.post", "x");
-        let empty: rsky_repo::types::RepoRecord = serde_json::from_value(serde_json::json!({})).unwrap();
+        let empty: rsky_repo::types::RepoRecord =
+            serde_json::from_value(serde_json::json!({})).unwrap();
         let conflicts = reader.get_backlink_conflicts(&uri, &empty).await.unwrap();
         assert!(conflicts.is_empty());
     }
@@ -805,7 +813,9 @@ mod tests {
             "subject": { "uri": target_uri.to_string() }
         }))
         .unwrap();
-        let rows = get_backlinks(&reader, &target_uri, &repo_record).await.unwrap();
+        let rows = get_backlinks(&reader, &target_uri, &repo_record)
+            .await
+            .unwrap();
         assert!(!rows.is_empty());
     }
 }

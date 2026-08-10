@@ -6,8 +6,7 @@ use serde_json::json;
 #[tokio::test]
 async fn create_list_revoke_app_password() {
     let (state, _dirs) = test_state().await;
-    let (access, _refresh) =
-        create_test_account(&state, "did:plc:a", "a.test").await;
+    let (access, _refresh) = create_test_account(&state, "did:plc:a", "a.test").await;
     let app = build_app_with_state(state).await;
     let cli = TestClient::new(app);
 
@@ -70,8 +69,7 @@ async fn create_app_password_requires_auth() {
 #[tokio::test]
 async fn duplicate_app_password_name_returns_runtime_error() {
     let (state, _dirs) = test_state().await;
-    let (access, _refresh) =
-        create_test_account(&state, "did:plc:dupe", "dupe.test").await;
+    let (access, _refresh) = create_test_account(&state, "did:plc:dupe", "dupe.test").await;
     let app = build_app_with_state(state).await;
     let cli = TestClient::new(app);
 
@@ -100,8 +98,7 @@ async fn duplicate_app_password_name_returns_runtime_error() {
 #[tokio::test]
 async fn list_app_passwords_is_empty_for_new_account() {
     let (state, _dirs) = test_state().await;
-    let (access, _refresh) =
-        create_test_account(&state, "did:plc:new", "new.test").await;
+    let (access, _refresh) = create_test_account(&state, "did:plc:new", "new.test").await;
     let app = build_app_with_state(state).await;
     let cli = TestClient::new(app);
 
@@ -118,8 +115,7 @@ async fn list_app_passwords_is_empty_for_new_account() {
 #[tokio::test]
 async fn revoke_app_password_is_a_noop_for_unknown_name() {
     let (state, _dirs) = test_state().await;
-    let (access, _refresh) =
-        create_test_account(&state, "did:plc:noop", "noop.test").await;
+    let (access, _refresh) = create_test_account(&state, "did:plc:noop", "noop.test").await;
     let app = build_app_with_state(state).await;
     let cli = TestClient::new(app);
 

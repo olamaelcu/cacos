@@ -9,15 +9,12 @@ pub async fn list_app_passwords(
     auth: AccessStandard,
     state: Data<&SharedState>,
 ) -> ApiResult<Json<ListAppPasswordsOutput>> {
-    let credentials = auth
-        .access
-        .credentials
-        .ok_or(ApiError::InvalidRequest(
-            "Missing credentials on access token".to_string(),
-        ))?;
-    let did = credentials
-        .did
-        .ok_or(ApiError::InvalidRequest("Missing did on access token".to_string()))?;
+    let credentials = auth.access.credentials.ok_or(ApiError::InvalidRequest(
+        "Missing credentials on access token".to_string(),
+    ))?;
+    let did = credentials.did.ok_or(ApiError::InvalidRequest(
+        "Missing did on access token".to_string(),
+    ))?;
     match state.account_manager.list_app_passwords(&did).await {
         Ok(passwords) => {
             let passwords: Vec<AppPassword> = passwords

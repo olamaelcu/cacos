@@ -679,12 +679,13 @@ impl ActorStoreTransactor {
             )
         })?;
         if let Some(swap_commit) = swap_commit
-            && !current_root.cid.eq(&swap_commit) {
-                return Err(PdsError::internal(
-                    "ActorStoreTransactor::format_commit: swap commit mismatch",
-                    anyhow::anyhow!("BadCommitSwapError: current root is `{}`", current_root.cid),
-                ));
-            }
+            && !current_root.cid.eq(&swap_commit)
+        {
+            return Err(PdsError::internal(
+                "ActorStoreTransactor::format_commit: swap commit mismatch",
+                anyhow::anyhow!("BadCommitSwapError: current root is `{}`", current_root.cid),
+            ));
+        }
         {
             let storage_guard = self.storage.write().await;
             storage_guard.cache_rev(current_root.rev.clone()).await?;

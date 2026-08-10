@@ -7,12 +7,12 @@
 
 use cacos_pds::auth::auth_verifier::_reset_auth_dependencies_for_tests;
 use cacos_pds::auth::auth_verifier::register_auth_dependencies;
+use cacos_pds::context::PDS_REPO_SIGNING_KEYPAIR;
 use cacos_pds::observability::metrics as obs_metrics;
 use cacos_pds::observability::metrics::TIMING_STAGE_SECONDS;
+use cacos_pds::xrpc::SharedState;
 use cacos_pds::xrpc::build_app_with_state;
 use cacos_pds::xrpc::test_utils::{create_test_account, test_state};
-use cacos_pds::xrpc::SharedState;
-use cacos_pds::context::PDS_REPO_SIGNING_KEYPAIR;
 use poem::http::StatusCode;
 use poem::test::TestClient;
 use serde_json::{Value, json};
@@ -38,9 +38,7 @@ async fn setup_env() -> &'static SharedState {
     state
 }
 
-async fn read(
-    resp: poem::test::TestResponse,
-) -> (StatusCode, Value) {
+async fn read(resp: poem::test::TestResponse) -> (StatusCode, Value) {
     let status = resp.0.status();
     let body_text = resp.0.into_body().into_string().await.unwrap_or_default();
     let body: Value = if body_text.is_empty() {
@@ -104,10 +102,7 @@ fn assert_label_set_is_bounded(dodgy_substrings: &[&str]) {
         }
         if let Some(rest) = line.strip_prefix("cacos_timing_seconds") {
             for sub in dodgy_substrings {
-                assert!(
-                    !rest.contains(sub),
-                    "stage label leaks {sub}: {line}"
-                );
+                assert!(!rest.contains(sub), "stage label leaks {sub}: {line}");
             }
         }
     }
@@ -267,10 +262,7 @@ async fn upload_blob_stores_and_returns_ref() {
         cid.starts_with("bafk"),
         "expected CID-shaped blob ref, got: {cid}"
     );
-    assert!(
-        cid.len() >= 30,
-        "expected full CID, got short value: {cid}"
-    );
+    assert!(cid.len() >= 30, "expected full CID, got short value: {cid}");
 
     assert_stage_observed("blob_put");
 }
