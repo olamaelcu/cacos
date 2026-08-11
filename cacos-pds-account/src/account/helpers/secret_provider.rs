@@ -158,9 +158,14 @@ fn build_from_env() -> Result<Arc<dyn SecretProvider>, String> {
     }
     match backend.as_str() {
         "env" => Ok(Arc::new(EnvSecretProvider)),
-        "kms" => Ok(Arc::new(KmsSecretProvider {
-            config: std::env::var("PDS_KMS_CONFIG").unwrap_or_default(),
-        })),
+        "kms" => {
+            let config = std::env::var("PDS_KMS_CONFIG").unwrap_or_default();
+            tracing::warn!(
+                kms_config = %config,
+                "PDS_SECRET_BACKEND=kms is selected; KmsSecretProvider refuses every read until a real KMS client (AWS/GCP/Vault) is wired. See ADR-0012."
+            );
+            Ok(Arc::new(KmsSecretProvider { config }))
+        }
         other => Err(format!("unknown PDS_SECRET_BACKEND: {other}")),
     }
 }
@@ -224,5 +229,66 @@ mod tests {
         let msg = SecretError::NotFound("PDS_X".to_string()).to_string();
         assert!(msg.contains("PDS_X"));
         assert!(msg.contains("_FILE"));
+    }
+
+    #[test]
+    fn kms_selection_emits_startup_warning() {
+        // SAFETY: tests run sequentially within a single test binary.
+        unsafe { std::env::set_var("PDS_SECRET_BACKEND", "kms") };
+        // SAFETY: tests run sequentially within a single test binary.
+        unsafe { std::env::set_var("PDS_KMS_CONFIG", "test-config") };
+        reset_provider();
+
+        struct OwnedBufWriter {
+            buf: std::sync::Arc<std::sync::Mutex<Vec<u8>>>,
+        }
+        impl std::io::Write for OwnedBufWriter {
+            fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+                let mut g = self.buf.lock().expect("buffer lock poisoned");
+                std::io::Write::write(&mut *g, buf)
+            }
+            fn flush(&mut self) -> std::io::Result<()> {
+                Ok(())
+            }
+        }
+
+        let captured: std::sync::Arc<std::sync::Mutex<Vec<u8>>> =
+            std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let make_writer = {
+            let captured = std::sync::Arc::clone(&captured);
+            move || OwnedBufWriter {
+                buf: std::sync::Arc::clone(&captured),
+            }
+        };
+
+        let subscriber = tracing_subscriber::fmt::Subscriber::builder()
+            .with_writer(make_writer)
+            .with_max_level(tracing::level_filters::LevelFilter::WARN)
+            .with_ansi(false)
+            .with_target(false)
+            .finish();
+        tracing::subscriber::with_default(subscriber, || {
+            build_from_env().expect("kms backend should build");
+        });
+
+        let output = String::from_utf8(captured.lock().unwrap().clone()).unwrap();
+        assert!(
+            output.contains("kms"),
+            "warning should mention kms, got: {output}"
+        );
+        assert!(
+            output.contains("PDS_SECRET_BACKEND"),
+            "warning should mention PDS_SECRET_BACKEND, got: {output}"
+        );
+        assert!(
+            output.contains("test-config"),
+            "warning should surface PDS_KMS_CONFIG value, got: {output}"
+        );
+
+        // SAFETY: tests run sequentially within a single test binary.
+        unsafe { std::env::remove_var("PDS_SECRET_BACKEND") };
+        // SAFETY: tests run sequentially within a single test binary.
+        unsafe { std::env::remove_var("PDS_KMS_CONFIG") };
+        reset_provider();
     }
 }
