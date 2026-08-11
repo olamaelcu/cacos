@@ -18,6 +18,7 @@ use chrono::offset::Utc as UtcOffset;
 use chrono::{DateTime, Duration};
 use futures::{SinkExt, StreamExt};
 use poem::IntoResponse;
+use tracing_unwrap::ResultExt;
 use poem::web::websocket::{Message, WebSocket};
 use rsky_common::RFC3339_VARIANT;
 use rsky_lexicon::com::atproto::sync::{
@@ -66,7 +67,7 @@ pub async fn subscribe_repos(
     let sequencer_lock = shared
         .sequencer
         .read()
-        .expect("sequencer lock poisoned")
+        .expect_or_log("sequencer lock poisoned")
         .clone();
     let seq_broadcast = (*broadcast).clone();
 

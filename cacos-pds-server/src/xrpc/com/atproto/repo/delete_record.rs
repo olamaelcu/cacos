@@ -7,6 +7,7 @@ use lexicon_cid::Cid;
 use poem::web::{Data, Json};
 use rsky_lexicon::com::atproto::repo::DeleteRecordInput;
 use rsky_repo::types::PreparedWrite;
+use tracing_unwrap::ResultExt;
 
 fn requester_did(
     auth: &crate::xrpc::auth_extractors::AccessStandardIncludeChecks,
@@ -61,7 +62,7 @@ async fn inner_delete_record(
         .sequencer
         .sequencer
         .read()
-        .expect("sequencer lock poisoned")
+        .expect_or_log("sequencer lock poisoned")
         .clone();
     let _ = timed("seq_write", async {
         seq.sequence_commit(did.clone(), commit).await

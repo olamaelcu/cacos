@@ -18,6 +18,7 @@ use crate::xrpc::auth_extractors::UserDidAuthOptional;
 use crate::xrpc::types::SharedIdResolver;
 use crate::xrpc::{ApiError, ApiResult, SharedState};
 use email_address::EmailAddress;
+use tracing_unwrap::ResultExt;
 use poem::web::{Data, Json};
 use rsky_common::env::env_bool;
 use rsky_crypto::utils::encode_did_key;
@@ -212,7 +213,7 @@ async fn inner_create_account(
             .sequencer
             .sequencer
             .read()
-            .expect("sequencer lock poisoned")
+            .expect_or_log("sequencer lock poisoned")
             .clone();
         if sequencer_clone
             .sequence_identity_evt(did.clone(), Some(handle.clone()))

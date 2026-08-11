@@ -17,6 +17,7 @@ use rsky_lexicon::com::atproto::repo::{
 };
 use rsky_lexicon::com::atproto::space::ApplyWritesOutput;
 use rsky_repo::types::{PreparedWrite, RepoRecord};
+use tracing_unwrap::ResultExt;
 
 fn requester_did(
     auth: &crate::xrpc::auth_extractors::AccessStandardIncludeChecks,
@@ -124,7 +125,7 @@ async fn inner_apply_writes(
         .sequencer
         .sequencer
         .read()
-        .expect("sequencer lock poisoned")
+        .expect_or_log("sequencer lock poisoned")
         .clone();
     let _ = timed("seq_write", async {
         seq.sequence_commit(did.clone(), commit).await

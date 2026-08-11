@@ -6,6 +6,7 @@ use crate::xrpc::auth_extractors::RequireAccountAdmin;
 use crate::xrpc::{ApiError, ApiResult, SharedState};
 use poem::web::{Data, Json};
 use rsky_lexicon::com::atproto::server::DeleteAccountInput;
+use tracing_unwrap::ResultExt;
 
 async fn inner_delete_account(
     body: DeleteAccountInput,
@@ -56,7 +57,7 @@ async fn inner_delete_account(
             .sequencer
             .sequencer
             .read()
-            .expect("sequencer lock poisoned")
+            .expect_or_log("sequencer lock poisoned")
             .clone();
         let (active, status) = {
             let s: AccountStatus = AccountStatus::Deleted;

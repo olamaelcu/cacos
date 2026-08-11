@@ -16,6 +16,7 @@ use cacos_pds_sequencer::crawlers::Crawlers;
 use crate::xrpc::SharedState;
 use rsky_identity::IdResolver;
 use std::sync::Arc;
+use tracing_unwrap::ResultExt;
 use tokio::sync::RwLock;
 
 /// rsky wraps `IdResolver` in a `RwLock` and passes it everywhere; same
@@ -34,15 +35,15 @@ impl SharedStateFromEnv {
         let account_db = cacos_pds_core::db::DatabaseKind::Account
             .open(camino::Utf8Path::new(&cfg.service_db.account_db_location))
             .await
-            .expect("failed to open account database");
+            .expect_or_log("failed to open account database");
         let sequencer_db = cacos_pds_core::db::DatabaseKind::Sequencer
             .open(camino::Utf8Path::new(&cfg.service_db.sequencer_db_location))
             .await
-            .expect("failed to open sequencer database");
+            .expect_or_log("failed to open sequencer database");
         let did_cache_db = cacos_pds_core::db::DatabaseKind::DidCache
             .open(camino::Utf8Path::new(&cfg.service_db.did_cache_db_location))
             .await
-            .expect("failed to open did cache database");
+            .expect_or_log("failed to open did cache database");
 
         let account_manager = AccountManager::new(account_db);
         let sequencer = SharedSequencer::new(cacos_pds_sequencer::Sequencer::new(
@@ -74,7 +75,7 @@ impl SharedStateFromEnv {
                 std::path::Path::new(&cfg.blobstore.disk_location),
                 "shared",
             )
-            .expect("build shared blobstore"),
+            .expect_or_log("build shared blobstore"),
         );
         let plc_client: Arc<dyn PlcClient> =
             cacos_pds_plc::plc_client_from_env(&cfg.identity.plc_url);

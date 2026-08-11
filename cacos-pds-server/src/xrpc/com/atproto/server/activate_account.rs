@@ -7,6 +7,7 @@ use crate::xrpc::com::atproto::server::assert_valid_did_documents_for_service;
 use crate::xrpc::{ApiError, ApiResult, SharedState};
 use poem::web::Data;
 use rsky_syntax::handle::INVALID_HANDLE;
+use tracing_unwrap::ResultExt;
 
 async fn inner_activate_account(auth: AccessFull, state: &SharedState) -> Result<(), ApiError> {
     let requester = auth
@@ -61,7 +62,7 @@ async fn inner_activate_account(auth: AccessFull, state: &SharedState) -> Result
             .sequencer
             .sequencer
             .read()
-            .expect("sequencer lock poisoned")
+            .expect_or_log("sequencer lock poisoned")
             .clone();
         let (active, status_lex) = status.into();
         sequencer_clone
