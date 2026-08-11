@@ -24,7 +24,7 @@ pub mod reset_password;
 pub mod revoke_app_password;
 pub mod update_email;
 
-use crate::actor_store::ActorStore;
+use cacos_pds_actor_store::ActorStore;
 use cacos_pds_account::auth::PDS_PLC_ROTATION_KEYPAIR;
 use cacos_pds_account::auth::PDS_REPO_SIGNING_KEYPAIR;
 use cacos_pds_plc::PlcClient;

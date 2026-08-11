@@ -4,14 +4,14 @@
 //! subscribers. The handler validates the cursor, backfills from the
 //! sequencer DB if needed, then live-streams from the broadcast channel.
 
-use crate::context::SharedSequencer;
+use cacos_pds_sequencer::shared_sequencer::SharedSequencer;
 use cacos_pds_core::db::types::db_id::DbId;
-use crate::sequencer::apalis_worker::SharedBroadcast;
-use crate::sequencer::events::{
+use cacos_pds_sequencer::apalis_worker::SharedBroadcast;
+use cacos_pds_sequencer::events::{
     SeqEvt, TypedAccountEvt, TypedCommitEvt, TypedIdentityEvt, TypedSyncEvt,
 };
-use crate::sequencer::outbox::{Outbox, OutboxOpts};
-use crate::sequencer::ws_frames::{
+use cacos_pds_sequencer::outbox::{Outbox, OutboxOpts};
+use cacos_pds_sequencer::ws_frames::{
     ErrorFrame, ErrorFrameBody, Frame, InfoFrameBody, MessageFrame, MessageFrameOpts,
 };
 use chrono::offset::Utc as UtcOffset;
@@ -363,12 +363,12 @@ mod tests {
 
     #[test]
     fn info_frame_for_outdated_cursor_carries_correct_discriminator() {
-        let frame = crate::sequencer::ws_frames::MessageFrame::new(
-            crate::sequencer::ws_frames::InfoFrameBody {
+        let frame = cacos_pds_sequencer::ws_frames::MessageFrame::new(
+            cacos_pds_sequencer::ws_frames::InfoFrameBody {
                 name: "OutdatedCursor".to_string(),
                 message: Some("Requested cursor exceeded limit".to_string()),
             },
-            Some(crate::sequencer::ws_frames::MessageFrameOpts {
+            Some(cacos_pds_sequencer::ws_frames::MessageFrameOpts {
                 r#type: Some("#info".to_string()),
             }),
         );
@@ -419,13 +419,13 @@ mod tests {
 #[cfg(test)]
 mod tcp_roundtrip_tests {
     use super::subscribe_repos;
-    use crate::context::SharedSequencer;
+    use cacos_pds_sequencer::shared_sequencer::SharedSequencer;
     use cacos_pds_core::db::DatabaseKind;
-    use crate::sequencer::Sequencer;
-    use crate::sequencer::apalis_worker::{
+    use cacos_pds_sequencer::Sequencer;
+    use cacos_pds_sequencer::apalis_worker::{
         SharedBroadcast, connect_jobs_db, spawn_seq_event_worker,
     };
-    use crate::sequencer::crawlers::Crawlers;
+    use cacos_pds_sequencer::crawlers::Crawlers;
     use futures::StreamExt;
     use lexicon_cid::Cid;
     use rsky_repo::block_map::BlockMap;

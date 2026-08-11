@@ -42,7 +42,7 @@ pub struct ActorStoreRemoteCreateAccount {
     #[allow(dead_code)]
     pub account_manager: Arc<cacos_pds_account::account::AccountManager>,
     #[allow(dead_code)]
-    pub actor_store: Arc<crate::actor_store::ActorStore>,
+    pub actor_store: Arc<cacos_pds_actor_store::ActorStore>,
     #[allow(dead_code)]
     pub plc_client: Arc<dyn cacos_pds_plc::PlcClient>,
 }
@@ -50,7 +50,7 @@ pub struct ActorStoreRemoteCreateAccount {
 impl ActorStoreRemoteCreateAccount {
     pub fn new(
         account_manager: cacos_pds_account::account::AccountManager,
-        actor_store: Arc<crate::actor_store::ActorStore>,
+        actor_store: Arc<cacos_pds_actor_store::ActorStore>,
         plc_client: Arc<dyn cacos_pds_plc::PlcClient>,
     ) -> Self {
         Self {

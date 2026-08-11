@@ -5,14 +5,14 @@
 //! lifetime of the state.
 
 use cacos_pds_account::account::AccountManager;
-use crate::actor_store::ActorStore;
+use cacos_pds_actor_store::ActorStore;
 use cacos_pds_blobstore::{BlobStore, BoxedBlobStream, OpenDALBlobStore};
 use cacos_pds_core::config::ServerConfig;
-use crate::context::SharedSequencer;
+use cacos_pds_sequencer::shared_sequencer::SharedSequencer;
 use cacos_pds_identity::did_cache::DidSqliteCache;
 use cacos_pds_plc::MockPlcClient;
-use crate::sequencer::crawlers::Crawlers;
-use crate::sequencer::{Sequencer, apalis_worker::SharedBroadcast};
+use cacos_pds_sequencer::crawlers::Crawlers;
+use cacos_pds_sequencer::{Sequencer, apalis_worker::SharedBroadcast};
 use crate::xrpc::SharedState;
 use rsky_identity::IdResolver;
 use std::sync::{Arc, Once};

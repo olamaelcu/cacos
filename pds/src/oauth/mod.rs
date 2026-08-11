@@ -222,7 +222,7 @@ fn schedule_dpop_replay_prune(store: Arc<cacos_pds_account::account::oauth_store
 pub fn bootstrap_oauth_app(
     account_db: sea_orm::DatabaseConnection,
     account_manager: cacos_pds_account::account::AccountManager,
-    actor_store: std::sync::Arc<crate::actor_store::ActorStore>,
+    actor_store: std::sync::Arc<cacos_pds_actor_store::ActorStore>,
     plc_client: std::sync::Arc<dyn cacos_pds_plc::PlcClient>,
 ) -> Option<OAuthBootstrap<impl poem::Endpoint<Output = poem::Response>>> {
     if std::env::var("PDS_JWT_KEY_K256_PRIVATE_KEY_HEX").is_err() {

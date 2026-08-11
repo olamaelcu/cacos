@@ -12,8 +12,6 @@
 //!
 //! Step 9 will trim this file down to a 1-line stub.
 
-pub mod actor_store;
 pub mod context;
 pub mod oauth;
-pub mod sequencer;
 pub mod xrpc;

@@ -22,7 +22,7 @@ use cacos_pds_core::error::{PdsError, Result};
 use cacos_pds_core::config::ActorStoreConfig;
 use lexicon_cid::Cid;
 use lru::LruCache;
-use rsky_common;
+
 use rsky_crypto::utils::encode_did_key;
 use rsky_repo::repo::Repo;
 use rsky_repo::storage::readable_blockstore::ReadableBlockstore;

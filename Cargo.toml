@@ -11,6 +11,7 @@ members = [
     "cacos-pds-identity",
     "cacos-pds-handle",
     "cacos-pds-mailer",
+    "cacos-pds-actor-store",
     "cacos-pds-sequencer",
 ]
 

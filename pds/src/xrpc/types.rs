@@ -6,13 +6,13 @@
 //! [`crate::xrpc::SharedState`].
 
 use cacos_pds_account::account::AccountManager;
-use crate::actor_store::ActorStore;
+use cacos_pds_actor_store::ActorStore;
 use cacos_pds_blobstore::OpenDALBlobStore;
 use cacos_pds_core::config::ServerConfig;
-use crate::context::SharedSequencer;
+use cacos_pds_sequencer::shared_sequencer::SharedSequencer;
 use cacos_pds_identity::did_cache::DidSqliteCache;
 use cacos_pds_plc::PlcClient;
-use crate::sequencer::crawlers::Crawlers;
+use cacos_pds_sequencer::crawlers::Crawlers;
 use crate::xrpc::SharedState;
 use rsky_identity::IdResolver;
 use std::sync::Arc;
@@ -45,13 +45,13 @@ impl SharedStateFromEnv {
             .expect("failed to open did cache database");
 
         let account_manager = AccountManager::new(account_db);
-        let sequencer = SharedSequencer::new(crate::sequencer::Sequencer::new(
+        let sequencer = SharedSequencer::new(cacos_pds_sequencer::Sequencer::new(
             sequencer_db,
             Crawlers::new(cfg.service.hostname.clone(), cfg.crawlers.clone()),
             None,
             None,
         ));
-        let shared_broadcast = crate::sequencer::apalis_worker::SharedBroadcast::new(1024);
+        let shared_broadcast = cacos_pds_sequencer::apalis_worker::SharedBroadcast::new(1024);
 
         let id_resolver = IdResolver::new(rsky_identity::types::IdentityResolverOpts {
             timeout: Some(std::time::Duration::from_millis(

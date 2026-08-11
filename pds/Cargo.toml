@@ -118,6 +118,9 @@ cacos-pds-mailer = { path = "../cacos-pds-mailer" }
 cacos-pds-core = { path = "../cacos-pds-core", features = ["test-utils"] }
 # --- Step 3 extraction: account manager + auth verifier (split into 5 submodules) ---
 cacos-pds-account = { path = "../cacos-pds-account" }
+# --- Step 4 extraction: per-DID storage + firehose sequencer ---
+cacos-pds-actor-store = { path = "../cacos-pds-actor-store" }
+cacos-pds-sequencer = { path = "../cacos-pds-sequencer" }
 
 [dev-dependencies]                                                                                                                                                                                                                                                                                                                                                 
 camino-tempfile = { workspace = true }
