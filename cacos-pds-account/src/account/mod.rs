@@ -170,7 +170,8 @@ impl AccountManager {
         }
         account::register_actor(did.clone(), handle, deactivated, &self.db).await?;
         if let (Some(email), Some(password_encrypted)) = (email, password_encrypted) {
-            account::register_account(did.clone(), email, password_encrypted, &self.db).await?;
+            account::register_account(did.clone(), email, password_encrypted, None, &self.db)
+                .await?;
         }
         invite::record_invite_use(did.clone(), invite_code.clone(), now, &self.db).await?;
         auth::store_refresh_token(refresh_payload, None, &self.db).await?;

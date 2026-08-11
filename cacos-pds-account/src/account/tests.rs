@@ -371,6 +371,7 @@ async fn register_account_rejects_duplicate_did() {
         "did:plc:dup".to_owned(),
         "dup2@example.com".to_owned(),
         "hash".to_owned(),
+        None,
         &am.db,
     )
     .await

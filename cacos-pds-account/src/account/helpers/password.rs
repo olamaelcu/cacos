@@ -200,6 +200,7 @@ mod tests {
             "did:plc:grace".to_owned(),
             "grace.test@example.com".to_owned(),
             "phc-hash".to_owned(),
+            None,
             &db,
         )
         .await
@@ -300,6 +301,7 @@ mod tests {
             "did:plc:grace".to_owned(),
             "grace.test@example.com".to_owned(),
             gen_salt_and_hash("oldsecret".to_owned()).unwrap(),
+            None,
             &db,
         )
         .await

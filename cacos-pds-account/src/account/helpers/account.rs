@@ -240,21 +240,22 @@ pub async fn register_account(
     did: String,
     email: String,
     password: String,
+    recovery_key: Option<String>,
     db: &DatabaseConnection,
 ) -> Result<()> {
     let created_at = rsky_common::now();
 
-    // @TODO record recovery key for bring your own recovery key
     let registered: Option<QueryResult> = db
         .query_one_raw(sql(
-            "INSERT INTO account (did, email, password, \"createdAt\") \
-             VALUES (?1, ?2, ?3, ?4) \
+            "INSERT INTO account (did, email, password, \"recoveryKey\", \"createdAt\") \
+             VALUES (?1, ?2, ?3, ?4, ?5) \
              ON CONFLICT (did) DO NOTHING \
              RETURNING did",
             vec![
                 Value::from(did),
                 Value::from(email),
                 Value::from(password),
+                Value::from(recovery_key),
                 Value::from(created_at),
             ],
         ))
@@ -600,6 +601,7 @@ mod tests {
             did.to_owned(),
             format!("{handle}@example.com"),
             "phc-hash".to_owned(),
+            None,
             db,
         )
         .await
@@ -655,11 +657,76 @@ mod tests {
             "did:plc:dup".to_owned(),
             "dup2@example.com".to_owned(),
             "hash".to_owned(),
+            None,
             &db,
         )
         .await
         .unwrap_err();
         assert_eq!(err.to_string(), "UserAlreadyExistsError");
+    }
+
+    #[tokio::test]
+    async fn register_account_persists_recovery_key() {
+        let (_dir, db) = test_db().await;
+        register_actor(
+            "did:plc:keystest".to_owned(),
+            "keystest.test".to_owned(),
+            None,
+            &db,
+        )
+        .await
+        .unwrap();
+        register_account(
+            "did:plc:keystest".to_owned(),
+            "keystest.test@example.com".to_owned(),
+            "phc-hash".to_owned(),
+            Some("recovery-key-blob".to_owned()),
+            &db,
+        )
+        .await
+        .unwrap();
+
+        // `ActorAccount` doesn't expose `recovery_key`; SELECT the column
+        // directly to verify the value persisted.
+        let row: Option<QueryResult> = db
+            .query_one_raw(sql(
+                "SELECT \"recoveryKey\" FROM account WHERE did = ?1",
+                vec![Value::from("did:plc:keystest")],
+            ))
+            .await
+            .unwrap();
+        let row = row.expect("account row should exist");
+        let key: Option<String> = row.try_get_by_index(0).unwrap();
+        assert_eq!(key, Some("recovery-key-blob".to_owned()));
+
+        // and confirm that omitting the key leaves the column NULL.
+        register_actor(
+            "did:plc:nokey".to_owned(),
+            "nokey.test".to_owned(),
+            None,
+            &db,
+        )
+        .await
+        .unwrap();
+        register_account(
+            "did:plc:nokey".to_owned(),
+            "nokey.test@example.com".to_owned(),
+            "phc-hash".to_owned(),
+            None,
+            &db,
+        )
+        .await
+        .unwrap();
+        let row: Option<QueryResult> = db
+            .query_one_raw(sql(
+                "SELECT \"recoveryKey\" FROM account WHERE did = ?1",
+                vec![Value::from("did:plc:nokey")],
+            ))
+            .await
+            .unwrap();
+        let row = row.expect("account row should exist");
+        let key: Option<String> = row.try_get_by_index(0).unwrap();
+        assert_eq!(key, None);
     }
 
     #[tokio::test]

@@ -395,6 +395,7 @@ mod tests {
             did.to_owned(),
             format!("{handle}@example.com"),
             "phc-hash".to_owned(),
+            None,
             db,
         )
         .await
