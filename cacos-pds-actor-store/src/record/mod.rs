@@ -2,7 +2,7 @@
 //!
 //! Uses sea-orm entities (`record`, `backlink`) for declarative queries.
 
-use crate::actor_store::db::{backlink, record};
+use crate::db::{backlink, record};
 use cacos_pds_core::error::{PdsError, Result};
 use lexicon_cid::Cid;
 use rsky_repo::storage::Ipld;

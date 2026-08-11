@@ -9,7 +9,7 @@
 use sea_orm::DatabaseConnection;
 
 /// Re-export `DatabaseKind` so callers can do
-/// `crate::actor_store::db::DatabaseKind::Actor.open(path)`.
+/// `crate::db::DatabaseKind::Actor.open(path)`.
 pub use cacos_pds_core::db::DatabaseKind;
 
 /// The per-actor database handle. A named alias over

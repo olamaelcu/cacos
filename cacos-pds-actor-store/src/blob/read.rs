@@ -1,6 +1,6 @@
 //! Read-only blob queries (single-row lookups, counts, and paged listing).
 
-use crate::actor_store::blob::types::{BLOB_SELECT, BlobReader, row_to_blob};
+use super::types::{BLOB_SELECT, BlobReader, row_to_blob};
 use anyhow::{Result, bail};
 use lexicon_cid::Cid;
 use rsky_lexicon::com::atproto::repo::ListMissingBlobsRefRecordBlob;

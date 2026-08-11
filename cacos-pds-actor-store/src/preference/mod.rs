@@ -3,7 +3,7 @@
 //! `account_pref` rows are unique on `name` within the per-actor DB
 //! (one DID per actor DB), so `put` upserts by name.
 
-use crate::actor_store::db::account_pref;
+use crate::db::account_pref;
 use cacos_pds_core::error::{PdsError, Result};
 use sea_orm::{
     ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, Set,

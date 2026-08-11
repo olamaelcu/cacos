@@ -12,7 +12,7 @@
 //! block on the trait's side then only awaits the `JoinHandle`, which is
 //! `Send + Sync`.
 
-use crate::actor_store::db::{repo_block, repo_root};
+use crate::db::{repo_block, repo_root};
 use cacos_pds_core::error::{PdsError, Result};
 use lexicon_cid::Cid;
 use rsky_repo::block_map::{BlockMap, BlocksAndMissing};
@@ -626,10 +626,10 @@ impl SqlRepoReader {
         &self,
         after_rev: &Option<String>,
         after_cid: &Option<rsky_repo::storage::CidAndRev>,
-    ) -> Result<Vec<crate::actor_store::db::repo_block::Model>> {
+    ) -> Result<Vec<crate::db::repo_block::Model>> {
         use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
 
-        let mut query = crate::actor_store::db::repo_block::Entity::find();
+        let mut query = crate::db::repo_block::Entity::find();
 
         if let Some(rev) = after_rev {
             let cid_str = after_cid.as_ref().map(|cr| cr.cid.to_string());
@@ -638,25 +638,25 @@ impl SqlRepoReader {
                 Some(c) => query.filter(
                     sea_orm::Condition::any()
                         .add(sea_orm::Condition::all().add(
-                            crate::actor_store::db::repo_block::Column::RepoRev.lt(rev.clone()),
+                            crate::db::repo_block::Column::RepoRev.lt(rev.clone()),
                         ))
                         .add(
                             sea_orm::Condition::all()
                                 .add(
-                                    crate::actor_store::db::repo_block::Column::RepoRev
+                                    crate::db::repo_block::Column::RepoRev
                                         .eq(rev.clone()),
                                 )
-                                .add(crate::actor_store::db::repo_block::Column::Cid.lt(c)),
+                                .add(crate::db::repo_block::Column::Cid.lt(c)),
                         ),
                 ),
                 None => query
-                    .filter(crate::actor_store::db::repo_block::Column::RepoRev.lt(rev.clone())),
+                    .filter(crate::db::repo_block::Column::RepoRev.lt(rev.clone())),
             };
         }
 
         let rows = query
-            .order_by_desc(crate::actor_store::db::repo_block::Column::RepoRev)
-            .order_by_desc(crate::actor_store::db::repo_block::Column::Cid)
+            .order_by_desc(crate::db::repo_block::Column::RepoRev)
+            .order_by_desc(crate::db::repo_block::Column::Cid)
             .limit(500)
             .all(&self.db)
             .await
@@ -672,7 +672,7 @@ impl SqlRepoReader {
 
     pub async fn count_blocks(&self) -> Result<usize> {
         use sea_orm::PaginatorTrait;
-        let count = crate::actor_store::db::repo_block::Entity::find()
+        let count = crate::db::repo_block::Entity::find()
             .count(&self.db)
             .await
             .map_err(|e| {
@@ -689,8 +689,8 @@ impl SqlRepoReader {
     pub async fn cache_rev(&self, rev: String) -> Result<()> {
         use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QuerySelect};
 
-        let rows = crate::actor_store::db::repo_block::Entity::find()
-            .filter(crate::actor_store::db::repo_block::Column::RepoRev.eq(rev))
+        let rows = crate::db::repo_block::Entity::find()
+            .filter(crate::db::repo_block::Column::RepoRev.eq(rev))
             .limit(15)
             .all(&self.db)
             .await

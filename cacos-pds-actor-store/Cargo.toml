@@ -1,0 +1,59 @@
+[package]
+name = "cacos-pds-actor-store"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+# --- foundation ---
+cacos-pds-core = { path = "../cacos-pds-core" }
+cacos-pds-blobstore = { path = "../cacos-pds-blobstore" }
+migration = { path = "../migration", package = "cacos-migration" }
+sea-orm = { workspace = true }
+
+# --- atproto protocol crates (heavy ones) ---
+rsky-repo = { workspace = true }
+rsky-crypto = { workspace = true }
+rsky-common = { workspace = true }
+rsky-syntax = { workspace = true }
+rsky-lexicon = { workspace = true }
+
+# --- CID + DAG-CBOR ---
+lexicon_cid = { workspace = true }
+
+# --- error handling ---
+anyhow = { workspace = true }
+miette = { workspace = true }
+thiserror = { workspace = true }
+
+# --- runtime / traits ---
+tokio = { workspace = true }
+async-trait = "0.1"
+futures = { workspace = true }
+sha2 = { workspace = true }
+hex = "0.4"
+
+# --- lru cache for blob/per-record ---
+lru = "0.12"
+secp256k1 = { version = "0.28", features = ["global-context", "rand"] }
+
+# --- encoding / dates ---
+serde = { workspace = true }
+serde_json = { workspace = true }
+time = { workspace = true }
+
+# --- observability ---
+metrics = { workspace = true }
+tracing = { workspace = true }
+
+# --- DB / filesystem paths ---
+camino = { workspace = true }
+rand = { workspace = true }
+
+[dev-dependencies]
+bytes = "1"
+camino-tempfile = { workspace = true }
+metrics = { workspace = true }
+metrics-exporter-prometheus = { workspace = true }
+cacos-pds-blobstore = { path = "../cacos-pds-blobstore" }
+rsky-common = { workspace = true }
+cacos-pds-core = { path = "../cacos-pds-core" }

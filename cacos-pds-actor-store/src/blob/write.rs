@@ -1,6 +1,6 @@
 //! Upload/track/promote/associate + write-batch GC for blob metadata.
 
-use crate::actor_store::blob::types::{BLOB_SELECT, BlobMetadata, BlobReader, row_to_blob};
+use super::types::{BLOB_SELECT, BlobMetadata, BlobReader, row_to_blob};
 use anyhow::{Result, bail};
 use lexicon_cid::Cid;
 use rsky_common::ipld::sha256_to_cid;

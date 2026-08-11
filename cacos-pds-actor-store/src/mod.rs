@@ -1,20 +1,20 @@
-//! Per-actor storage: one SQLite database per DID, plus the repo and record
-//! readers that sit over it. The schema is laid out as sea-orm entities and
-//! accessed through a `sea_orm::DatabaseConnection`.
-//!
-//! `pref: PreferenceReader` is deferred to a later plan and `blob: BlobReader`
-//! lands with the blob-store plan.
-//!
-//! Errors: all app-level fallible APIs return `cacos_pds_core::error::Result<T>` so
-//! anyhow-returning helpers from downstream crates get wrapped via
-//! `PdsError::From` (and explicit `PdsError::internal(...)` at site for context).
+// Per-actor storage: one SQLite database per DID, plus the repo and record
+// readers that sit over it. The schema is laid out as sea-orm entities and
+// accessed through a `sea_orm::DatabaseConnection`.
+//
+// `pref: PreferenceReader` is deferred to a later plan and `blob: BlobReader`
+// lands with the blob-store plan.
+//
+// Errors: all app-level fallible APIs return `cacos_pds_core::error::Result<T>` so
+// anyhow-returning helpers from downstream crates get wrapped via
+// `PdsError::From` (and explicit `PdsError::internal(...)` at site for context).
 
-use crate::actor_store::blob::BlobReader;
-use crate::actor_store::db::ActorDb;
-use crate::actor_store::preference::PreferenceReader;
-use crate::actor_store::record::RecordReader;
-use crate::actor_store::repo::sql_repo::SqlRepoReader;
-use crate::actor_store::repo::types::SyncEvtData;
+use crate::blob::BlobReader;
+use crate::db::ActorDb;
+use crate::preference::PreferenceReader;
+use crate::record::RecordReader;
+use crate::repo::sql_repo::SqlRepoReader;
+use crate::repo::types::SyncEvtData;
 use cacos_pds_core::background::BackgroundQueue;
 use cacos_pds_blobstore::{BlobStore, BoxedBlobStream};
 use cacos_pds_core::db::DatabaseKind;
@@ -44,12 +44,6 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 use tokio::sync::{OwnedMutexGuard, RwLock};
-
-pub mod blob;
-pub mod db;
-pub mod preference;
-pub mod record;
-pub mod repo;
 
 #[derive(Debug)]
 pub enum FormatCommitError {
@@ -363,7 +357,7 @@ impl ActorStore {
     pub async fn get_repo_root(&self, did: &str) -> Result<Option<Cid>> {
         let db = self.open_db(did).await?;
         let did_key = migration::types::did::Did::new(did.to_string());
-        let root = crate::actor_store::db::repo_root::Entity::find_by_id(did_key)
+        let root = crate::db::repo_root::Entity::find_by_id(did_key)
             .one(&db)
             .await
             .map_err(|e| {
@@ -929,8 +923,8 @@ impl ActorStoreTransactor {
         let touched_uri_strs: Vec<String> = touched_uris.iter().map(|t| t.to_string()).collect();
         let sql = format!(
             "SELECT cid FROM record WHERE cid IN ({}) AND uri NOT IN ({})",
-            crate::actor_store::repo::sql_repo::placeholders(cid_strs.len()),
-            crate::actor_store::repo::sql_repo::placeholders(touched_uri_strs.len())
+            crate::repo::sql_repo::placeholders(cid_strs.len()),
+            crate::repo::sql_repo::placeholders(touched_uri_strs.len())
         );
         let mut values: Vec<Value> = Vec::with_capacity(cid_strs.len() + touched_uri_strs.len());
         values.extend(cid_strs.iter().cloned().map(Value::from));

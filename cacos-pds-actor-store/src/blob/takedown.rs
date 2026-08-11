@@ -1,6 +1,6 @@
 //! Takedown/quarantine transactor and status reporter.
 
-use crate::actor_store::blob::types::BlobReader;
+use super::types::BlobReader;
 use anyhow::Result;
 use lexicon_cid::Cid;
 use rsky_common::now;
