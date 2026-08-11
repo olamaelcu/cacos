@@ -35,6 +35,7 @@ pub const ACTOR_CACHE_MISSES_TOTAL: &str = "cacos_actor_cache_misses_total";
 pub const COMMITS_TOTAL: &str = "cacos_commits_total";
 pub const AUTH_REQUESTS_TOTAL: &str = "cacos_auth_requests_total";
 pub const AUTH_FAILURES_TOTAL: &str = "cacos_auth_failures_total";
+pub const DPOP_REPLAY_PRUNED_TOTAL: &str = "cacos_dpop_replay_pruned_total";
 
 /// Register a description (HELP line) for every cacos metric. Idempotent.
 pub fn describe() {
@@ -125,6 +126,11 @@ pub fn describe() {
         AUTH_FAILURES_TOTAL,
         Unit::Count,
         "Auth verification failures, labeled by kind"
+    );
+    describe_counter!(
+        DPOP_REPLAY_PRUNED_TOTAL,
+        Unit::Count,
+        "DPoP replay rows pruned by the periodic housekeeping task"
     );
 }
 

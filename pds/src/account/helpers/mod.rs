@@ -5,9 +5,11 @@ pub mod account;
 pub mod admin_tokens;
 pub mod auth;
 pub mod email_token;
+pub mod init_required_keys;
 pub mod invite;
 pub mod password;
 pub mod repo;
+pub mod secret_provider;
 pub mod secrets;
 
 use sea_orm::{DatabaseBackend, Statement, Value};

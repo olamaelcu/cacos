@@ -28,8 +28,8 @@ use rsky_oauth::token::{TokenData, TokenInfo};
 use rsky_oauth::types::{AuthorizationRequestParameters, ClientAuth};
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, PaginatorTrait, QueryFilter,
-    QuerySelect, Set, TransactionTrait,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, PaginatorTrait,
+    QueryFilter, QuerySelect, Set, TransactionTrait,
 };
 use std::str::FromStr;
 use time::OffsetDateTime;
@@ -729,6 +729,102 @@ impl OAuthStore for PdsOAuthStore {
             })
             .unwrap_or_default();
         Ok(Some(scopes))
+    }
+}
+
+/// Persistent DPoP `jti` replay store backed by the `dpop_replay` table
+/// (added in `migration::m20260801_000008_dpop_replay`). Each row is a
+/// `(jti, expires_at)` pair; replay inserts that lose the unique-key
+/// race return `false` (replay detected), fresh inserts return `true`.
+///
+/// A background task schedules [`DbBackedReplayStore::prune_expired`]
+/// every five minutes via [`crate::background::BackgroundQueue`]; the
+/// `expires_at` index keeps the prune cheap.
+pub struct DbBackedReplayStore {
+    pub db: std::sync::Arc<sea_orm::DatabaseConnection>,
+}
+
+// Cloning is cheap (inner `Arc`) and lets the same store be passed both as
+// `Arc<DbBackedReplayStore>` (for the periodic prune task) and as
+// `Box<dyn ReplayStore>` (for the `DpopManager`).
+impl Clone for DbBackedReplayStore {
+    fn clone(&self) -> Self {
+        Self {
+            db: self.db.clone(),
+        }
+    }
+}
+
+impl DbBackedReplayStore {
+    pub fn new(db: std::sync::Arc<sea_orm::DatabaseConnection>) -> Self {
+        Self { db }
+    }
+
+    /// Delete every row whose `expires_at` is strictly less than `now`.
+    /// Returns the number of rows removed. Used by the periodic prune
+    /// task; not part of the [`rsky_oauth::ReplayStore`] trait.
+    pub async fn prune_expired(&self, now: u64) -> Result<usize, OAuthError> {
+        let res = self
+            .db
+            .execute_raw(crate::account::helpers::sql(
+                "DELETE FROM dpop_replay WHERE expires_at < ?1",
+                vec![sea_orm::Value::from(now as i64)],
+            ))
+            .await
+            .map_err(server_error)?;
+        Ok(res.rows_affected() as usize)
+    }
+}
+
+impl rsky_oauth::ReplayStore for DbBackedReplayStore {
+    fn consume(&self, jti: &str, exp: u64, _now: u64) -> bool {
+        // The `ReplayStore` trait is sync (rsky-oauth calls it from inside
+        // the async `check_proof`), but the underlying DB call is async.
+        // Bridge sync → async by spinning up a fresh current-thread runtime
+        // on a dedicated thread. The dedicated thread is not owned by any
+        // outer runtime, so `block_on` cannot deadlock with
+        // `#[tokio::main]`'s `current_thread` flavor.
+        let db = self.db.clone();
+        let jti_owned = jti.to_owned();
+        let join: std::thread::JoinHandle<Result<bool, sea_orm::DbErr>> =
+            std::thread::Builder::new()
+                .name("dpop-replay-store".to_owned())
+                .spawn(move || {
+                    let rt = tokio::runtime::Builder::new_current_thread()
+                        .enable_all()
+                        .build()
+                        .expect("build DPoP replay store runtime");
+                    rt.block_on(async move {
+                        let stmt = crate::account::helpers::sql(
+                            "INSERT INTO dpop_replay (jti, expires_at) VALUES (?1, ?2) \
+                             ON CONFLICT (jti) DO NOTHING",
+                            vec![
+                                sea_orm::Value::from(jti_owned),
+                                sea_orm::Value::from(exp as i64),
+                            ],
+                        );
+                        let res = db.execute_raw(stmt).await?;
+                        Ok(res.rows_affected() > 0)
+                    })
+                })
+                .expect("spawn DPoP replay store thread");
+        match join.join() {
+            Ok(Ok(inserted)) => inserted,
+            Ok(Err(err)) => {
+                tracing::warn!(?err, "dpop replay store insert failed");
+                false
+            }
+            Err(err) => {
+                if let Some(msg) = err.downcast_ref::<&str>() {
+                    tracing::warn!(%msg, "dpop replay store thread panicked");
+                } else if let Some(msg) = err.downcast_ref::<String>() {
+                    tracing::warn!(%msg, "dpop replay store thread panicked");
+                } else {
+                    tracing::warn!("dpop replay store thread panicked");
+                }
+                false
+            }
+        }
     }
 }
 

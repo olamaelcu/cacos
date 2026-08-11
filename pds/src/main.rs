@@ -3,6 +3,11 @@ use tracing_unwrap::ResultExt;
 
 #[tokio::main]
 async fn main() {
+    if let Err(e) = cacos_pds::account::helpers::init_required_keys::init_required_keys() {
+        eprintln!("fatal: {e}");
+        std::process::exit(1);
+    }
+
     cacos_pds::observability::metrics::init_metrics();
     let downcaster = cacos_pds::observability::tracing::init_tracing("info");
     let _timing = cacos_pds::observability::timing::TimingReporter::start(

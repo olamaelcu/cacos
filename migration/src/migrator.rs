@@ -17,8 +17,9 @@ use crate::m20260801_000004_actor;
 use crate::m20260801_000005_actor_space;
 use crate::m20260801_000006_account_lockout;
 use crate::m20260801_000007_plc_rotation_keys_migrated;
+use crate::m20260801_000008_dpop_replay;
 
-/// Account database: 15 tables.
+/// Account database: 16 tables.
 pub struct AccountMigrator;
 
 #[async_trait::async_trait]
@@ -28,6 +29,7 @@ impl MigratorTrait for AccountMigrator {
             Box::new(m20260801_000001_account::Migration),
             Box::new(m20260801_000006_account_lockout::Migration),
             Box::new(m20260801_000007_plc_rotation_keys_migrated::Migration),
+            Box::new(m20260801_000008_dpop_replay::Migration),
         ]
     }
 

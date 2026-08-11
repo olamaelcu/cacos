@@ -150,6 +150,7 @@ pub(crate) mod tests {
                 "authorized_client",
                 "consent_state",
                 "device",
+                "dpop_replay",
                 "email_token",
                 "invite_code",
                 "invite_code_use",

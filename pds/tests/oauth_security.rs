@@ -11,18 +11,26 @@
 //! runs synchronously on the host string.
 
 use base64::Engine;
-use cacos_pds::oauth::registered_provider;
+use cacos_pds::account::oauth_store::DbBackedReplayStore;
+use cacos_pds::config::OAuthRemoteConfig;
+use cacos_pds::db::DatabaseKind;
+use cacos_pds::oauth::remote_create_account::MockRemoteCreateAccount;
+use cacos_pds::oauth::{SharedOAuthProvider, build_oauth_app, csrf, registered_provider};
 use cacos_pds::plc::{HttpPlcClient, PlcClient};
 use cacos_pds::xrpc::build_app_with_state;
 use cacos_pds::xrpc::test_utils::{create_test_account, test_state};
+use camino::Utf8Path;
+use poem::http::StatusCode;
 use poem::test::TestClient;
 use rsky_oauth::OAuthProvider;
+use rsky_oauth::ReplayStore;
 use rsky_oauth::jwk::{EcCurve, Jwk};
 use rsky_oauth::jwt::{self, JwtClaims, JwtHeader};
 use rsky_oauth::token::{TokenData, generate_token_id};
 use rsky_oauth::types::{AuthorizationRequestParameters, ClientAuth};
 use serde_json::json;
 use sha2::{Digest, Sha256};
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 fn build(endpoint: &str) -> HttpPlcClient {
@@ -415,4 +423,276 @@ async fn cors_denies_unknown_origin() {
         acao.is_none() || acao.as_deref() != Some("https://attacker.example"),
         "non-allowlisted origin must NOT be reflected, got: {acao:?}"
     );
+}
+
+// ---------------------------------------------------------------------------
+// R12: per-IP rate limit on the headless-consent POST endpoints.
+// ---------------------------------------------------------------------------
+
+/// Builds a standalone OAuth route tree so the test controls
+/// `PDS_RATELIMIT_OAUTH_REMOTE_PER_MINUTE` before the limiter is built.
+async fn oauth_app_with_temp_db(
+    dir: &camino_tempfile::Utf8TempDir,
+) -> impl poem::Endpoint<Output = poem::Response> {
+    let db = DatabaseKind::Account
+        .open(dir.path().join("account.sqlite"))
+        .await
+        .expect("test setup: open account db");
+    let shared = SharedOAuthProvider::new(
+        db.clone(),
+        "https://pds.test".to_string(),
+        PDS_TEST_AUDIENCE.to_string(),
+        Box::new(rsky_oauth::InMemoryReplayStore::default()),
+    );
+    build_oauth_app(
+        shared,
+        db,
+        OAuthRemoteConfig {
+            url: Some("https://remote.example.com".to_string()),
+            token: Some("secret-token".to_string()),
+        },
+        "https://pds.test".to_string(),
+        Arc::new(MockRemoteCreateAccount::default()),
+    )
+}
+
+fn sign_in_body() -> String {
+    json!({
+        "rqid": "req-0123456789abcdef0123456789abcdef",
+        "state": "state-1",
+        "device_id": "dev-1",
+        "identifier": "alice.test",
+        "password": "hunter2",
+    })
+    .to_string()
+}
+
+#[tokio::test]
+async fn oauth_remote_rate_limit_blocks_after_threshold() {
+    // SAFETY: integration tests run sequentially (`--test-threads=1`).
+    unsafe {
+        std::env::set_var("PDS_JWT_KEY_K256_PRIVATE_KEY_HEX", PDS_TEST_KEY_HEX);
+        std::env::set_var("PDS_RATELIMIT_OAUTH_REMOTE_PER_MINUTE", "2");
+    }
+
+    let dir = camino_tempfile::Utf8TempDir::new().unwrap();
+    let cli = TestClient::new(oauth_app_with_temp_db(&dir).await);
+
+    let mut statuses = Vec::new();
+    for _ in 0..3 {
+        let resp = cli
+            .post("/oauth/remote/sign-in")
+            .content_type("application/json")
+            .body(sign_in_body())
+            .send()
+            .await;
+        statuses.push(resp.0.status());
+    }
+
+    assert_ne!(
+        statuses[0],
+        StatusCode::TOO_MANY_REQUESTS,
+        "request 1 is within the 2/min budget, got {:?}",
+        statuses
+    );
+    assert_ne!(
+        statuses[1],
+        StatusCode::TOO_MANY_REQUESTS,
+        "request 2 is within the 2/min budget, got {:?}",
+        statuses
+    );
+    assert_eq!(
+        statuses[2],
+        StatusCode::TOO_MANY_REQUESTS,
+        "request 3 must exceed the 2/min budget, got {:?}",
+        statuses
+    );
+
+    // The five remote POSTs share one budget, so a different endpoint is
+    // also shed once the bucket is empty.
+    let resp = cli
+        .post("/oauth/remote/reject")
+        .content_type("application/json")
+        .body(sign_in_body())
+        .send()
+        .await;
+    assert_eq!(
+        resp.0.status(),
+        StatusCode::TOO_MANY_REQUESTS,
+        "the remote POST endpoints share a single per-IP budget"
+    );
+
+    // SAFETY: integration tests run sequentially.
+    unsafe { std::env::remove_var("PDS_RATELIMIT_OAUTH_REMOTE_PER_MINUTE") };
+}
+
+#[tokio::test]
+async fn oauth_remote_post_requires_bearer_token() {
+    // SAFETY: integration tests run sequentially.
+    unsafe {
+        std::env::set_var("PDS_JWT_KEY_K256_PRIVATE_KEY_HEX", PDS_TEST_KEY_HEX);
+        std::env::set_var("PDS_RATELIMIT_OAUTH_REMOTE_PER_MINUTE", "100");
+    }
+
+    let dir = camino_tempfile::Utf8TempDir::new().unwrap();
+    let cli = TestClient::new(oauth_app_with_temp_db(&dir).await);
+
+    // The bearer token — not a cookie — is what authenticates this
+    // server-to-server surface. Missing and wrong tokens are both 401.
+    for auth in [None, Some("Bearer wrong-token")] {
+        let mut req = cli
+            .post("/oauth/remote/sign-in")
+            .content_type("application/json")
+            .body(sign_in_body());
+        if let Some(value) = auth {
+            req = req.header("Authorization", value);
+        }
+        let resp = req.send().await;
+        resp.assert_status(StatusCode::UNAUTHORIZED);
+    }
+
+    // SAFETY: integration tests run sequentially.
+    unsafe { std::env::remove_var("PDS_RATELIMIT_OAUTH_REMOTE_PER_MINUTE") };
+}
+
+// ---------------------------------------------------------------------------
+// R13: keyed CSRF primitive.
+//
+// NOTE: these cover `oauth::csrf` as a primitive only. It is deliberately
+// NOT wired into `/oauth/remote/*`: those endpoints are server-to-server
+// (bearer token, `device_id` in the JSON body) and the PDS sets no cookie
+// on that path, so there is no ambient credential to defend and requiring
+// a CSRF cookie there would reject every legitimate RemoteClient call.
+// See the module docs on `cacos_pds::oauth::csrf`.
+// ---------------------------------------------------------------------------
+
+const CSRF_SECRET: &[u8] = b"integration-test-csrf-secret";
+
+#[test]
+fn csrf_token_round_trip() {
+    let token = csrf::issue("dev-abc", CSRF_SECRET);
+    assert!(
+        csrf::verify("dev-abc", &token, CSRF_SECRET),
+        "a freshly issued token must verify for its own device id"
+    );
+    // Issuance is deterministic for a fixed (device, secret) pair.
+    assert_eq!(token, csrf::issue("dev-abc", CSRF_SECRET));
+    // ...and opaque: the device id must not be recoverable from the token.
+    assert!(!token.contains("dev-abc"));
+}
+
+#[test]
+fn csrf_rejects_wrong_device_id() {
+    let token = csrf::issue("dev-abc", CSRF_SECRET);
+    assert!(!csrf::verify("dev-xyz", &token, CSRF_SECRET));
+    assert!(!csrf::verify("", &token, CSRF_SECRET));
+}
+
+#[test]
+fn csrf_rejects_tampered_token() {
+    let token = csrf::issue("dev-abc", CSRF_SECRET);
+
+    // Flip the first base64 character: it carries significant bits of
+    // byte 0, so the decoded tag definitely differs.
+    let mut chars: Vec<char> = token.chars().collect();
+    chars[0] = if chars[0] == 'A' { 'B' } else { 'A' };
+    let tampered: String = chars.into_iter().collect();
+    assert_ne!(tampered, token);
+    assert!(!csrf::verify("dev-abc", &tampered, CSRF_SECRET));
+
+    // Malformed input is rejected, never panics.
+    assert!(!csrf::verify("dev-abc", "!!!not-base64!!!", CSRF_SECRET));
+    assert!(!csrf::verify("dev-abc", "", CSRF_SECRET));
+    assert!(!csrf::verify(
+        "dev-abc",
+        &token[..token.len() - 4],
+        CSRF_SECRET
+    ));
+}
+
+// ---------------------------------------------------------------------------
+// R4: DB-backed DPoP replay store.
+//
+// The store lives in the account database (`dpop_replay` table) so the
+// per-DPoP single-use guarantee survives restarts. Each test opens a fresh
+// SQLite file and exercises the trait methods directly.
+// ---------------------------------------------------------------------------
+
+async fn fresh_replay_store() -> (DbBackedReplayStore, camino_tempfile::Utf8TempDir) {
+    let dir = camino_tempfile::Utf8TempDir::new().unwrap();
+    let db = DatabaseKind::Account
+        .open(Utf8Path::from_path(dir.path().join("account.sqlite").as_std_path()).unwrap())
+        .await
+        .expect("test setup: open account db");
+    let store = DbBackedReplayStore::new(Arc::new(db));
+    (store, dir)
+}
+
+#[tokio::test]
+async fn db_replay_store_rejects_replay_within_ttl() {
+    let (store, _dir) = fresh_replay_store().await;
+    // The store impl bridges sync → async via a thread-local runtime
+    // because rsky-oauth's `ReplayStore::consume` is sync. With a single
+    // live call site and a small row count, that round-trip is still
+    // observably correct end-to-end.
+    assert!(
+        store.consume("jti-replay-1", 1_000_000, 1),
+        "first consume of a fresh jti must be accepted"
+    );
+    assert!(
+        !store.consume("jti-replay-1", 1_000_000, 1),
+        "second consume of the same jti within TTL must be flagged as replay"
+    );
+    // Different jti, same DB: independent, not blocked by the prior replay.
+    assert!(
+        store.consume("jti-replay-2", 1_000_000, 1),
+        "a different jti must still be accepted"
+    );
+}
+
+#[tokio::test]
+async fn db_replay_store_accepts_after_expiry() {
+    let (store, _dir) = fresh_replay_store().await;
+    // Insert at t=100, expires at t=200. The store's contract is just
+    // that a row exists in the table; the consumer (`DpopManager`)
+    // computes the expiry from `iat + iat_max_age + clock_tolerance` and
+    // decides what `now` to use. So we verify the storage layer directly:
+    // the row stays past the live window until prune sweeps it away.
+    assert!(store.consume("jti-expiry", 200, 100));
+    assert!(!store.consume("jti-expiry", 200, 150));
+
+    // After prune sweeps the expired row, the same jti is once again
+    // accepted on insertion.
+    let pruned = store.prune_expired(250).await.expect("prune succeeds");
+    assert!(pruned >= 1, "prune_expired(250) must remove the t<250 row");
+    assert!(
+        store.consume("jti-expiry", 300, 260),
+        "jti must be reusable after the expired row is pruned"
+    );
+}
+
+#[tokio::test]
+async fn db_replay_store_prunes_expired_rows() {
+    let (store, _dir) = fresh_replay_store().await;
+    // Seed three rows: two in the past (expires_at < now=1_000), one
+    // still live.
+    assert!(store.consume("jti-old-1", 500, 1));
+    assert!(store.consume("jti-old-2", 800, 1));
+    assert!(store.consume("jti-live", 1_500, 1));
+
+    let pruned = store
+        .prune_expired(1_000)
+        .await
+        .expect("prune_expired succeeds");
+    assert_eq!(pruned, 2, "exactly the two expired rows must be removed");
+
+    // Re-running the prune is idempotent.
+    let pruned_again = store.prune_expired(1_000).await.unwrap();
+    assert_eq!(
+        pruned_again, 0,
+        "second prune at the same instant removes nothing"
+    );
+
+    // The live row survives and is still rejected for replay.
+    assert!(!store.consume("jti-live", 1_500, 1));
 }

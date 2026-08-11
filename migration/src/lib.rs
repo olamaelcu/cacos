@@ -21,3 +21,4 @@ pub mod m20260801_000004_actor;
 pub mod m20260801_000005_actor_space;
 pub mod m20260801_000006_account_lockout;
 pub mod m20260801_000007_plc_rotation_keys_migrated;
+pub mod m20260801_000008_dpop_replay;
