@@ -1,43 +1,22 @@
-use std::time::Duration;
-use tracing_unwrap::ResultExt;
+// pds/src/main.rs
+//!
+//! Operator migration binary. The HTTP server boot has moved to
+//! `cacos-pds-server/src/main.rs`; the only thing left in this binary
+//! is the `migrate { rotation-keys | plc-rotation-keys }` dispatch
+//! (Step 8 will move this into a new `cacos-pds-migrate` binary).
 
 #[tokio::main]
 async fn main() {
-    if let Err(e) = cacos_pds_account::account::helpers::init_required_keys::init_required_keys() {
-        eprintln!("fatal: {e}");
-        std::process::exit(1);
-    }
-
-    cacos_pds_core::observability::metrics::init_metrics();
-    let downcaster = cacos_pds_core::observability::tracing::init_tracing("info");
-    let _timing = cacos_pds_core::observability::timing::TimingReporter::start(
-        Duration::from_secs(10),
-        downcaster,
-    );
-
-    // Subcommand dispatch. Without args, fall through to the PDS server
-    // start. `cacos-pds migrate rotation-keys` backfills per-DID
-    // rotation keys for legacy actors; `cacos-pds migrate
+    // Subcommand dispatch. `cacos-pds migrate rotation-keys` backfills
+    // per-DID rotation keys for legacy actors; `cacos-pds migrate
     // plc-rotation-keys` rewrites each DID document to drop the shared
     // server rotation key.
     let args: Vec<String> = std::env::args().collect();
-    if args.len() >= 2 && args[1] == "migrate" {
-        run_migrate_subcommand(&args[2..]).await;
-        return;
+    if args.len() < 2 || args[1] != "migrate" {
+        eprintln!("usage: cacos-pds migrate rotation-keys|plc-rotation-keys [--dry-run]");
+        std::process::exit(2);
     }
-
-    // Build the shared OpenDAL operator (S3 if S3_ENDPOINT is set, else
-    // disk) once for the process. Per-DID handles come from this via
-    // `blobstore_for_did(did)` at the call site.
-    cacos_pds_blobstore::init_operator().expect_or_log("blobstore init failed");
-
-    let app = cacos_pds_server::xrpc::build_app().await;
-    let listener = poem::listener::TcpListener::bind("127.0.0.1:8080");
-    tracing::info!("pds listening on http://127.0.0.1:8080");
-    poem::Server::new(listener)
-        .run(app)
-        .await
-        .expect_or_log("poem server failed");
+    run_migrate_subcommand(&args[2..]).await;
 }
 
 async fn run_migrate_subcommand(args: &[String]) {
@@ -175,10 +154,10 @@ async fn migrate_rotation_keys() -> anyhow::Result<()> {
 /// Pass `--dry-run` to log what would change without contacting PLC.
 /// Idempotent: actors already marked migrated are skipped.
 async fn migrate_plc_rotation_keys(dry_run: bool) -> anyhow::Result<()> {
+    use cacos_pds_account::auth::PDS_PLC_ROTATION_KEYPAIR;
     use cacos_pds_plc::operations::CreateAtprotoUpdateOpOpts;
     use cacos_pds_plc::operations::create_atproto_update_op;
     use cacos_pds_plc::types::{CompatibleOp, CompatibleOpOrTombstone, OpOrTombstone};
-    use cacos_pds_account::auth::PDS_PLC_ROTATION_KEYPAIR;
 
     let cfg = cacos_pds_core::config::env_to_cfg();
     let state = cacos_pds_server::xrpc::types::SharedStateFromEnv::from_env(&cfg).await;

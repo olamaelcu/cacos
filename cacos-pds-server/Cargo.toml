@@ -58,6 +58,7 @@ tempfile = "3"
 # --- observability ---
 metrics = { workspace = true }
 tracing = { workspace = true }
+tracing-unwrap = { workspace = true }
 
 # --- at-rest hygiene ---
 secrecy = "0.10"

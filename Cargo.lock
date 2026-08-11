@@ -1179,6 +1179,7 @@ dependencies = [
  "tokio-tungstenite",
  "tracing",
  "tracing-subscriber",
+ "tracing-unwrap",
  "ulid 3.0.0",
  "wiremock",
  "zeroize",
