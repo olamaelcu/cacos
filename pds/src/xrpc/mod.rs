@@ -14,7 +14,7 @@ pub mod cors;
 pub mod error;
 pub mod health;
 pub mod metrics;
-pub mod rate_limit;
+// `rate_limit` moved to cacos-pds-oauth in Step 5.
 #[cfg(any(test, feature = "test-utils"))]
 pub mod test_utils;
 pub mod types;
@@ -111,7 +111,7 @@ pub async fn build_app_with_state(
             .open(camino::Utf8Path::new(&db_path))
             .await
         {
-            Ok(account_db) => crate::oauth::bootstrap_oauth_app(
+            Ok(account_db) => cacos_pds_oauth::bootstrap_oauth_app(
                 account_db,
                 state.account_manager.clone(),
                 state.actor_store.clone(),
@@ -156,7 +156,7 @@ fn env_limit(name: &str, default: u32) -> u32 {
 
 fn wire_server_routes_with_rate_limits(route: poem::Route) -> poem::Route {
     use poem::{get, post};
-    use rate_limit::{RouteRateLimit, ip_limiter};
+    use cacos_pds_oauth::rate_limit::{RouteRateLimit, ip_limiter};
 
     // Defaults match the cacos-pds cacos-pds-OAuth security plan. A value of
     // 0 disables the per-route limiter.
@@ -168,7 +168,7 @@ fn wire_server_routes_with_rate_limits(route: poem::Route) -> poem::Route {
         ip_limiter(env_limit("PDS_RATELIMIT_PASSWORD_RESET_PER_MINUTE", 5));
     let email_ops_limiter = ip_limiter(env_limit("PDS_RATELIMIT_EMAIL_OPS_PER_MINUTE", 5));
 
-    let rl = |l: std::sync::Arc<rate_limit::IpRateLimiter>| RouteRateLimit { limiter: l };
+    let rl = |l: std::sync::Arc<cacos_pds_oauth::rate_limit::IpRateLimiter>| RouteRateLimit { limiter: l };
 
     route
         .at(

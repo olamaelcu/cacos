@@ -797,6 +797,7 @@ dependencies = [
  "cacos-pds-handle",
  "cacos-pds-identity",
  "cacos-pds-mailer",
+ "cacos-pds-oauth",
  "cacos-pds-plc",
  "cacos-pds-sequencer",
  "camino",
@@ -1025,6 +1026,43 @@ dependencies = [
  "anyhow",
  "serde",
  "tracing",
+]
+
+[[package]]
+name = "cacos-pds-oauth"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "base64 0.22.1",
+ "cacos-migration",
+ "cacos-pds-account",
+ "cacos-pds-actor-store",
+ "cacos-pds-core",
+ "cacos-pds-plc",
+ "camino-tempfile",
+ "governor",
+ "hex",
+ "metrics",
+ "metrics-exporter-prometheus",
+ "poem",
+ "reqwest",
+ "rsky-common",
+ "rsky-crypto",
+ "rsky-oauth",
+ "sea-orm",
+ "secrecy",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "subtle",
+ "thiserror 2.0.19",
+ "time",
+ "tokio",
+ "tracing",
+ "url",
+ "wiremock",
+ "zeroize",
 ]
 
 [[package]]

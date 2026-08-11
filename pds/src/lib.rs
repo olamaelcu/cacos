@@ -13,5 +13,4 @@
 //! Step 9 will trim this file down to a 1-line stub.
 
 pub mod context;
-pub mod oauth;
 pub mod xrpc;

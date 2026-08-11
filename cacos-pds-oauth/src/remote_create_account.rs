@@ -2,7 +2,7 @@
 //! endpoint delegates account creation here.
 //!
 //! [`ActorStoreRemoteCreateAccount`] is the production impl; it is wired
-//! up in [`crate::oauth::bootstrap_oauth_app`]. The mock variant remains
+//! up in [`crate::bootstrap_oauth_app`]. The mock variant remains
 //! available for unit tests behind `#[cfg(any(test, feature = "test-utils"))]`.
 
 use async_trait::async_trait;

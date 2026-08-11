@@ -13,6 +13,7 @@ members = [
     "cacos-pds-mailer",
     "cacos-pds-actor-store",
     "cacos-pds-sequencer",
+    "cacos-pds-oauth",
 ]
 
 
@@ -75,5 +76,11 @@ tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter", "fmt"] }
 tracing-timing = { version = "0.7", features = ["layer"] }
 tracing-unwrap = "1.0"
+
+# --- rate limiting (governor) ---
+governor = "0.6"
+
+# --- constant-time comparisons ---
+subtle = "2"
 
 # --- misc ---

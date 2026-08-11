@@ -121,6 +121,8 @@ cacos-pds-account = { path = "../cacos-pds-account" }
 # --- Step 4 extraction: per-DID storage + firehose sequencer ---
 cacos-pds-actor-store = { path = "../cacos-pds-actor-store" }
 cacos-pds-sequencer = { path = "../cacos-pds-sequencer" }
+# --- Step 5 extraction: OAuth provider, remote API, rate-limit middleware ---
+cacos-pds-oauth = { path = "../cacos-pds-oauth", features = ["test-utils"] }
 
 [dev-dependencies]                                                                                                                                                                                                                                                                                                                                                 
 camino-tempfile = { workspace = true }

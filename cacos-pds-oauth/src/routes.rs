@@ -169,7 +169,7 @@ pub async fn oauth_par(
     form: Form<ParFormData>,
     req: &Request,
     shared: Data<&SharedOAuthProvider>,
-    config: Data<&crate::oauth::OAuthConfig>,
+    config: Data<&crate::OAuthConfig>,
 ) -> Response {
     let provider = &shared.provider;
     let now = now_secs();
@@ -217,7 +217,7 @@ pub async fn oauth_token(
     form: Form<TokenFormData>,
     req: &Request,
     shared: Data<&SharedOAuthProvider>,
-    config: Data<&crate::oauth::OAuthConfig>,
+    config: Data<&crate::OAuthConfig>,
 ) -> Response {
     let provider = &shared.provider;
     let now = now_secs();

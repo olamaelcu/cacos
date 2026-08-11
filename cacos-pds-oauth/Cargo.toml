@@ -1,0 +1,68 @@
+[package]
+name = "cacos-pds-oauth"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+# Mock RemoteCreateAccount / fixtures for downstream integration tests.
+test-utils = []
+
+[dependencies]
+# --- foundation + domain deps ---
+cacos-pds-core = { path = "../cacos-pds-core" }
+cacos-pds-account = { path = "../cacos-pds-account" }
+cacos-pds-actor-store = { path = "../cacos-pds-actor-store" }
+cacos-pds-plc = { path = "../cacos-pds-plc", features = ["test-utils"] }
+
+# --- atproto protocol crates ---
+rsky-oauth = { workspace = true }
+rsky-common = { workspace = true }
+rsky-crypto = { workspace = true }
+# governor is enabled by workspace.dependencies
+
+# --- storage ---
+migration = { path = "../migration", package = "cacos-migration" }
+sea-orm = { workspace = true }
+
+# --- error handling ---
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# --- encoding / dates ---
+serde = { workspace = true }
+serde_json = { workspace = true }
+time = { workspace = true }
+
+# --- HTTP (poem) ---
+poem = { workspace = true }
+governor = { workspace = true }
+
+# --- crypto / encoding ---
+sha2 = { workspace = true }
+base64 = "0.22"
+hex = "0.4"
+subtle = { workspace = true }
+# subtle already in workspace.dependencies
+
+# --- http / metadata fetch ---
+reqwest = { version = "0.12", features = ["json"] }
+url = "2"
+
+# --- at-rest hygiene ---
+secrecy = "0.10"
+zeroize = "1"
+
+# --- runtime / traits ---
+tokio = { workspace = true }
+async-trait = "0.1"
+
+# --- observability ---
+tracing = { workspace = true }
+metrics = { workspace = true }
+
+[dev-dependencies]
+camino-tempfile = { workspace = true }
+metrics = { workspace = true }
+metrics-exporter-prometheus = { workspace = true }
+wiremock = "0.6"
+poem = { workspace = true, features = ["test"] }

@@ -1,16 +1,11 @@
-//! Shared OAuth provider module: `SharedOAuthProvider`, the SSRF-hardened
-//! client-metadata fetcher (Task 6), and the headless-consent remote API
-//! (Task 5).
-//!
-//! [`SharedOAuthProvider::new`] constructs an `OAuthProvider` from env
-//! (`PDS_JWT_KEY_K256_PRIVATE_KEY_HEX`, `PDS_DPOP_SECRET`, and
-//! `PDS_OAUTH_TRUSTED_CLIENTS`) and wires it to the cacos backing store
-//! ([`cacos_pds_account::account::oauth_store::PdsOAuthStore`]).
-
-pub mod fetcher;
-pub mod remote;
-pub mod remote_create_account;
-pub mod routes;
+// Shared OAuth provider module: `SharedOAuthProvider`, the SSRF-hardened
+// client-metadata fetcher (Task 6), and the headless-consent remote API
+// (Task 5).
+//
+// [`SharedOAuthProvider::new`] constructs an `OAuthProvider` from env
+// (`PDS_JWT_KEY_K256_PRIVATE_KEY_HEX`, `PDS_DPOP_SECRET`, and
+// `PDS_OAUTH_TRUSTED_CLIENTS`) and wires it to the cacos backing store
+// ([`cacos_pds_account::account::oauth_store::PdsOAuthStore`]).
 
 use cacos_pds_account::account::oauth_store::PdsOAuthStore;
 use base64::Engine as _;
@@ -280,7 +275,7 @@ pub fn build_oauth_app(
     public_url: String,
     remote_create_account: Arc<dyn remote_create_account::RemoteCreateAccount>,
 ) -> impl poem::Endpoint<Output = poem::Response> {
-    use crate::xrpc::rate_limit::{RouteRateLimit, ip_limiter};
+    use crate::rate_limit::{RouteRateLimit, ip_limiter};
     use poem::{Middleware, get, post};
 
     // The headless-consent POSTs relay credentials (`sign-in`,

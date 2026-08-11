@@ -9,10 +9,10 @@
 //! See the [headless-consent design spec](../../docs/superpowers/specs/2026-08-04-headless-oauth-consent-design.md).
 
 use cacos_pds_core::config::OAuthRemoteConfig;
-use crate::oauth::remote_create_account::{
+use crate::remote_create_account::{
     CreateAccountError, CreateAccountInput, RemoteCreateAccount,
 };
-use crate::oauth::{SharedOAuthProvider, now_secs};
+use crate::{SharedOAuthProvider, now_secs};
 use poem::Response;
 use poem::web::{Data, Json, Query};
 use rsky_oauth::OAuthError;
@@ -562,7 +562,7 @@ mod tests {
             issuer: ISSUER.to_string(),
             audience: AUDIENCE.to_string(),
             signing_key: key,
-            fetcher: Arc::new(crate::oauth::fetcher::HttpClientMetadataFetcher::new()),
+            fetcher: Arc::new(crate::fetcher::HttpClientMetadataFetcher::new()),
             store,
             dpop: rsky_oauth::DpopManager::new(
                 None,
