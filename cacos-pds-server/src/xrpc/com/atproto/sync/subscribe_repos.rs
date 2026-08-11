@@ -18,7 +18,6 @@ use chrono::offset::Utc as UtcOffset;
 use chrono::{DateTime, Duration};
 use futures::{SinkExt, StreamExt};
 use poem::IntoResponse;
-use tracing_unwrap::ResultExt;
 use poem::web::websocket::{Message, WebSocket};
 use rsky_common::RFC3339_VARIANT;
 use rsky_lexicon::com::atproto::sync::{
@@ -27,6 +26,7 @@ use rsky_lexicon::com::atproto::sync::{
 };
 use std::time::SystemTime;
 use tokio::time::{Duration as TokioDuration, interval};
+use tracing_unwrap::ResultExt;
 
 fn get_backfill_limit(ms: u64) -> String {
     let system_time = SystemTime::now();

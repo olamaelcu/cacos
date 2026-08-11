@@ -16,8 +16,8 @@ use cacos_pds_sequencer::crawlers::Crawlers;
 use crate::xrpc::SharedState;
 use rsky_identity::IdResolver;
 use std::sync::Arc;
-use tracing_unwrap::ResultExt;
 use tokio::sync::RwLock;
+use tracing_unwrap::ResultExt;
 
 /// rsky wraps `IdResolver` in a `RwLock` and passes it everywhere; same
 /// here.

@@ -18,13 +18,13 @@ use crate::xrpc::auth_extractors::UserDidAuthOptional;
 use crate::xrpc::types::SharedIdResolver;
 use crate::xrpc::{ApiError, ApiResult, SharedState};
 use email_address::EmailAddress;
-use tracing_unwrap::ResultExt;
 use poem::web::{Data, Json};
 use rsky_common::env::env_bool;
 use rsky_crypto::utils::encode_did_key;
 use rsky_lexicon::com::atproto::server::{CreateAccountInput, CreateAccountOutput};
 use secp256k1::{Keypair, Secp256k1};
 use std::env;
+use tracing_unwrap::ResultExt;
 
 #[derive(Debug, serde::Deserialize, serde::Serialize, Clone)]
 pub struct TransformedCreateAccountInput {
