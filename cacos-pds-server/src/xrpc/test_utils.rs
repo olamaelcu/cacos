@@ -103,6 +103,7 @@ pub async fn test_state() -> (SharedState, Vec<tempfile::TempDir>) {
             hostname: "pds.test".to_string(),
             public_url: "https://pds.test".to_string(),
             port: 8080,
+            service_did: "did:web:pds.test".to_string(),
         },
         service_db: cacos_pds_core::config::ServiceDbConfig {
             account_db_location: path_str(&dir.path().join("account.sqlite")),
@@ -113,6 +114,7 @@ pub async fn test_state() -> (SharedState, Vec<tempfile::TempDir>) {
             plc_url: "https://plc.test".to_string(),
             resolver_timeout: 3000,
             service_handle_domains: vec![".test".to_string()],
+            plc_client_mode: "http".to_string(),
         },
         actor_store: cacos_pds_core::config::ActorStoreConfig {
             directory: path_str(actor_dir.path()),
@@ -120,6 +122,22 @@ pub async fn test_state() -> (SharedState, Vec<tempfile::TempDir>) {
         },
         blobstore: cacos_pds_core::config::BlobstoreConfig {
             disk_location: path_str(blob_dir.path()),
+        },
+        cors: cacos_pds_core::config::CorsConfig {
+            allowed_origins: Default::default(),
+        },
+        health: cacos_pds_core::config::HealthConfig {
+            version: "0.0.0-test".to_string(),
+        },
+        oauth: cacos_pds_core::config::OauthConfig {
+            trusted_clients: vec![],
+            rate_limit_per_minute: 50,
+        },
+        rate_limit: cacos_pds_core::config::RateLimitConfig {
+            create_session_per_minute: 10,
+            create_account_per_minute: 10,
+            password_reset_per_minute: 5,
+            email_ops_per_minute: 5,
         },
         crawlers: vec![],
     };
