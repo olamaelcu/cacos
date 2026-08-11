@@ -1,0 +1,25 @@
+# cacos-pds-handle/Cargo.toml
+[package]
+name = "cacos-pds-handle"
+version = "0.1.0"
+edition = "2024"
+
+[workspace]
+# Empty self-contained workspace. Keeps `cargo check -p cacos-pds-handle`
+# runnable from this directory in isolation, without yet being added to
+# the parent workspace's `members` array (planned for a follow-up step).
+# `workspace = true` would resolve to *this* workspace's
+# `[workspace.dependencies]`, so we pin the versions explicitly here
+# to mirror the parent.
+resolver = "2"
+
+[dependencies]
+# Handle normalization + TLD validation (mirrors parent workspace dep)
+rsky-syntax = { git = "https://github.com/olamaelcu/rsky", rev = "aee5aec5ad9473d80232beab58ddba25a936298a" }
+# Explicit-slur detection for handle validation (mirrors parent workspace dep)
+rsky-common = { git = "https://github.com/olamaelcu/rsky", rev = "aee5aec5ad9473d80232beab58ddba25a936298a" }
+# Error derive on `Error`
+thiserror = "2"
+# `#[tokio::test]` in the unit tests below; rt-multi-thread keeps
+# the runtime behavior consistent with the parent workspace's tokio.
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
