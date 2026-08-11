@@ -2,7 +2,7 @@
 
 use crate::account::EmailTokenPurpose;
 use crate::account::helpers::account::{AccountStatus, AvailabilityFlags};
-use crate::xrpc::auth_extractors::AdminToken;
+use crate::xrpc::auth_extractors::RequireAccountAdmin;
 use crate::xrpc::{ApiError, ApiResult, SharedState};
 use poem::web::{Data, Json};
 use rsky_lexicon::com::atproto::server::DeleteAccountInput;
@@ -81,7 +81,7 @@ async fn inner_delete_account(
 #[poem::handler]
 pub async fn delete_account(
     body: Json<DeleteAccountInput>,
-    _auth: AdminToken,
+    _auth: RequireAccountAdmin,
     state: Data<&SharedState>,
 ) -> ApiResult<()> {
     match inner_delete_account(body.0, state.0).await {

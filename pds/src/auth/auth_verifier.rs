@@ -19,6 +19,7 @@
 
 use crate::account::AccountManager;
 use crate::account::helpers::account::{ActorAccount, AvailabilityFlags};
+use crate::account::helpers::admin_tokens::{AdminScopeSet, AdminTokenRegistry};
 use crate::account::helpers::auth::CustomClaimObj;
 use crate::account::helpers::auth::{AuthScope, PDS_JWT_KEYPAIR};
 use anyhow::{Result, bail};
@@ -146,6 +147,11 @@ pub struct Credentials {
     pub aud: Option<String>,
     pub iss: Option<String>,
     pub is_privileged: Option<bool>,
+    /// Granted admin scopes when this credential came from an admin token
+    /// (basic-auth). `None` for access / refresh / user_did credentials and
+    /// for admin credentials where the registry returned no entry (the
+    /// extractors that need admin scope fail closed when this is `None`).
+    pub admin_scopes: Option<AdminScopeSet>,
 }
 
 #[derive(Clone, Debug)]
@@ -412,6 +418,7 @@ pub fn validate_bearer_access_token(
             aud: None,
             iss: None,
             is_privileged: Some(is_privileged),
+            admin_scopes: None,
         }),
         artifacts: Some(token),
     })
@@ -580,6 +587,7 @@ pub async fn validate_dpop_access_token(
             aud: None,
             iss: None,
             is_privileged: None,
+            admin_scopes: None,
         }),
         artifacts: Some(token),
     })
@@ -663,46 +671,50 @@ async fn validate_access_token_inner(
             aud: None,
             iss: None,
             is_privileged: None,
+            admin_scopes: None,
         }),
         artifacts: Some(token),
     })
 }
 
 /// Basic-auth admin token guard.
+///
+/// Resolves the presented credentials against the [`AdminTokenRegistry`]
+/// built from `PDS_ADMIN_TOKEN_<NAME>_*` env vars (and the legacy
+/// `PDS_ADMIN_PASSWORD` fallback). The granted [`AdminScopeSet`] is
+/// propagated on the returned `Credentials.admin_scopes` so the route
+/// extractors can check the appropriate scope (Invite / Account /
+/// Takedown).
+///
+/// We build a fresh [`AdminTokenRegistry`] on every call so env mutations
+/// during tests / runtime config reloads are picked up without a process
+/// restart. The registry's `lookup` itself is constant-time (uses
+/// `subtle::ConstantTimeEq`), so the per-call rebuild does not weaken
+/// the timing side-channel guarantee.
 pub async fn verify_admin_token(auth_header: Option<&str>) -> Result<AccessOutput, AuthError> {
-    use subtle::ConstantTimeEq;
-    match parse_basic_auth(auth_header.unwrap_or_default()) {
-        None => Err(AuthError::AuthRequired("AuthMissing".to_string())),
-        Some(parsed) => {
-            let Some(admin_password) = admin_password_from_env() else {
-                tracing::error!("admin password is not configured");
-                return Err(AuthError::AuthRequired("BadAuth".to_string()));
-            };
-            let user_ok: bool = parsed.username.as_bytes().ct_eq(b"admin").into();
-            let pass_ok: bool = parsed
-                .password
-                .as_bytes()
-                .ct_eq(admin_password.as_bytes())
-                .into();
-            if !user_ok || !pass_ok {
-                Err(AuthError::AuthRequired("BadAuth".to_string()))
-            } else {
-                Ok(AccessOutput {
-                    credentials: Some(Credentials {
-                        r#type: "admin_token".to_string(),
-                        did: None,
-                        scope: None,
-                        audience: None,
-                        token_id: None,
-                        aud: None,
-                        iss: None,
-                        is_privileged: None,
-                    }),
-                    artifacts: None,
-                })
-            }
-        }
-    }
+    let parsed = match parse_basic_auth(auth_header.unwrap_or_default()) {
+        None => return Err(AuthError::AuthRequired("AuthMissing".to_string())),
+        Some(parsed) => parsed,
+    };
+    let registry = AdminTokenRegistry::from_env();
+    let Some(scopes) = registry.lookup(&parsed.username, &parsed.password).cloned() else {
+        tracing::error!("admin token lookup failed (no matching entry)");
+        return Err(AuthError::AuthRequired("BadAuth".to_string()));
+    };
+    Ok(AccessOutput {
+        credentials: Some(Credentials {
+            r#type: "admin_token".to_string(),
+            did: None,
+            scope: None,
+            audience: None,
+            token_id: None,
+            aud: None,
+            iss: None,
+            is_privileged: None,
+            admin_scopes: Some(scopes),
+        }),
+        artifacts: None,
+    })
 }
 
 /// User-did (service) JWT guard.
@@ -735,6 +747,7 @@ pub async fn verify_user_did_token(auth_header: Option<&str>) -> Result<AccessOu
             aud: Some(payload.aud),
             iss: Some(payload.iss),
             is_privileged: None,
+            admin_scopes: None,
         }),
         artifacts: None,
     })
@@ -1373,6 +1386,7 @@ mod tests {
                 aud: None,
                 iss: None,
                 is_privileged: None,
+                admin_scopes: None,
             }),
             artifacts: None,
         };
@@ -1388,6 +1402,7 @@ mod tests {
                 aud: None,
                 iss: None,
                 is_privileged: None,
+                admin_scopes: None,
             }),
             artifacts: None,
         };

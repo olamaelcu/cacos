@@ -1,4 +1,4 @@
-use crate::xrpc::auth_extractors::AdminToken;
+use crate::xrpc::auth_extractors::RequireInviteAdmin;
 use crate::xrpc::com::atproto::server::gen_invite_code;
 use crate::xrpc::{ApiError, ApiResult, SharedState};
 use poem::web::{Data, Json};
@@ -39,7 +39,7 @@ async fn inner_create_invite_code(
 #[poem::handler]
 pub async fn create_invite_code(
     body: Json<CreateInviteCodeInput>,
-    _auth: AdminToken,
+    _auth: RequireInviteAdmin,
     state: Data<&SharedState>,
 ) -> ApiResult<Json<CreateInviteCodeOutput>> {
     match inner_create_invite_code(body.0, state.0).await {

@@ -12,6 +12,7 @@
 //! context from a thread-local, so every access-token validation is
 //! wrapped in `set_dpop_request_context` / `clear_dpop_request_context`.
 
+use crate::account::helpers::admin_tokens::AdminScope;
 use crate::account::helpers::auth::AuthScope;
 use crate::auth::auth_verifier::{
     self, AccessOutput, AuthError, Credentials, DpopRequestContext, ValidateAccessTokenOpts,
@@ -225,6 +226,7 @@ impl<'a> FromRequest<'a> for Refresh {
                         aud: None,
                         iss: None,
                         is_privileged: None,
+                        admin_scopes: None,
                     }),
                     artifacts: Some(validated.token),
                 },
@@ -264,6 +266,61 @@ impl<'a> FromRequest<'a> for AdminToken {
             Ok(access) => Ok(AdminToken { access }),
             Err(error) => Err(poem_error(auth_error_to_api_error(&error))),
         }
+    }
+}
+
+/// Checks the granted admin scopes on `credentials` for `scope`. Returns
+/// `AuthRequiredError` when the credentials don't carry the requested
+/// scope (either because the credential type isn't admin or because the
+/// configured token registry entry doesn't grant it). Wildcard-scope
+/// entries grant every checked scope by definition.
+fn require_admin_scope(
+    credentials: &Option<Credentials>,
+    scope: AdminScope,
+) -> Result<(), PoemError> {
+    let granted = credentials.as_ref().and_then(|c| c.admin_scopes.as_ref());
+    match granted {
+        Some(scopes) if scopes.contains(scope) => Ok(()),
+        _ => Err(poem_error(ApiError::AuthRequiredError(format!(
+            "Missing admin scope: {}",
+            scope.as_str()
+        )))),
+    }
+}
+
+/// Admin token + `InviteAdmin` scope required. Used by the invite-code
+/// issuance endpoints (`com.atproto.server.createInviteCode[s]`).
+pub struct RequireInviteAdmin(pub AccessOutput);
+
+impl<'a> FromRequest<'a> for RequireInviteAdmin {
+    async fn from_request(req: &'a Request, body: &mut RequestBody) -> Result<Self> {
+        let admin = AdminToken::from_request(req, body).await?;
+        require_admin_scope(&admin.access.credentials, AdminScope::InviteAdmin)?;
+        Ok(Self(admin.access))
+    }
+}
+
+/// Admin token + `AccountAdmin` scope required. Used by destructive
+/// account-management endpoints (`com.atproto.server.deleteAccount`).
+pub struct RequireAccountAdmin(pub AccessOutput);
+
+impl<'a> FromRequest<'a> for RequireAccountAdmin {
+    async fn from_request(req: &'a Request, body: &mut RequestBody) -> Result<Self> {
+        let admin = AdminToken::from_request(req, body).await?;
+        require_admin_scope(&admin.access.credentials, AdminScope::AccountAdmin)?;
+        Ok(Self(admin.access))
+    }
+}
+
+/// Admin token + `TakedownAdmin` scope required. Used by takedown / repo
+/// moderation endpoints.
+pub struct RequireTakedownAdmin(pub AccessOutput);
+
+impl<'a> FromRequest<'a> for RequireTakedownAdmin {
+    async fn from_request(req: &'a Request, body: &mut RequestBody) -> Result<Self> {
+        let admin = AdminToken::from_request(req, body).await?;
+        require_admin_scope(&admin.access.credentials, AdminScope::TakedownAdmin)?;
+        Ok(Self(admin.access))
     }
 }
 
