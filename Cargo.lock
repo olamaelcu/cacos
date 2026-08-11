@@ -1084,7 +1084,6 @@ dependencies = [
  "cacos-pds-plc",
  "cacos-pds-sequencer",
  "camino-tempfile",
- "cid",
  "governor",
  "hex",
  "metrics",
