@@ -116,6 +116,8 @@ pub async fn build_app_with_state(
                 state.account_manager.clone(),
                 state.actor_store.clone(),
                 state.plc_client.clone(),
+                state.blobstore.clone(),
+                state.sequencer.clone(),
             ),
             Err(err) => {
                 tracing::error!(%err, "failed to open account database for OAuth");

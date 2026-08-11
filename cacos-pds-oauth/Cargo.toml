@@ -13,11 +13,12 @@ cacos-pds-core = { path = "../cacos-pds-core" }
 cacos-pds-account = { path = "../cacos-pds-account" }
 cacos-pds-actor-store = { path = "../cacos-pds-actor-store" }
 cacos-pds-plc = { path = "../cacos-pds-plc", features = ["test-utils"] }
+cacos-pds-sequencer = { path = "../cacos-pds-sequencer" }
+cacos-pds-blobstore = { path = "../cacos-pds-blobstore" }
 
 # --- atproto protocol crates ---
 rsky-oauth = { workspace = true }
 rsky-common = { workspace = true }
-rsky-crypto = { workspace = true }
 # governor is enabled by workspace.dependencies
 
 # --- storage ---
@@ -32,6 +33,7 @@ thiserror = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 time = { workspace = true }
+lexicon_cid = { workspace = true }
 
 # --- HTTP (poem) ---
 poem = { workspace = true }
@@ -42,6 +44,9 @@ sha2 = { workspace = true }
 base64 = "0.22"
 hex = "0.4"
 subtle = { workspace = true }
+secp256k1 = { version = "0.28", features = ["global-context", "rand"] }
+rsky-crypto = { workspace = true }
+rand = { workspace = true }
 # subtle already in workspace.dependencies
 
 # --- http / metadata fetch ---

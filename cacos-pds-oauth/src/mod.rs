@@ -219,6 +219,10 @@ pub fn bootstrap_oauth_app(
     account_manager: cacos_pds_account::account::AccountManager,
     actor_store: std::sync::Arc<cacos_pds_actor_store::ActorStore>,
     plc_client: std::sync::Arc<dyn cacos_pds_plc::PlcClient>,
+    blobstore: std::sync::Arc<
+        dyn cacos_pds_blobstore::BlobStore<Stream = cacos_pds_blobstore::BoxedBlobStream>,
+    >,
+    sequencer: cacos_pds_sequencer::shared_sequencer::SharedSequencer,
 ) -> Option<OAuthBootstrap<impl poem::Endpoint<Output = poem::Response>>> {
     if std::env::var("PDS_JWT_KEY_K256_PRIVATE_KEY_HEX").is_err() {
         return None;
@@ -253,6 +257,8 @@ pub fn bootstrap_oauth_app(
             account_manager,
             actor_store,
             plc_client,
+            blobstore,
+            sequencer,
         ));
     let endpoint = build_oauth_app(
         shared,
