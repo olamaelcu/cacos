@@ -52,4 +52,4 @@ We needed per-actor block and root storage that plugs into the atproto `Readable
   - `process_write_blobs` calls are omitted inside `create_repo` / `process_import_repo` / `process_writes`.
   - `pref: PreferenceReader` is deferred.
   - `RecordReader` is missing `list_records_for_collection`, `get_record_takedown_status`, `update_record_takedown_status`, `list_existing_blocks`, and serde derives on `GetRecord`.
-  - `get_backlink_conflicts` and `get_backlinks` are stubs (Plan 07 fleshes them out).
+  - `get_backlink_conflicts` and `get_backlinks` are now real implementations in `cacos-pds-actor-store/src/record/mod.rs` (with tests), not stubs.
