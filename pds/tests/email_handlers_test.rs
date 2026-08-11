@@ -11,7 +11,7 @@
 //! name (e.g. `/confirmEmail`), then nests them under `/xrpc`. Existing
 //! `server_sessions_test.rs` uses `/xrpc/createSession` — same shape here.
 
-use cacos_pds::account::EmailTokenPurpose;
+use cacos_pds_account::account::EmailTokenPurpose;
 use cacos_pds::xrpc::build_app_with_state;
 use cacos_pds::xrpc::test_utils::{create_test_account, test_state};
 use poem::test::TestClient;
@@ -124,7 +124,7 @@ async fn update_email_requires_token_for_confirmed_account() {
         .unwrap();
     state
         .account_manager
-        .confirm_email(cacos_pds::account::ConfirmEmailOpts {
+        .confirm_email(cacos_pds_account::account::ConfirmEmailOpts {
             did: &"did:plc:f".to_string(),
             token: &token,
         })
@@ -172,7 +172,7 @@ async fn update_email_with_valid_token_succeeds() {
         .unwrap();
     state
         .account_manager
-        .confirm_email(cacos_pds::account::ConfirmEmailOpts {
+        .confirm_email(cacos_pds_account::account::ConfirmEmailOpts {
             did: &"did:plc:h".to_string(),
             token: &confirm_token,
         })

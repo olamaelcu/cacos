@@ -7,9 +7,9 @@
 //! through the injected [`PlcClient`] instead of a directly-constructed
 //! `plc::Client`, and account creation runs through the shared state.
 
-use crate::account::CreateAccountOpts;
-use crate::account::helpers::account::AccountStatus;
-use crate::context::PDS_REPO_SIGNING_KEYPAIR;
+use cacos_pds_account::account::CreateAccountOpts;
+use cacos_pds_account::account::helpers::account::AccountStatus;
+use cacos_pds_account::auth::PDS_REPO_SIGNING_KEYPAIR;
 use cacos_pds_handle::{HandleValidationOpts, normalize_and_validate_handle};
 use cacos_pds_plc::operations::{CreateAtprotoOpInput, create_op};
 use cacos_pds_plc::types::{OpOrTombstone, Operation};

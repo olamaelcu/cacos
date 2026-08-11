@@ -40,7 +40,7 @@ pub trait RemoteCreateAccount: Send + Sync + 'static {
 /// rotation key) is the next wave (Phase E).
 pub struct ActorStoreRemoteCreateAccount {
     #[allow(dead_code)]
-    pub account_manager: Arc<crate::account::AccountManager>,
+    pub account_manager: Arc<cacos_pds_account::account::AccountManager>,
     #[allow(dead_code)]
     pub actor_store: Arc<crate::actor_store::ActorStore>,
     #[allow(dead_code)]
@@ -49,7 +49,7 @@ pub struct ActorStoreRemoteCreateAccount {
 
 impl ActorStoreRemoteCreateAccount {
     pub fn new(
-        account_manager: crate::account::AccountManager,
+        account_manager: cacos_pds_account::account::AccountManager,
         actor_store: Arc<crate::actor_store::ActorStore>,
         plc_client: Arc<dyn cacos_pds_plc::PlcClient>,
     ) -> Self {

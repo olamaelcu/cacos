@@ -116,6 +116,8 @@ cacos-pds-mailer = { path = "../cacos-pds-mailer" }
 
 # --- Step 2 extraction: foundation crate (error, config, observability, db, background) ---
 cacos-pds-core = { path = "../cacos-pds-core", features = ["test-utils"] }
+# --- Step 3 extraction: account manager + auth verifier (split into 5 submodules) ---
+cacos-pds-account = { path = "../cacos-pds-account" }
 
 [dev-dependencies]                                                                                                                                                                                                                                                                                                                                                 
 camino-tempfile = { workspace = true }

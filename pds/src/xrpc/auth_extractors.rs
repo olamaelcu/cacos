@@ -12,10 +12,10 @@
 //! context from a thread-local, so every access-token validation is
 //! wrapped in `set_dpop_request_context` / `clear_dpop_request_context`.
 
-use crate::account::helpers::admin_tokens::AdminScope;
-use crate::account::helpers::auth::AuthScope;
-use crate::auth::auth_verifier::{
-    self, AccessOutput, AuthError, Credentials, DpopRequestContext, ValidateAccessTokenOpts,
+use cacos_pds_account::account::helpers::admin_tokens::AdminScope;
+use cacos_pds_account::account::helpers::auth::AuthScope;
+use cacos_pds_account::auth::verifier::{
+    AccessOutput, AuthError, Credentials, DpopRequestContext, ValidateAccessTokenOpts,
 };
 use crate::xrpc::ApiError;
 use poem::IntoResponse;
@@ -62,7 +62,7 @@ async fn validate_access(
     scopes: Vec<AuthScope>,
     opts: Option<ValidateAccessTokenOpts>,
 ) -> std::result::Result<AccessOutput, AuthError> {
-    auth_verifier::set_dpop_request_context(DpopRequestContext {
+    cacos_pds_account::auth::verifier::set_dpop_request_context(DpopRequestContext {
         method: req.method().to_string(),
         uri: req.uri().to_string(),
         dpop_headers: req
@@ -72,8 +72,8 @@ async fn validate_access(
             .filter_map(|v| v.to_str().ok().map(String::from))
             .collect(),
     });
-    let result = auth_verifier::validate_access_token(auth_header(req), scopes, opts).await;
-    auth_verifier::clear_dpop_request_context();
+    let result = cacos_pds_account::auth::verifier::validate_access_token(auth_header(req), scopes, opts).await;
+    cacos_pds_account::auth::verifier::clear_dpop_request_context();
     result
 }
 
@@ -214,7 +214,7 @@ pub struct Refresh {
 
 impl<'a> FromRequest<'a> for Refresh {
     async fn from_request(req: &'a Request, _body: &mut RequestBody) -> Result<Self> {
-        match auth_verifier::validate_refresh_token(auth_header(req)).await {
+        match cacos_pds_account::auth::verifier::validate_refresh_token(auth_header(req)).await {
             Ok(validated) => Ok(Refresh {
                 access: AccessOutput {
                     credentials: Some(Credentials {
@@ -243,7 +243,7 @@ pub struct RevokeRefreshToken {
 
 impl<'a> FromRequest<'a> for RevokeRefreshToken {
     async fn from_request(req: &'a Request, _body: &mut RequestBody) -> Result<Self> {
-        match auth_verifier::validate_refresh_token(auth_header(req)).await {
+        match cacos_pds_account::auth::verifier::validate_refresh_token(auth_header(req)).await {
             Ok(validated) => match validated.payload.jti {
                 Some(jti) => Ok(RevokeRefreshToken { id: jti }),
                 None => Err(poem_error(ApiError::InvalidRequest(
@@ -262,7 +262,7 @@ pub struct AdminToken {
 
 impl<'a> FromRequest<'a> for AdminToken {
     async fn from_request(req: &'a Request, _body: &mut RequestBody) -> Result<Self> {
-        match auth_verifier::verify_admin_token(auth_header(req)).await {
+        match cacos_pds_account::auth::verifier::verify_admin_token(auth_header(req)).await {
             Ok(access) => Ok(AdminToken { access }),
             Err(error) => Err(poem_error(auth_error_to_api_error(&error))),
         }
@@ -343,7 +343,7 @@ impl<'a> FromRequest<'a> for Moderator {
                 "moderator token not yet wired".to_string(),
             )));
         }
-        match auth_verifier::verify_admin_token(auth_header(req)).await {
+        match cacos_pds_account::auth::verifier::verify_admin_token(auth_header(req)).await {
             Ok(access) => Ok(Moderator { access }),
             Err(error) => Err(poem_error(auth_error_to_api_error(&error))),
         }
@@ -368,7 +368,7 @@ impl<'a> FromRequest<'a> for OptionalAccessOrAdminToken {
                     Err(error) => Err(poem_error(auth_error_to_api_error(&error))),
                 }
             }
-            Some(_) => match auth_verifier::verify_admin_token(auth_header(req)).await {
+            Some(_) => match cacos_pds_account::auth::verifier::verify_admin_token(auth_header(req)).await {
                 Ok(access) => Ok(OptionalAccessOrAdminToken {
                     access: Some(access),
                 }),
@@ -389,7 +389,7 @@ impl<'a> FromRequest<'a> for UserDidAuthOptional {
             .map(|h| h.starts_with("Bearer "))
             .unwrap_or(false)
         {
-            match auth_verifier::verify_user_did_token(auth_header(req)).await {
+            match cacos_pds_account::auth::verifier::verify_user_did_token(auth_header(req)).await {
                 Ok(access) => Ok(UserDidAuthOptional {
                     access: Some(access),
                 }),
@@ -408,7 +408,7 @@ pub struct UserDidAuth {
 
 impl<'a> FromRequest<'a> for UserDidAuth {
     async fn from_request(req: &'a Request, _body: &mut RequestBody) -> Result<Self> {
-        match auth_verifier::verify_user_did_token(auth_header(req)).await {
+        match cacos_pds_account::auth::verifier::verify_user_did_token(auth_header(req)).await {
             Ok(access) => Ok(UserDidAuth { access }),
             Err(error) => Err(poem_error(auth_error_to_api_error(&error))),
         }

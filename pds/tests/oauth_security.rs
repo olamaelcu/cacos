@@ -11,7 +11,7 @@
 //! runs synchronously on the host string.
 
 use base64::Engine;
-use cacos_pds::account::oauth_store::DbBackedReplayStore;
+use cacos_pds_account::account::oauth_store::DbBackedReplayStore;
 use cacos_pds_core::config::OAuthRemoteConfig;
 use cacos_pds_core::db::DatabaseKind;
 use cacos_pds::oauth::remote_create_account::MockRemoteCreateAccount;

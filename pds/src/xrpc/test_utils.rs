@@ -4,7 +4,7 @@
 //! directories. Callers must keep the returned temp dirs alive for the
 //! lifetime of the state.
 
-use crate::account::AccountManager;
+use cacos_pds_account::account::AccountManager;
 use crate::actor_store::ActorStore;
 use cacos_pds_blobstore::{BlobStore, BoxedBlobStream, OpenDALBlobStore};
 use cacos_pds_core::config::ServerConfig;
@@ -131,7 +131,7 @@ pub async fn test_state() -> (SharedState, Vec<tempfile::TempDir>) {
 
     // Plan 06: account-status checks inside validate_access_token need
     // the registered AccountManager.
-    crate::auth::auth_verifier::register_auth_dependencies(Arc::new(account_manager.clone()), None);
+    cacos_pds_account::auth::verifier::register_auth_dependencies(Arc::new(account_manager.clone()), None);
 
     let state = SharedState {
         account_manager,
@@ -151,7 +151,7 @@ pub async fn test_state() -> (SharedState, Vec<tempfile::TempDir>) {
 pub async fn create_test_account(state: &SharedState, did: &str, handle: &str) -> (String, String) {
     state
         .account_manager
-        .create_account(crate::account::CreateAccountOpts {
+        .create_account(cacos_pds_account::account::CreateAccountOpts {
             did: did.to_owned(),
             handle: handle.to_owned(),
             email: Some(format!("{handle}@example.com")),

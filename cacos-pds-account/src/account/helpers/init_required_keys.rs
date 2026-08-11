@@ -31,15 +31,15 @@ pub fn init_required_keys() -> Result<(), String> {
         "PDS_JWT_KEY_K256_PRIVATE_KEY_HEX",
     )?;
     validate_hex("PDS_ACCESS_JWT_KEY_K256_PRIVATE_KEY_HEX", &access)?;
-    let _ = &*crate::account::helpers::auth::PDS_JWT_KEYPAIR;
+    let _ = &*crate::auth::PDS_JWT_KEYPAIR;
 
     let repo = required("PDS_REPO_SIGNING_KEY_K256_PRIVATE_KEY_HEX")?;
     validate_hex("PDS_REPO_SIGNING_KEY_K256_PRIVATE_KEY_HEX", &repo)?;
-    let _ = &*crate::context::PDS_REPO_SIGNING_KEYPAIR;
+    let _ = &*crate::auth::PDS_REPO_SIGNING_KEYPAIR;
 
     let plc = required("PDS_PLC_ROTATION_KEY_K256_PRIVATE_KEY_HEX")?;
     validate_hex("PDS_PLC_ROTATION_KEY_K256_PRIVATE_KEY_HEX", &plc)?;
-    let _ = &*crate::xrpc::com::atproto::server::PDS_PLC_ROTATION_KEYPAIR;
+    let _ = &*crate::auth::PDS_PLC_ROTATION_KEYPAIR;
 
     let dpop = required("PDS_DPOP_SECRET")?;
     if dpop.len() != 64 {

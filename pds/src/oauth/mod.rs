@@ -5,14 +5,14 @@
 //! [`SharedOAuthProvider::new`] constructs an `OAuthProvider` from env
 //! (`PDS_JWT_KEY_K256_PRIVATE_KEY_HEX`, `PDS_DPOP_SECRET`, and
 //! `PDS_OAUTH_TRUSTED_CLIENTS`) and wires it to the cacos backing store
-//! ([`crate::account::oauth_store::PdsOAuthStore`]).
+//! ([`cacos_pds_account::account::oauth_store::PdsOAuthStore`]).
 
 pub mod fetcher;
 pub mod remote;
 pub mod remote_create_account;
 pub mod routes;
 
-use crate::account::oauth_store::PdsOAuthStore;
+use cacos_pds_account::account::oauth_store::PdsOAuthStore;
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 #[allow(unused_imports)] // clippy false-positive: used by build_oauth_app's `.data()`
@@ -183,7 +183,7 @@ pub struct OAuthConfig {
 /// interval is short enough that the table stays bounded even under
 /// sustained traffic, but long enough that the per-tick cost is
 /// negligible against the indexed column.
-fn schedule_dpop_replay_prune(store: Arc<crate::account::oauth_store::DbBackedReplayStore>) {
+fn schedule_dpop_replay_prune(store: Arc<cacos_pds_account::account::oauth_store::DbBackedReplayStore>) {
     let queue = cacos_pds_core::background::BackgroundQueue::default();
     let store = store.clone();
     queue.add(async move {
@@ -221,7 +221,7 @@ fn schedule_dpop_replay_prune(store: Arc<crate::account::oauth_store::DbBackedRe
 ///   headless-consent RemoteClient config (see [`cacos_pds_core::config`]).
 pub fn bootstrap_oauth_app(
     account_db: sea_orm::DatabaseConnection,
-    account_manager: crate::account::AccountManager,
+    account_manager: cacos_pds_account::account::AccountManager,
     actor_store: std::sync::Arc<crate::actor_store::ActorStore>,
     plc_client: std::sync::Arc<dyn cacos_pds_plc::PlcClient>,
 ) -> Option<OAuthBootstrap<impl poem::Endpoint<Output = poem::Response>>> {
@@ -234,7 +234,7 @@ pub fn bootstrap_oauth_app(
     let audience =
         std::env::var("PDS_SERVICE_DID").unwrap_or_else(|_| "did:web:localhost".to_string());
 
-    let replay_store = Arc::new(crate::account::oauth_store::DbBackedReplayStore::new(
+    let replay_store = Arc::new(cacos_pds_account::account::oauth_store::DbBackedReplayStore::new(
         std::sync::Arc::new(account_db.clone()),
     ));
     schedule_dpop_replay_prune(replay_store.clone());

@@ -3,7 +3,7 @@ use tracing_unwrap::ResultExt;
 
 #[tokio::main]
 async fn main() {
-    if let Err(e) = cacos_pds::account::helpers::init_required_keys::init_required_keys() {
+    if let Err(e) = cacos_pds_account::account::helpers::init_required_keys::init_required_keys() {
         eprintln!("fatal: {e}");
         std::process::exit(1);
     }
@@ -72,7 +72,7 @@ async fn run_migrate_subcommand(args: &[String]) {
 /// each actor has been migrated; this command is the seam between the
 /// old and new worlds.
 async fn migrate_rotation_keys() -> anyhow::Result<()> {
-    use cacos_pds::xrpc::com::atproto::server::PDS_PLC_ROTATION_KEYPAIR;
+    use cacos_pds_account::auth::PDS_PLC_ROTATION_KEYPAIR;
 
     let cfg = cacos_pds_core::config::env_to_cfg();
     let state = cacos_pds::xrpc::types::SharedStateFromEnv::from_env(&cfg).await;
@@ -178,7 +178,7 @@ async fn migrate_plc_rotation_keys(dry_run: bool) -> anyhow::Result<()> {
     use cacos_pds_plc::operations::CreateAtprotoUpdateOpOpts;
     use cacos_pds_plc::operations::create_atproto_update_op;
     use cacos_pds_plc::types::{CompatibleOp, CompatibleOpOrTombstone, OpOrTombstone};
-    use cacos_pds::xrpc::com::atproto::server::PDS_PLC_ROTATION_KEYPAIR;
+    use cacos_pds_account::auth::PDS_PLC_ROTATION_KEYPAIR;
 
     let cfg = cacos_pds_core::config::env_to_cfg();
     let state = cacos_pds::xrpc::types::SharedStateFromEnv::from_env(&cfg).await;

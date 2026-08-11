@@ -1,5 +1,5 @@
-use crate::account::EmailTokenPurpose;
-use crate::account::helpers::account::AvailabilityFlags;
+use cacos_pds_account::account::EmailTokenPurpose;
+use cacos_pds_account::account::helpers::account::AvailabilityFlags;
 use cacos_pds_mailer;
 use cacos_pds_mailer::IdentifierAndTokenParams;
 use crate::xrpc::{ApiError, ApiResult, SharedState};

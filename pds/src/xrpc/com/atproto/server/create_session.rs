@@ -1,11 +1,11 @@
-use crate::account::helpers::account::AvailabilityFlags;
+use cacos_pds_account::account::helpers::account::AvailabilityFlags;
 use crate::xrpc::{ApiError, ApiResult, SharedState};
 use poem::web::{Data, Json};
 use rsky_lexicon::com::atproto::server::{CreateSessionInput, CreateSessionOutput};
 use rsky_syntax::handle::INVALID_HANDLE;
 
 fn api_error_from_account_error(e: anyhow::Error) -> ApiError {
-    use crate::account::helpers::account::AccountHelperError;
+    use cacos_pds_account::account::helpers::account::AccountHelperError;
     if let Some(AccountHelperError::AccountLocked) = e.downcast_ref::<AccountHelperError>() {
         ApiError::RateLimitExceeded
     } else {

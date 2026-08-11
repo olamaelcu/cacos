@@ -22,7 +22,7 @@ pub mod well_known;
 
 pub use error::{ApiError, ApiResult, ErrorBody};
 
-use crate::account::AccountManager;
+use cacos_pds_account::account::AccountManager;
 use crate::actor_store::ActorStore;
 use cacos_pds_blobstore::{BlobStore, BoxedBlobStream};
 use cacos_pds_core::config::ServerConfig;
@@ -123,7 +123,7 @@ pub async fn build_app_with_state(
             }
         };
         let provider = oauth_app.as_ref().map(|b| Arc::clone(&b.provider));
-        crate::auth::auth_verifier::register_auth_dependencies(
+        cacos_pds_account::auth::verifier::register_auth_dependencies(
             Arc::new(state.account_manager.clone()),
             provider,
         );

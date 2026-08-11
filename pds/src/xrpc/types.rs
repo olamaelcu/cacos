@@ -5,7 +5,7 @@
 //! blobstore, PLC client, auth verifier) into the per-process
 //! [`crate::xrpc::SharedState`].
 
-use crate::account::AccountManager;
+use cacos_pds_account::account::AccountManager;
 use crate::actor_store::ActorStore;
 use cacos_pds_blobstore::OpenDALBlobStore;
 use cacos_pds_core::config::ServerConfig;
@@ -79,7 +79,7 @@ impl SharedStateFromEnv {
         let plc_client: Arc<dyn PlcClient> =
             cacos_pds_plc::plc_client_from_env(&cfg.identity.plc_url);
 
-        crate::auth::auth_verifier::register_auth_dependencies(
+        cacos_pds_account::auth::verifier::register_auth_dependencies(
             Arc::new(account_manager.clone()),
             None,
         );

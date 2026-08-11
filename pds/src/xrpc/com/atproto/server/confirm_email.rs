@@ -1,5 +1,5 @@
-use crate::account::helpers::account::AvailabilityFlags;
-use crate::account::{AccountManager, ConfirmEmailOpts};
+use cacos_pds_account::account::helpers::account::AvailabilityFlags;
+use cacos_pds_account::account::{AccountManager, ConfirmEmailOpts};
 use crate::xrpc::auth_extractors::AccessFull;
 use crate::xrpc::{ApiError, ApiResult, SharedState};
 use poem::web::{Data, Json};

@@ -1,30 +1,20 @@
-//! Process-wide keypairs and shared sequencer state used across helpers
-//! and HTTP handlers.
+//! Shared sequencer state used across helpers and HTTP handlers.
+//!
+//! The service-signing keypairs (`PDS_REPO_SIGNING_KEYPAIR`,
+//! `PDS_PLC_ROTATION_KEYPAIR`, `PDS_JWT_KEYPAIR`) live in
+//! `cacos_pds_account::auth::*` since Plan 00 Step 3.
 
 use crate::sequencer::Sequencer;
-use secp256k1::{Keypair, Secp256k1, SecretKey};
-use secrecy::{ExposeSecret, ExposeSecretMut, SecretBox};
-use std::env;
-use std::sync::{Arc, LazyLock, RwLock};
-use zeroize::Zeroize;
-
-/// Signs service JWTs and is exposed as the PDS's repo signing key by the
-/// server handlers.
-pub static PDS_REPO_SIGNING_KEYPAIR: LazyLock<Keypair> = LazyLock::new(|| {
-    let secp = Secp256k1::new();
-    let private_key = env::var("PDS_REPO_SIGNING_KEY_K256_PRIVATE_KEY_HEX").unwrap();
-    let mut secret_bytes = SecretBox::new(Box::new(hex::decode(private_key.as_bytes()).unwrap()));
-    let secret_key = SecretKey::from_slice(secret_bytes.expose_secret()).unwrap();
-    let keypair = Keypair::from_secret_key(&secp, &secret_key);
-    secret_bytes.expose_secret_mut().zeroize();
-    keypair
-});
+use std::sync::{Arc, RwLock};
 
 /// Shared sequencer handle, mounted as poem state. The subscribe-repos
 /// websocket handler reads this to sequence/commit/emit events. The
 /// `Arc<RwLock<…>>` indirection makes `SharedSequencer: Clone` so it can be
 /// handed to poem's `.data(...)` (which requires `Clone`) and still be
 /// mutated concurrently from tests / background tasks via a second clone.
+///
+/// Step 4's `cacos-pds-sequencer` extraction will move this type out of
+/// `cacos-pds` entirely.
 pub struct SharedSequencer {
     pub sequencer: Arc<RwLock<Sequencer>>,
 }

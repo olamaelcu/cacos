@@ -1,12 +1,15 @@
 //! Auth helper: access/refresh/service JWTs (ES256K), refresh-token storage
 //! with grace-period rotation, concurrent-refresh detection.
 //!
-//! Owns `PDS_JWT_KEYPAIR` and `AuthScope` for the whole crate (see the
-//! cross-plan contracts in the plan header — Plan 06's auth_verifier imports
-//! both from here).
+//! Owns `AuthScope` for the whole crate (see the cross-plan contracts in the
+//! plan header — Plan 06's auth_verifier imports it from here). The
+//! canonical `PDS_JWT_KEYPAIR` static lives at
+//! `cacos_pds_account::auth::PDS_JWT_KEYPAIR`; use
+//! `cacos_pds_account::auth::PDS_REPO_SIGNING_KEYPAIR` for the repo signing
+//! key (re-exported from this module's parent auth namespace).
 
 use crate::account::helpers::sql;
-use crate::context::PDS_REPO_SIGNING_KEYPAIR;
+use crate::auth::{PDS_JWT_KEYPAIR, PDS_REPO_SIGNING_KEYPAIR};
 use anyhow::{Error, Result, bail};
 use chrono::DateTime;
 use jwt_simple::prelude::*;
@@ -15,26 +18,9 @@ use rsky_common::time::MINUTE;
 use rsky_common::{RFC3339_VARIANT, get_random_str, json_to_b64url};
 use sea_orm::{ConnectionTrait, DatabaseConnection, QueryResult, Value};
 use secp256k1::Message;
-use secrecy::{ExposeSecret, ExposeSecretMut, SecretBox};
 use sha2::{Digest, Sha256};
-use std::env;
-use std::sync::LazyLock;
 use std::time::SystemTime;
 use thiserror::Error;
-use zeroize::Zeroize;
-
-/// Canonical ES256K signing key for access/refresh/service JWTs, from
-/// `PDS_JWT_KEY_K256_PRIVATE_KEY_HEX`. Owned HERE; Plan 06's auth_verifier
-/// imports it (`use crate::account::helpers::auth::PDS_JWT_KEYPAIR;`).
-pub static PDS_JWT_KEYPAIR: LazyLock<ES256kKeyPair> = LazyLock::new(|| {
-    let secp = secp256k1::Secp256k1::new();
-    let private_key = env::var("PDS_JWT_KEY_K256_PRIVATE_KEY_HEX").unwrap();
-    let mut secret_bytes = SecretBox::new(Box::new(hex::decode(private_key.as_bytes()).unwrap()));
-    let secret_key = secp256k1::SecretKey::from_slice(secret_bytes.expose_secret()).unwrap();
-    let jwt_key = secp256k1::Keypair::from_secret_key(&secp, &secret_key);
-    secret_bytes.expose_secret_mut().zeroize();
-    ES256kKeyPair::from_bytes(jwt_key.secret_bytes().as_slice()).unwrap()
-});
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum AuthScope {

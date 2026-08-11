@@ -1,4 +1,4 @@
-use crate::account::helpers::auth::{ServiceJwtParams, create_service_jwt};
+use cacos_pds_account::account::helpers::auth::{ServiceJwtParams, create_service_jwt};
 use crate::xrpc::auth_extractors::AccessFull;
 use crate::xrpc::{ApiError, ApiResult};
 use anyhow::{Result, bail};

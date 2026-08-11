@@ -10,15 +10,15 @@
 
 use std::sync::Mutex;
 
-use cacos_pds::account::helpers::admin_tokens::{
+use cacos_pds_account::account::helpers::admin_tokens::{
     AdminScope, AdminScopeSet, AdminTokenRegistry, cached_admin_token_registry,
     reset_admin_token_registry,
 };
-use cacos_pds::account::helpers::secret_provider::{
+use cacos_pds_account::account::helpers::secret_provider::{
     EnvSecretProvider, FileSecretProvider, KmsSecretProvider, SecretError, SecretProvider,
     reset_provider,
 };
-use cacos_pds::account::helpers::secrets::{
+use cacos_pds_account::account::helpers::secrets::{
     read_admin_password, read_secret, validate_password_strength,
 };
 
@@ -497,7 +497,7 @@ fn provider_can_be_swapped_at_runtime() {
 mod admin_scope_extractors {
     use super::{AdminScope, clear_test_env, lock_env};
     use base64ct::Encoding;
-    use cacos_pds::auth::auth_verifier::verify_admin_token;
+    use cacos_pds_account::auth::verifier::verify_admin_token;
     use cacos_pds::xrpc::auth_extractors::{
         RequireAccountAdmin, RequireInviteAdmin, RequireTakedownAdmin,
     };
@@ -684,7 +684,7 @@ mod admin_scope_extractors {
 #[cfg(test)]
 mod init_required_keys_tests {
     use super::{lock_env, strong_password};
-    use cacos_pds::account::helpers::init_required_keys::init_required_keys;
+    use cacos_pds_account::account::helpers::init_required_keys::init_required_keys;
 
     // 32-byte hex -> 64 chars
     const KEY_HEX: &str = "9d5907143471e8f0e8df0f8b9512a8c5377878ee767f18fcf961055ecfc071cd";
