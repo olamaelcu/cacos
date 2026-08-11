@@ -519,6 +519,10 @@ pub async fn create_account(
                 .map_err(oauth_error_to_poem)?;
             Ok(Json(error_page("create", &page, &sessions, Some(fresh), e)))
         }
+        Err(CreateAccountError::InvalidInput(msg)) => Err(poem::Error::from_string(
+            msg,
+            poem::http::StatusCode::BAD_REQUEST,
+        )),
         Err(CreateAccountError::Internal(msg)) => Err(poem::Error::from_string(
             msg,
             poem::http::StatusCode::INTERNAL_SERVER_ERROR,

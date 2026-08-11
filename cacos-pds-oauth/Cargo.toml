@@ -27,6 +27,7 @@ sea-orm = { workspace = true }
 
 # --- error handling ---
 anyhow = { workspace = true }
+email_address = "0.2"
 thiserror = { workspace = true }
 
 # --- encoding / dates ---

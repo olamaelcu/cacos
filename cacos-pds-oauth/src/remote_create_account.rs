@@ -15,6 +15,7 @@ use cacos_pds_plc::types::{OpOrTombstone, Operation};
 use cacos_pds_sequencer::events::sync_evt_data_from_commit;
 use rsky_crypto::utils::encode_did_key;
 use rsky_oauth::OAuthError;
+use email_address::EmailAddress;
 use secp256k1::{Keypair, Secp256k1};
 use std::sync::Arc;
 
@@ -34,6 +35,8 @@ pub struct CreateAccountInput {
 pub enum CreateAccountError {
     #[error("oauth: {0}")]
     OAuth(#[source] OAuthError),
+    #[error("invalid input: {0}")]
+    InvalidInput(String),
     #[error("internal: {0}")]
     Internal(String),
 }
@@ -82,6 +85,19 @@ impl RemoteCreateAccount for ActorStoreRemoteCreateAccount {
         &self,
         input: CreateAccountInput,
     ) -> Result<String, CreateAccountError> {
+        if input.handle.trim().is_empty() {
+            return Err(CreateAccountError::InvalidInput("handle must not be empty".into()));
+        }
+        if input.handle.contains('@') {
+            return Err(CreateAccountError::InvalidInput("handle must not contain '@'".into()));
+        }
+        if input.email.trim().is_empty() || !EmailAddress::is_valid(&input.email) {
+            return Err(CreateAccountError::InvalidInput("email is invalid".into()));
+        }
+        if input.password.is_empty() {
+            return Err(CreateAccountError::InvalidInput("password must not be empty".into()));
+        }
+
         let (did, plc_op, plc_rotation_key) = match build_did_and_plc_op(&input.handle).await {
             Ok(v) => v,
             Err(err) => {
@@ -202,10 +218,12 @@ impl RemoteCreateAccount for ActorStoreRemoteCreateAccount {
                 )));
             }
         };
-        let mut sequencer_clone = match self.sequencer.sequencer.read() {
-            Ok(g) => g.clone(),
-            Err(poisoned) => poisoned.into_inner().clone(),
-        };
+        let mut sequencer_clone = self
+            .sequencer
+            .sequencer
+            .read()
+            .expect("sequencer lock poisoned")
+            .clone();
         if sequencer_clone
             .sequence_identity_evt(did.clone(), Some(input.handle.clone()))
             .await

@@ -21,6 +21,34 @@ fn input() -> CreateAccountInput {
 }
 
 #[tokio::test]
+async fn actor_store_remote_create_account_rejects_empty_handle_without_mutating_state() {
+    let (state, _dirs) = test_state().await;
+    let impl_ = ActorStoreRemoteCreateAccount::new(
+        state.account_manager.clone(),
+        state.actor_store.clone(),
+        state.plc_client.clone(),
+        state.blobstore.clone(),
+        state.sequencer.clone(),
+    );
+    let mut invalid_input = input();
+    invalid_input.handle = "  ".into();
+
+    let result = impl_.create_account(invalid_input).await;
+
+    assert!(matches!(
+        result,
+        Err(cacos_pds_oauth::remote_create_account::CreateAccountError::InvalidInput(message))
+            if message == "handle must not be empty"
+    ));
+    assert!(state
+        .account_manager
+        .get_account("alice.test", None)
+        .await
+        .expect("account lookup must not error")
+        .is_none());
+}
+
+#[tokio::test]
 async fn actor_store_remote_create_account_produces_did_and_account() {
     let (state, _dirs) = test_state().await;
     let impl_ = ActorStoreRemoteCreateAccount::new(
