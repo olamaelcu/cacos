@@ -114,6 +114,9 @@ cacos-pds-identity = { path = "../cacos-pds-identity" }
 cacos-pds-handle = { path = "../cacos-pds-handle" }
 cacos-pds-mailer = { path = "../cacos-pds-mailer" }
 
+# --- Step 2 extraction: foundation crate (error, config, observability, db, background) ---
+cacos-pds-core = { path = "../cacos-pds-core", features = ["test-utils"] }
+
 [dev-dependencies]                                                                                                                                                                                                                                                                                                                                                 
 camino-tempfile = { workspace = true }
 poem = { workspace = true, features = ["test"] }

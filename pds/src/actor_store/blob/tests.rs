@@ -1,10 +1,10 @@
 use super::*;
-use cacos_pds_identity::background::BackgroundQueue;
+use cacos_pds_core::background::BackgroundQueue;
 use cacos_pds_blobstore::BlobStore;
 use cacos_pds_blobstore::BoxedBlobStream;
 use cacos_pds_blobstore::MemoryBlobStore;
 use cacos_pds_blobstore::opendal::OpenDALBlobStore;
-use crate::db::DatabaseKind;
+use cacos_pds_core::db::DatabaseKind;
 use futures::TryStreamExt;
 use lexicon_cid::Cid;
 use rsky_common::ipld::sha256_to_cid;

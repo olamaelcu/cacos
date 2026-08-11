@@ -11,7 +11,7 @@
 //! `DbId`; the store resolves the external TEXT keys to DbIds at the
 //! boundary.
 
-use crate::db::entities::{
+use cacos_pds_core::db::entities::{
     account_device, authorization_request, device, token, used_refresh_token,
 };
 use migration::types::db_id::DbId;
@@ -654,22 +654,22 @@ impl OAuthStore for PdsOAuthStore {
         let authorized_scopes: Vec<&str> = scope.split_ascii_whitespace().collect();
         let data = serde_json::json!({ "authorizedScopes": authorized_scopes }).to_string();
         let did_typed: migration::types::did::Did = did.to_owned().into();
-        let model = crate::db::entities::authorized_client::ActiveModel {
+        let model = cacos_pds_core::db::entities::authorized_client::ActiveModel {
             did: Set(did_typed.clone()),
             client_id: Set(client_id.to_owned()),
             created_at: Set(now),
             updated_at: Set(now),
             data: Set(data),
         };
-        let insert_res = crate::db::entities::authorized_client::Entity::insert(model)
+        let insert_res = cacos_pds_core::db::entities::authorized_client::Entity::insert(model)
             .on_conflict(
                 OnConflict::columns([
-                    crate::db::entities::authorized_client::Column::Did,
-                    crate::db::entities::authorized_client::Column::ClientId,
+                    cacos_pds_core::db::entities::authorized_client::Column::Did,
+                    cacos_pds_core::db::entities::authorized_client::Column::ClientId,
                 ])
                 .update_columns([
-                    crate::db::entities::authorized_client::Column::UpdatedAt,
-                    crate::db::entities::authorized_client::Column::Data,
+                    cacos_pds_core::db::entities::authorized_client::Column::UpdatedAt,
+                    cacos_pds_core::db::entities::authorized_client::Column::Data,
                 ])
                 .to_owned(),
             )
@@ -677,21 +677,21 @@ impl OAuthStore for PdsOAuthStore {
             .await;
         if insert_res.is_err() {
             let new_data = serde_json::json!({ "authorizedScopes": authorized_scopes }).to_string();
-            crate::db::entities::authorized_client::Entity::update_many()
+            cacos_pds_core::db::entities::authorized_client::Entity::update_many()
                 .col_expr(
-                    crate::db::entities::authorized_client::Column::UpdatedAt,
+                    cacos_pds_core::db::entities::authorized_client::Column::UpdatedAt,
                     now.into(),
                 )
                 .col_expr(
-                    crate::db::entities::authorized_client::Column::Data,
+                    cacos_pds_core::db::entities::authorized_client::Column::Data,
                     new_data.into(),
                 )
                 .filter(
-                    crate::db::entities::authorized_client::Column::Did
+                    cacos_pds_core::db::entities::authorized_client::Column::Did
                         .eq(migration::types::did::Did::from(did.to_owned())),
                 )
                 .filter(
-                    crate::db::entities::authorized_client::Column::ClientId
+                    cacos_pds_core::db::entities::authorized_client::Column::ClientId
                         .eq(client_id.to_owned()),
                 )
                 .exec(&self.db)
@@ -707,10 +707,10 @@ impl OAuthStore for PdsOAuthStore {
         client_id: &str,
     ) -> Result<Option<String>, OAuthError> {
         let did_typed: migration::types::did::Did = did.to_owned().into();
-        let row = crate::db::entities::authorized_client::Entity::find()
-            .filter(crate::db::entities::authorized_client::Column::Did.eq(did_typed))
+        let row = cacos_pds_core::db::entities::authorized_client::Entity::find()
+            .filter(cacos_pds_core::db::entities::authorized_client::Column::Did.eq(did_typed))
             .filter(
-                crate::db::entities::authorized_client::Column::ClientId.eq(client_id.to_owned()),
+                cacos_pds_core::db::entities::authorized_client::Column::ClientId.eq(client_id.to_owned()),
             )
             .one(&self.db)
             .await
@@ -738,7 +738,7 @@ impl OAuthStore for PdsOAuthStore {
 /// race return `false` (replay detected), fresh inserts return `true`.
 ///
 /// A background task schedules [`DbBackedReplayStore::prune_expired`]
-/// every five minutes via [`cacos_pds_identity::background::BackgroundQueue`]; the
+/// every five minutes via [`cacos_pds_core::background::BackgroundQueue`]; the
 /// `expires_at` index keeps the prune cheap.
 pub struct DbBackedReplayStore {
     pub db: std::sync::Arc<sea_orm::DatabaseConnection>,
@@ -832,7 +832,7 @@ impl rsky_oauth::ReplayStore for DbBackedReplayStore {
 pub mod helpers {
     use crate::account::AccountManager;
     use crate::account::CreateAccountOpts;
-    use crate::db::DatabaseKind;
+    use cacos_pds_core::db::DatabaseKind;
     use camino::Utf8Path;
     use std::path::PathBuf;
     use std::sync::Once;

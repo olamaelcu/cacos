@@ -4,7 +4,7 @@
 //! `seq_write`) with `timed()` so the stage histogram and the
 //! inter-event timing layer report them.
 
-use crate::observability::timing::timed;
+use cacos_pds_core::observability::timing::timed;
 use crate::xrpc::com::atproto::repo::prepare::{
     PrepareCreateOpts, assert_valid_record, prepare_create, set_collection_name,
 };

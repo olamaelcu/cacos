@@ -36,7 +36,7 @@ pub(crate) fn init_env() {
 pub(crate) async fn test_db() -> (camino_tempfile::Utf8TempDir, DatabaseConnection) {
     init_env();
     let dir = camino_tempfile::Utf8TempDir::new().unwrap();
-    let db = crate::db::DatabaseKind::Account
+    let db = cacos_pds_core::db::DatabaseKind::Account
         .open(dir.path().join("account.sqlite"))
         .await
         .unwrap();

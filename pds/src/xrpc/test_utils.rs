@@ -7,7 +7,7 @@
 use crate::account::AccountManager;
 use crate::actor_store::ActorStore;
 use cacos_pds_blobstore::{BlobStore, BoxedBlobStream, OpenDALBlobStore};
-use crate::config::ServerConfig;
+use cacos_pds_core::config::ServerConfig;
 use crate::context::SharedSequencer;
 use cacos_pds_identity::did_cache::DidSqliteCache;
 use cacos_pds_plc::MockPlcClient;
@@ -64,15 +64,15 @@ pub async fn test_state() -> (SharedState, Vec<tempfile::TempDir>) {
     let dir = tempfile::tempdir().unwrap();
     let actor_dir = tempfile::tempdir().unwrap();
     let blob_dir = tempfile::tempdir().unwrap();
-    let account_db = crate::db::DatabaseKind::Account
+    let account_db = cacos_pds_core::db::DatabaseKind::Account
         .open(camino::Utf8Path::from_path(&dir.path().join("account.sqlite")).unwrap())
         .await
         .unwrap();
-    let sequencer_db = crate::db::DatabaseKind::Sequencer
+    let sequencer_db = cacos_pds_core::db::DatabaseKind::Sequencer
         .open(camino::Utf8Path::from_path(&dir.path().join("sequencer.sqlite")).unwrap())
         .await
         .unwrap();
-    let did_cache_db = crate::db::DatabaseKind::DidCache
+    let did_cache_db = cacos_pds_core::db::DatabaseKind::DidCache
         .open(camino::Utf8Path::from_path(&dir.path().join("did_cache.sqlite")).unwrap())
         .await
         .unwrap();
@@ -91,7 +91,7 @@ pub async fn test_state() -> (SharedState, Vec<tempfile::TempDir>) {
         plc_url: Some("https://plc.test".to_string()),
         did_cache: Some(Arc::new(DidSqliteCache::new(
             did_cache_db,
-            cacos_pds_identity::background::BackgroundQueue::default(),
+            cacos_pds_core::background::BackgroundQueue::default(),
             std::time::Duration::from_secs(60),
             std::time::Duration::from_secs(60 * 60 * 24),
         ))),
@@ -99,26 +99,26 @@ pub async fn test_state() -> (SharedState, Vec<tempfile::TempDir>) {
     });
 
     let config = ServerConfig {
-        service: crate::config::ServiceConfig {
+        service: cacos_pds_core::config::ServiceConfig {
             hostname: "pds.test".to_string(),
             public_url: "https://pds.test".to_string(),
             port: 8080,
         },
-        service_db: crate::config::ServiceDbConfig {
+        service_db: cacos_pds_core::config::ServiceDbConfig {
             account_db_location: path_str(&dir.path().join("account.sqlite")),
             sequencer_db_location: path_str(&dir.path().join("sequencer.sqlite")),
             did_cache_db_location: path_str(&dir.path().join("did_cache.sqlite")),
         },
-        identity: crate::config::IdentityConfig {
+        identity: cacos_pds_core::config::IdentityConfig {
             plc_url: "https://plc.test".to_string(),
             resolver_timeout: 3000,
             service_handle_domains: vec![".test".to_string()],
         },
-        actor_store: crate::actor_store::ActorStoreConfig {
+        actor_store: cacos_pds_core::config::ActorStoreConfig {
             directory: path_str(actor_dir.path()),
             cache_size: 10,
         },
-        blobstore: crate::config::BlobstoreConfig {
+        blobstore: cacos_pds_core::config::BlobstoreConfig {
             disk_location: path_str(blob_dir.path()),
         },
         crawlers: vec![],

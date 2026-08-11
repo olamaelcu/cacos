@@ -3,7 +3,7 @@
 //! Mirrors `rsky_identity::types::DidCache` so the cacos PDS can swap the
 //! in-process `MemoryCache` for a persisted implementation backed by the
 //! `did_cache` SQLite database. Cache writes triggered by stale reads are
-//! dispatched on the [`crate::background::BackgroundQueue`] passed to
+//! dispatched on the [`cacos_pds_core::background::BackgroundQueue`] passed to
 //! [`DidSqliteCache::new`]; cache failures are logged and swallowed so
 //! resolution never depends on the cache being healthy.
 //!
@@ -13,7 +13,7 @@
 //! underlying `did_doc` table stores `OffsetDateTime` via the typed entity
 //! column; the cache converts to/from micros at the boundary.
 
-use crate::background::BackgroundQueue;
+use cacos_pds_core::background::BackgroundQueue;
 use anyhow::Result;
 use migration::entities::did_doc;
 use migration::types::did::Did;

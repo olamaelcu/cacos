@@ -3,10 +3,10 @@ use poem::test::TestClient;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn metrics_endpoint_serves_prometheus_text() {
-    cacos_pds::observability::metrics::init_metrics();
+    cacos_pds_core::observability::metrics::init_metrics();
     counter!("cacos_http_requests_total").increment(1);
 
-    let client = TestClient::new(cacos_pds::observability::http::metrics_route());
+    let client = TestClient::new(cacos_pds_core::observability::http::metrics_route());
     let resp = client.get("/metrics").send().await;
     resp.assert_status_is_ok();
 

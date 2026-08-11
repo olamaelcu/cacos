@@ -5,7 +5,7 @@
 //! `pref: PreferenceReader` is deferred to a later plan and `blob: BlobReader`
 //! lands with the blob-store plan.
 //!
-//! Errors: all app-level fallible APIs return `crate::error::Result<T>` so
+//! Errors: all app-level fallible APIs return `cacos_pds_core::error::Result<T>` so
 //! anyhow-returning helpers from downstream crates get wrapped via
 //! `PdsError::From` (and explicit `PdsError::internal(...)` at site for context).
 
@@ -15,10 +15,11 @@ use crate::actor_store::preference::PreferenceReader;
 use crate::actor_store::record::RecordReader;
 use crate::actor_store::repo::sql_repo::SqlRepoReader;
 use crate::actor_store::repo::types::SyncEvtData;
-use cacos_pds_identity::background::BackgroundQueue;
+use cacos_pds_core::background::BackgroundQueue;
 use cacos_pds_blobstore::{BlobStore, BoxedBlobStream};
-use crate::db::DatabaseKind;
-use crate::error::{PdsError, Result};
+use cacos_pds_core::db::DatabaseKind;
+use cacos_pds_core::error::{PdsError, Result};
+use cacos_pds_core::config::ActorStoreConfig;
 use lexicon_cid::Cid;
 use lru::LruCache;
 use rsky_common;
@@ -126,13 +127,6 @@ async fn load_key(location: &Path) -> Result<Option<Keypair>> {
             anyhow::Error::from(err),
         )),
     }
-}
-
-/// Per-actor storage configuration.
-#[derive(Debug, Clone)]
-pub struct ActorStoreConfig {
-    pub directory: String,
-    pub cache_size: usize,
 }
 
 #[derive(Debug, Clone)]

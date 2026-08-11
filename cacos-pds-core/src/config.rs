@@ -68,7 +68,7 @@ pub struct ServerConfig {
     pub service: ServiceConfig,
     pub service_db: ServiceDbConfig,
     pub identity: IdentityConfig,
-    pub actor_store: crate::actor_store::ActorStoreConfig,
+    pub actor_store: ActorStoreConfig,
     pub blobstore: BlobstoreConfig,
     pub crawlers: Vec<String>,
 }
@@ -125,7 +125,7 @@ pub fn env_to_cfg() -> ServerConfig {
                 })
                 .unwrap_or_default(),
         },
-        actor_store: crate::actor_store::ActorStoreConfig {
+        actor_store: ActorStoreConfig {
             directory: env_or("PDS_ACTOR_STORE_DIRECTORY", "./actors"),
             cache_size: env_or("PDS_ACTOR_STORE_CACHE_SIZE", "100")
                 .parse()
@@ -136,4 +136,12 @@ pub fn env_to_cfg() -> ServerConfig {
         },
         crawlers,
     }
+}
+
+
+/// Per-actor storage configuration.
+#[derive(Debug, Clone)]
+pub struct ActorStoreConfig {
+    pub directory: String,
+    pub cache_size: usize,
 }

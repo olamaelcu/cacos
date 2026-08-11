@@ -8,7 +8,7 @@
 //! `NotFound` when nothing is on disk yet.
 
 use cacos_pds::context::PDS_REPO_SIGNING_KEYPAIR;
-use cacos_pds::error::PdsError;
+use cacos_pds_core::error::PdsError;
 use cacos_pds::xrpc::build_app_with_state;
 use cacos_pds::xrpc::test_utils::{create_test_account, test_state};
 use poem::test::TestClient;

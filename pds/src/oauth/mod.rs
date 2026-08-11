@@ -184,7 +184,7 @@ pub struct OAuthConfig {
 /// sustained traffic, but long enough that the per-tick cost is
 /// negligible against the indexed column.
 fn schedule_dpop_replay_prune(store: Arc<crate::account::oauth_store::DbBackedReplayStore>) {
-    let queue = cacos_pds_identity::background::BackgroundQueue::default();
+    let queue = cacos_pds_core::background::BackgroundQueue::default();
     let store = store.clone();
     queue.add(async move {
         let interval = std::time::Duration::from_secs(5 * 60);
@@ -194,7 +194,7 @@ fn schedule_dpop_replay_prune(store: Arc<crate::account::oauth_store::DbBackedRe
             match store.prune_expired(now).await {
                 Ok(0) => {}
                 Ok(pruned) => {
-                    metrics::counter!(crate::observability::metrics::DPOP_REPLAY_PRUNED_TOTAL)
+                    metrics::counter!(cacos_pds_core::observability::metrics::DPOP_REPLAY_PRUNED_TOTAL)
                         .increment(pruned as u64);
                     tracing::debug!(pruned, "dpop replay rows pruned");
                 }
@@ -218,7 +218,7 @@ fn schedule_dpop_replay_prune(store: Arc<crate::account::oauth_store::DbBackedRe
 /// - `PDS_PUBLIC_URL` (default `http://localhost:8080`): absolute base URL
 ///   used to build DPoP `htu` values and OAuth metadata.
 /// - `PDS_OAUTH_REMOTE_CLIENT_URL` / `PDS_OAUTH_REMOTE_CLIENT_TOKEN`:
-///   headless-consent RemoteClient config (see [`crate::config`]).
+///   headless-consent RemoteClient config (see [`cacos_pds_core::config`]).
 pub fn bootstrap_oauth_app(
     account_db: sea_orm::DatabaseConnection,
     account_manager: crate::account::AccountManager,
@@ -252,7 +252,7 @@ pub fn bootstrap_oauth_app(
     // Publish to the module-level handle so tests can mint tokens against
     // the same provider the resource server registered.
     let _ = REGISTERED_PROVIDER.set(Arc::clone(&provider));
-    let remote_config = crate::config::OAuthRemoteConfig::from_env();
+    let remote_config = cacos_pds_core::config::OAuthRemoteConfig::from_env();
     let remote_create_account: Arc<dyn remote_create_account::RemoteCreateAccount> =
         Arc::new(remote_create_account::ActorStoreRemoteCreateAccount::new(
             account_manager,
@@ -276,7 +276,7 @@ pub fn bootstrap_oauth_app(
 pub fn build_oauth_app(
     shared: SharedOAuthProvider,
     account_db: sea_orm::DatabaseConnection,
-    remote_config: crate::config::OAuthRemoteConfig,
+    remote_config: cacos_pds_core::config::OAuthRemoteConfig,
     public_url: String,
     remote_create_account: Arc<dyn remote_create_account::RemoteCreateAccount>,
 ) -> impl poem::Endpoint<Output = poem::Response> {

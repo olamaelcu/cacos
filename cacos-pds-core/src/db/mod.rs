@@ -69,17 +69,17 @@ impl DatabaseKind {
     }
 }
 
-#[cfg(test)]
-pub(crate) mod tests {
-    use sea_orm::{ConnectionTrait, DatabaseBackend, DatabaseConnection, Statement};
+#[cfg(any(test, feature = "test-utils"))]
+pub mod tests {
+    use sea_orm::DatabaseConnection;
 
-    use super::*;
+    use super::DatabaseKind;
 
     /// Test-only wrapper: an open PDS database with its backing temp dir kept
     /// alive for the lifetime of the value.
-    pub(crate) struct TestDb {
-        pub(crate) db: DatabaseConnection,
-        _dir: camino_tempfile::Utf8TempDir,
+    pub struct TestDb {
+        pub db: DatabaseConnection,
+        pub(crate) _dir: camino_tempfile::Utf8TempDir,
     }
 
     impl std::ops::Deref for TestDb {
@@ -91,7 +91,8 @@ pub(crate) mod tests {
     }
 
     /// Test-only helper: open a `DatabaseKind` into a fresh temporary directory.
-    pub(crate) trait TestDatabaseKind {
+    #[allow(async_fn_in_trait)]
+    pub trait TestDatabaseKind {
         async fn open_test_db(self) -> TestDb;
     }
 
@@ -108,6 +109,14 @@ pub(crate) mod tests {
             TestDb { db, _dir: dir }
         }
     }
+}
+
+#[cfg(test)]
+mod internal_tests {
+    use sea_orm::{ConnectionTrait, DatabaseBackend, DatabaseConnection, Statement};
+
+    use super::tests::TestDatabaseKind;
+    use super::*;
 
     async fn table_names(db: &DatabaseConnection) -> Vec<String> {
         let stmt = Statement::from_string(

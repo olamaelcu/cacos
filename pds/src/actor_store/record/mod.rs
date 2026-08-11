@@ -3,7 +3,7 @@
 //! Uses sea-orm entities (`record`, `backlink`) for declarative queries.
 
 use crate::actor_store::db::{backlink, record};
-use crate::error::{PdsError, Result};
+use cacos_pds_core::error::{PdsError, Result};
 use lexicon_cid::Cid;
 use rsky_repo::storage::Ipld;
 use rsky_repo::types::Lex;
@@ -525,7 +525,7 @@ mod tests {
 
     async fn setup() -> (camino_tempfile::Utf8TempDir, RecordReader, String) {
         let dir = camino_tempfile::Utf8TempDir::new().unwrap();
-        let db = crate::db::DatabaseKind::Actor
+        let db = cacos_pds_core::db::DatabaseKind::Actor
             .open(dir.path().join("store.sqlite"))
             .await
             .unwrap();

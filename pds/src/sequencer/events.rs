@@ -7,8 +7,8 @@
 //! delegates to the git-pinned `rsky-repo` crate so the on-wire and on-disk
 //! formats stay byte-compatible with the reference implementation.
 
-use crate::db::entities::repo_seq;
-use crate::db::types;
+use cacos_pds_core::db::entities::repo_seq;
+use cacos_pds_core::db::types;
 use anyhow::Result;
 use lexicon_cid::Cid;
 use rsky_repo::block_map::BlockMap;

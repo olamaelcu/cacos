@@ -8,7 +8,7 @@
 use crate::account::AccountManager;
 use crate::actor_store::ActorStore;
 use cacos_pds_blobstore::OpenDALBlobStore;
-use crate::config::ServerConfig;
+use cacos_pds_core::config::ServerConfig;
 use crate::context::SharedSequencer;
 use cacos_pds_identity::did_cache::DidSqliteCache;
 use cacos_pds_plc::PlcClient;
@@ -31,15 +31,15 @@ pub struct SharedStateFromEnv;
 
 impl SharedStateFromEnv {
     pub async fn from_env(cfg: &ServerConfig) -> SharedState {
-        let account_db = crate::db::DatabaseKind::Account
+        let account_db = cacos_pds_core::db::DatabaseKind::Account
             .open(camino::Utf8Path::new(&cfg.service_db.account_db_location))
             .await
             .expect("failed to open account database");
-        let sequencer_db = crate::db::DatabaseKind::Sequencer
+        let sequencer_db = cacos_pds_core::db::DatabaseKind::Sequencer
             .open(camino::Utf8Path::new(&cfg.service_db.sequencer_db_location))
             .await
             .expect("failed to open sequencer database");
-        let did_cache_db = crate::db::DatabaseKind::DidCache
+        let did_cache_db = cacos_pds_core::db::DatabaseKind::DidCache
             .open(camino::Utf8Path::new(&cfg.service_db.did_cache_db_location))
             .await
             .expect("failed to open did cache database");
@@ -60,7 +60,7 @@ impl SharedStateFromEnv {
             plc_url: Some(cfg.identity.plc_url.clone()),
             did_cache: Some(Arc::new(DidSqliteCache::new(
                 did_cache_db,
-                cacos_pds_identity::background::BackgroundQueue::default(),
+                cacos_pds_core::background::BackgroundQueue::default(),
                 std::time::Duration::from_secs(60),
                 std::time::Duration::from_secs(60 * 60 * 24),
             ))),

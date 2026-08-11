@@ -5,7 +5,7 @@
 //! sequencer DB if needed, then live-streams from the broadcast channel.
 
 use crate::context::SharedSequencer;
-use crate::db::types::db_id::DbId;
+use cacos_pds_core::db::types::db_id::DbId;
 use crate::sequencer::apalis_worker::SharedBroadcast;
 use crate::sequencer::events::{
     SeqEvt, TypedAccountEvt, TypedCommitEvt, TypedIdentityEvt, TypedSyncEvt,
@@ -420,7 +420,7 @@ mod tests {
 mod tcp_roundtrip_tests {
     use super::subscribe_repos;
     use crate::context::SharedSequencer;
-    use crate::db::DatabaseKind;
+    use cacos_pds_core::db::DatabaseKind;
     use crate::sequencer::Sequencer;
     use crate::sequencer::apalis_worker::{
         SharedBroadcast, connect_jobs_db, spawn_seq_event_worker,

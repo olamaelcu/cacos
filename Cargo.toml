@@ -4,6 +4,7 @@ resolver = "2"
 members = [
     "migration",
     "pds",
+    "cacos-pds-core",                                                                                                                                                                                                                                                                                                                                                 
     "cacos-pds-blobstore",
     "cacos-pds-plc",
     "cacos-pds-identity",

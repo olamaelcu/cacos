@@ -601,7 +601,7 @@ pub async fn validate_access_token(
     scopes: Vec<AuthScope>,
     opts: Option<ValidateAccessTokenOpts>,
 ) -> Result<AccessOutput, AuthError> {
-    crate::observability::timing::timed("auth", async {
+    cacos_pds_core::observability::timing::timed("auth", async {
         validate_access_token_inner(auth_header, scopes, opts).await
     })
     .await
@@ -1287,7 +1287,7 @@ mod tests {
     #[tokio::test]
     #[allow(non_snake_case)]
     async fn validate_access_token_records_auth_stage_timing() {
-        crate::observability::metrics::init_metrics();
+        cacos_pds_core::observability::metrics::init_metrics();
         setup_env();
         let token = sign_token(
             AuthScope::Access,
@@ -1296,7 +1296,7 @@ mod tests {
         );
         let header = format!("Bearer {token}");
         let _ = validate_access_token(Some(&header), vec![AuthScope::Access], None).await;
-        let snapshot = crate::observability::metrics::render();
+        let snapshot = cacos_pds_core::observability::metrics::render();
         assert!(
             snapshot.contains("cacos_timing_seconds_count{stage=\"auth\"}"),
             "expected auth stage sample: {snapshot}"

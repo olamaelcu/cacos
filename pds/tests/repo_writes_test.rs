@@ -8,8 +8,8 @@
 use cacos_pds::auth::auth_verifier::_reset_auth_dependencies_for_tests;
 use cacos_pds::auth::auth_verifier::register_auth_dependencies;
 use cacos_pds::context::PDS_REPO_SIGNING_KEYPAIR;
-use cacos_pds::observability::metrics as obs_metrics;
-use cacos_pds::observability::metrics::TIMING_STAGE_SECONDS;
+use cacos_pds_core::observability::metrics as obs_metrics;
+use cacos_pds_core::observability::metrics::TIMING_STAGE_SECONDS;
 use cacos_pds::xrpc::SharedState;
 use cacos_pds::xrpc::build_app_with_state;
 use cacos_pds::xrpc::test_utils::{create_test_account, test_state};

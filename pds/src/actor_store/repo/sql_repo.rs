@@ -13,7 +13,7 @@
 //! `Send + Sync`.
 
 use crate::actor_store::db::{repo_block, repo_root};
-use crate::error::{PdsError, Result};
+use cacos_pds_core::error::{PdsError, Result};
 use lexicon_cid::Cid;
 use rsky_repo::block_map::{BlockMap, BlocksAndMissing};
 use rsky_repo::cid_set::CidSet;
@@ -31,10 +31,10 @@ pub(crate) fn placeholders(len: usize) -> String {
     vec!["?"; len].join(",")
 }
 
-use crate::observability::metrics::{
+use cacos_pds_core::observability::metrics::{
     ACTOR_CACHE_HITS_TOTAL, ACTOR_CACHE_MISSES_TOTAL, COMMITS_TOTAL,
 };
-use crate::observability::timing::timed;
+use cacos_pds_core::observability::timing::timed;
 
 #[derive(Clone, Debug)]
 pub struct SqlRepoReader {
@@ -519,7 +519,7 @@ impl SqlRepoReader {
                     })?;
                 }
                 metrics::histogram!(
-                    crate::observability::metrics::TIMING_STAGE_SECONDS,
+                    cacos_pds_core::observability::metrics::TIMING_STAGE_SECONDS,
                     "stage" => "actor_root_write"
                 )
                 .record(root_start.elapsed().as_secs_f64());
@@ -543,7 +543,7 @@ impl SqlRepoReader {
                             )
                         })?;
                     metrics::histogram!(
-                        crate::observability::metrics::TIMING_STAGE_SECONDS,
+                        cacos_pds_core::observability::metrics::TIMING_STAGE_SECONDS,
                         "stage" => "actor_blocks_put"
                     )
                     .record(block_start.elapsed().as_secs_f64());
@@ -561,7 +561,7 @@ impl SqlRepoReader {
                             )
                         })?;
                     metrics::histogram!(
-                        crate::observability::metrics::TIMING_STAGE_SECONDS,
+                        cacos_pds_core::observability::metrics::TIMING_STAGE_SECONDS,
                         "stage" => "actor_blocks_delete"
                     )
                     .record(del_start.elapsed().as_secs_f64());
@@ -827,7 +827,7 @@ mod tests {
 
     async fn test_reader() -> (camino_tempfile::Utf8TempDir, SqlRepoReader) {
         let dir = camino_tempfile::Utf8TempDir::new().unwrap();
-        let db = crate::db::DatabaseKind::Actor
+        let db = cacos_pds_core::db::DatabaseKind::Actor
             .open(dir.path().join("store.sqlite"))
             .await
             .unwrap();
@@ -959,7 +959,7 @@ mod tests {
     /// intact.
     #[tokio::test]
     async fn commit_records_stage_timings() {
-        crate::observability::metrics::init_metrics();
+        cacos_pds_core::observability::metrics::init_metrics();
         let (_dir, reader) = test_reader().await;
         let root_cid = cid_for(b"root-stage");
         reader
@@ -982,7 +982,7 @@ mod tests {
         };
         reader.apply_commit(commit, None).await.unwrap();
 
-        let snapshot = crate::observability::metrics::render();
+        let snapshot = cacos_pds_core::observability::metrics::render();
         assert!(
             snapshot.contains("cacos_timing_seconds_count{stage=\"actor_apply_commit\"}"),
             "expected actor_apply_commit stage sample: {snapshot}"
@@ -1009,13 +1009,13 @@ mod tests {
     /// the cache-hit path and the cache-miss path.
     #[tokio::test]
     async fn get_blocks_records_actor_get_blocks_timing() {
-        crate::observability::metrics::init_metrics();
+        cacos_pds_core::observability::metrics::init_metrics();
         let (_dir, reader) = test_reader().await;
         let bytes = b"get-blocks-staged".to_vec();
         let cid = seed_block(&reader, &bytes, "rev-1").await;
         let _ = reader.get_blocks(vec![cid]).await.unwrap();
         let _ = reader.get_blocks(vec![cid]).await.unwrap();
-        let snapshot = crate::observability::metrics::render();
+        let snapshot = cacos_pds_core::observability::metrics::render();
         assert!(
             snapshot.contains("cacos_timing_seconds_count{stage=\"actor_get_blocks\"}"),
             "expected actor_get_blocks stage sample: {snapshot}"

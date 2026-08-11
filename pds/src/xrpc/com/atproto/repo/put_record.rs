@@ -1,6 +1,6 @@
 //! `com.atproto.repo.putRecord` handler.
 
-use crate::observability::timing::timed;
+use cacos_pds_core::observability::timing::timed;
 use crate::xrpc::com::atproto::repo::prepare::{
     PrepareUpdateOpts, prepare_update, set_collection_name,
 };

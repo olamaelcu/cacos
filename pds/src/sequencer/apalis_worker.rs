@@ -9,8 +9,8 @@
 //! apalis dependency churn for what is, at heart, a single broadcast
 //! fan-out. The on-disk schema matches what apalis-sql would create.
 
-use crate::observability::metrics::{SEQ_EVENTS_TOTAL, SEQUENCER_POLL_INTERVAL_SECONDS};
-use crate::observability::timing::timed;
+use cacos_pds_core::observability::metrics::{SEQ_EVENTS_TOTAL, SEQUENCER_POLL_INTERVAL_SECONDS};
+use cacos_pds_core::observability::timing::timed;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -170,8 +170,8 @@ const _CRAWLERS_REF: fn() -> crate::sequencer::Crawlers =
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::DatabaseKind;
-    use crate::db::entities::repo_seq;
+    use cacos_pds_core::db::DatabaseKind;
+    use cacos_pds_core::db::entities::repo_seq;
     use crate::sequencer::events::now_offset;
     use camino_tempfile::Utf8TempDir;
     use sea_orm::EntityTrait;
@@ -179,7 +179,7 @@ mod tests {
 
     #[tokio::test]
     async fn run_seq_event_job_publishes_envelope_to_broadcast() {
-        crate::observability::metrics::init_metrics();
+        cacos_pds_core::observability::metrics::init_metrics();
         let dir = Utf8TempDir::new().unwrap();
         let db_path = dir.path().join("sequencer.sqlite").to_string();
         let pool = connect_jobs_db(&db_path).await.unwrap();
@@ -193,7 +193,7 @@ mod tests {
         run_seq_event_job(job.clone(), &broadcast).await.unwrap();
         let received = rx.recv().await.unwrap();
         assert_eq!(received, job.envelope);
-        let snapshot = crate::observability::metrics::render();
+        let snapshot = cacos_pds_core::observability::metrics::render();
         assert!(
             snapshot.contains("cacos_seq_events_total"),
             "expected SEQ_EVENTS_TOTAL counter: {snapshot}"

@@ -5,8 +5,8 @@
 //! channel and the Stream interface. The consumer `next()`s on a unbuffered
 //! mpsc sender that we feed from the broadcast on a small background task.
 
-use crate::observability::metrics::OUTBOX_BUFFER_LAG;
-use crate::observability::timing::timed;
+use cacos_pds_core::observability::metrics::OUTBOX_BUFFER_LAG;
+use cacos_pds_core::observability::timing::timed;
 use crate::sequencer::Sequencer;
 use crate::sequencer::apalis_worker::SharedBroadcast;
 use crate::sequencer::events::SeqEvt;
@@ -221,14 +221,14 @@ impl Stream for OutboxStream {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::DatabaseKind;
-    use crate::db::tests::TestDatabaseKind;
-    use crate::db::types::did::Did;
+    use cacos_pds_core::db::DatabaseKind;
+    use cacos_pds_core::db::tests::TestDatabaseKind;
+    use cacos_pds_core::db::types::did::Did;
     use crate::sequencer::crawlers::Crawlers;
     use crate::sequencer::events::{RepoSeqNew, now_offset};
     use futures::StreamExt;
 
-    async fn test_sequencer() -> (Sequencer, crate::db::tests::TestDb) {
+    async fn test_sequencer() -> (Sequencer, cacos_pds_core::db::tests::TestDb) {
         let db = DatabaseKind::Sequencer.open_test_db().await;
         let seq = Sequencer::new(
             db.clone(),
@@ -357,8 +357,8 @@ mod tests {
 
     #[tokio::test]
     async fn outbox_lag_gauge_populated_from_backfill() {
-        use crate::observability::metrics::OUTBOX_BUFFER_LAG;
-        crate::observability::metrics::init_metrics();
+        use cacos_pds_core::observability::metrics::OUTBOX_BUFFER_LAG;
+        cacos_pds_core::observability::metrics::init_metrics();
         let (mut seq, _db) = test_sequencer().await;
         let did = "did:plc:lagtest";
         insert_envelope(&mut seq, did, "identity", event_body(did, "identity")).await;
@@ -380,7 +380,7 @@ mod tests {
             .unwrap()
             .unwrap();
 
-        let snapshot = crate::observability::metrics::render();
+        let snapshot = cacos_pds_core::observability::metrics::render();
         // After the consumer has caught up, the gauge should be zero.
         let needle = format!("{} 0", OUTBOX_BUFFER_LAG);
         assert!(

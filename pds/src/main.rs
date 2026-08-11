@@ -8,9 +8,9 @@ async fn main() {
         std::process::exit(1);
     }
 
-    cacos_pds::observability::metrics::init_metrics();
-    let downcaster = cacos_pds::observability::tracing::init_tracing("info");
-    let _timing = cacos_pds::observability::timing::TimingReporter::start(
+    cacos_pds_core::observability::metrics::init_metrics();
+    let downcaster = cacos_pds_core::observability::tracing::init_tracing("info");
+    let _timing = cacos_pds_core::observability::timing::TimingReporter::start(
         Duration::from_secs(10),
         downcaster,
     );
@@ -74,7 +74,7 @@ async fn run_migrate_subcommand(args: &[String]) {
 async fn migrate_rotation_keys() -> anyhow::Result<()> {
     use cacos_pds::xrpc::com::atproto::server::PDS_PLC_ROTATION_KEYPAIR;
 
-    let cfg = cacos_pds::config::env_to_cfg();
+    let cfg = cacos_pds_core::config::env_to_cfg();
     let state = cacos_pds::xrpc::types::SharedStateFromEnv::from_env(&cfg).await;
 
     // Touching the static forces the env var to be parsed up-front; if
@@ -180,7 +180,7 @@ async fn migrate_plc_rotation_keys(dry_run: bool) -> anyhow::Result<()> {
     use cacos_pds_plc::types::{CompatibleOp, CompatibleOpOrTombstone, OpOrTombstone};
     use cacos_pds::xrpc::com::atproto::server::PDS_PLC_ROTATION_KEYPAIR;
 
-    let cfg = cacos_pds::config::env_to_cfg();
+    let cfg = cacos_pds_core::config::env_to_cfg();
     let state = cacos_pds::xrpc::types::SharedStateFromEnv::from_env(&cfg).await;
 
     let dids = state

@@ -177,9 +177,9 @@ impl AccountManager {
         repo::update_root(did, repo_cid, repo_rev, &self.db).await?;
 
         // Metrics (Plan 02 constants; no-ops without a recorder)
-        metrics::counter!(crate::observability::metrics::SIGNUPS_TOTAL).increment(1);
+        metrics::counter!(cacos_pds_core::observability::metrics::SIGNUPS_TOTAL).increment(1);
         if invite_code.is_some() {
-            metrics::counter!(crate::observability::metrics::INVITE_USAGE_TOTAL).increment(1);
+            metrics::counter!(cacos_pds_core::observability::metrics::INVITE_USAGE_TOTAL).increment(1);
         }
         Ok((access_jwt, refresh_jwt))
     }
@@ -298,7 +298,7 @@ impl AccountManager {
         })?;
         let refresh_payload = auth::decode_refresh_token(refresh_jwt.clone())?;
         auth::store_refresh_token(refresh_payload, app_password_name, &self.db).await?;
-        metrics::counter!(crate::observability::metrics::SESSIONS_TOTAL).increment(1);
+        metrics::counter!(cacos_pds_core::observability::metrics::SESSIONS_TOTAL).increment(1);
         Ok((access_jwt, refresh_jwt))
     }
 

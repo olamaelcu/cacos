@@ -8,7 +8,7 @@
 //!
 //! See the [headless-consent design spec](../../docs/superpowers/specs/2026-08-04-headless-oauth-consent-design.md).
 
-use crate::config::OAuthRemoteConfig;
+use cacos_pds_core::config::OAuthRemoteConfig;
 use crate::oauth::remote_create_account::{
     CreateAccountError, CreateAccountInput, RemoteCreateAccount,
 };
@@ -314,7 +314,7 @@ pub async fn request(
     db: Data<&DatabaseConnection>,
 ) -> Result<Json<PagePayload>, poem::Error> {
     let now = now_secs();
-    let fresh = crate::db::consent_state::rotate(&db, &q.rqid, &q.state)
+    let fresh = cacos_pds_core::db::consent_state::rotate(&db, &q.rqid, &q.state)
         .await
         .map_err(|_| {
             poem::Error::from_string("invalid state", poem::http::StatusCode::UNAUTHORIZED)
@@ -354,7 +354,7 @@ pub async fn sign_in(
     db: Data<&DatabaseConnection>,
 ) -> Result<Json<PagePayload>, poem::Error> {
     let now = now_secs();
-    let fresh = crate::db::consent_state::rotate(&db, &b.rqid, &b.state)
+    let fresh = cacos_pds_core::db::consent_state::rotate(&db, &b.rqid, &b.state)
         .await
         .map_err(|_| {
             poem::Error::from_string("invalid state", poem::http::StatusCode::UNAUTHORIZED)
@@ -397,7 +397,7 @@ pub async fn select_account(
     db: Data<&DatabaseConnection>,
 ) -> Result<Json<PagePayload>, poem::Error> {
     let now = now_secs();
-    let fresh = crate::db::consent_state::rotate(&db, &b.rqid, &b.state)
+    let fresh = cacos_pds_core::db::consent_state::rotate(&db, &b.rqid, &b.state)
         .await
         .map_err(|_| {
             poem::Error::from_string("invalid state", poem::http::StatusCode::UNAUTHORIZED)
@@ -429,7 +429,7 @@ pub async fn accept(
     db: Data<&DatabaseConnection>,
 ) -> Result<Json<RedirectPayload>, poem::Error> {
     let now = now_secs();
-    let fresh = crate::db::consent_state::rotate(&db, &b.rqid, &b.state)
+    let fresh = cacos_pds_core::db::consent_state::rotate(&db, &b.rqid, &b.state)
         .await
         .map_err(|_| {
             poem::Error::from_string("invalid state", poem::http::StatusCode::UNAUTHORIZED)
@@ -444,7 +444,7 @@ pub async fn accept(
         .accept(&client_id, &request_uri, &b.device_id, &b.did, now)
         .await
         .map_err(oauth_error_to_poem)?;
-    let _ = crate::db::consent_state::delete(&db, &b.rqid).await;
+    let _ = cacos_pds_core::db::consent_state::delete(&db, &b.rqid).await;
     Ok(Json(RedirectPayload { redirect_url: url }))
 }
 
@@ -456,7 +456,7 @@ pub async fn reject(
     db: Data<&DatabaseConnection>,
 ) -> Result<Json<RedirectPayload>, poem::Error> {
     let now = now_secs();
-    let _fresh = crate::db::consent_state::rotate(&db, &b.rqid, &b.state)
+    let _fresh = cacos_pds_core::db::consent_state::rotate(&db, &b.rqid, &b.state)
         .await
         .map_err(|_| {
             poem::Error::from_string("invalid state", poem::http::StatusCode::UNAUTHORIZED)
@@ -470,7 +470,7 @@ pub async fn reject(
         .reject(&client_id, &request_uri, &b.device_id, now)
         .await
         .map_err(oauth_error_to_poem)?;
-    let _ = crate::db::consent_state::delete(&db, &b.rqid).await;
+    let _ = cacos_pds_core::db::consent_state::delete(&db, &b.rqid).await;
     Ok(Json(RedirectPayload { redirect_url: url }))
 }
 
@@ -483,7 +483,7 @@ pub async fn create_account(
     impl_: Data<&Arc<dyn RemoteCreateAccount>>,
 ) -> Result<Json<PagePayload>, poem::Error> {
     let now = now_secs();
-    let fresh = crate::db::consent_state::rotate(&db, &b.rqid, &b.state)
+    let fresh = cacos_pds_core::db::consent_state::rotate(&db, &b.rqid, &b.state)
         .await
         .map_err(|_| {
             poem::Error::from_string("invalid state", poem::http::StatusCode::UNAUTHORIZED)
@@ -529,7 +529,7 @@ pub async fn create_account(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::DatabaseKind;
+    use cacos_pds_core::db::DatabaseKind;
     use poem::EndpointExt;
     use poem::test::TestClient;
     use rsky_oauth::store::MemoryOAuthStore;

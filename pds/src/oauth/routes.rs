@@ -7,8 +7,8 @@
 //! pre-validation per the OIDC spec.
 
 use super::{SharedOAuthProvider, now_secs};
-use crate::config::OAuthRemoteConfig;
-use crate::db;
+use cacos_pds_core::config::OAuthRemoteConfig;
+use cacos_pds_core::db;
 use poem::web::{Data, Form};
 use poem::{Request, Response};
 use rsky_oauth::client::ParRequest;
@@ -395,8 +395,8 @@ pub fn oauth_routes() -> poem::Route {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::OAuthRemoteConfig;
-    use crate::db::DatabaseKind;
+    use cacos_pds_core::config::OAuthRemoteConfig;
+    use cacos_pds_core::db::DatabaseKind;
     use poem::EndpointExt;
     use poem::test::TestClient;
     use sea_orm::EntityTrait;
@@ -438,7 +438,7 @@ mod tests {
         resp.assert_status(poem::http::StatusCode::FOUND);
         // We can't read headers easily; just assert a location redirect by
         // the status code. The consent_state row is created.
-        let rows = crate::db::entities::consent_state::Entity::find()
+        let rows = cacos_pds_core::db::entities::consent_state::Entity::find()
             .all(&db)
             .await
             .unwrap();

@@ -45,29 +45,12 @@ use rand::RngCore;
 
 use crate::{BlobNotFoundError, BlobStore, BoxedBlobStream};
 
+use cacos_pds_core::observability::metrics::{BLOB_GET_BYTES, BLOB_OPS_TOTAL, BLOB_PUT_BYTES};
+use cacos_pds_core::observability::timing::timed;
+
 /// Chunk size for `delete_many` error counting. OpenDAL batches deletes
 /// server-side for S3; for local FS each call is one syscall.
 const DELETE_MANY_CHUNK_SIZE: usize = 500;
-
-/// Metric name registered with the `metrics` facade for each blobstore
-/// operation. The host process's Prometheus recorder is responsible
-/// for emitting samples with HELP lines; this crate does not install a
-/// recorder itself. The constant strings here must match the names
-/// used by the PDS observability module's `describe()` calls.
-pub const BLOB_OPS_TOTAL: &str = "cacos_blob_ops_total";
-pub const BLOB_PUT_BYTES: &str = "cacos_blob_put_bytes";
-pub const BLOB_GET_BYTES: &str = "cacos_blob_get_bytes";
-
-/// Local stub for the PDS-level `timed()` helper. The full PDS
-/// observability integration (tracing-timing percentiles, the
-/// `cacos.stage` span, stage histograms) lives in the caller; here we
-/// only need the wrapped future's output preserved. The blobstore
-/// still emits per-operation counters and byte-size histograms via
-/// the `metrics` facade, so those metrics are visible to whatever
-/// recorder the host process installs.
-async fn timed<T>(_stage: &'static str, fut: impl std::future::Future<Output = T>) -> T {
-    fut.await
-}
 
 /// Per-DID handle over a shared OpenDAL [`Operator`](opendal::Operator).
 ///

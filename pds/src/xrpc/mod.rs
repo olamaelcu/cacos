@@ -25,7 +25,7 @@ pub use error::{ApiError, ApiResult, ErrorBody};
 use crate::account::AccountManager;
 use crate::actor_store::ActorStore;
 use cacos_pds_blobstore::{BlobStore, BoxedBlobStream};
-use crate::config::ServerConfig;
+use cacos_pds_core::config::ServerConfig;
 use crate::context::SharedSequencer;
 use cacos_pds_plc::PlcClient;
 use crate::sequencer::apalis_worker::SharedBroadcast;
@@ -101,13 +101,13 @@ pub async fn build_app_with_state(
     // entry that would conflict with the OAuth nest below.
     base = base.at(
         "/metrics",
-        poem::get(crate::observability::http::metrics_handler),
+        poem::get(cacos_pds_core::observability::http::metrics_handler),
     );
 
     if std::env::var("PDS_JWT_KEY_K256_PRIVATE_KEY_HEX").is_ok() {
         let db_path =
             std::env::var("PDS_DB_PATH").unwrap_or_else(|_| "./account.sqlite".to_string());
-        let oauth_app = match crate::db::DatabaseKind::Account
+        let oauth_app = match cacos_pds_core::db::DatabaseKind::Account
             .open(camino::Utf8Path::new(&db_path))
             .await
         {
@@ -142,7 +142,7 @@ pub async fn build_app_with_state(
 /// Builds the app from environment-derived state. Convenience wrapper
 /// used by `main.rs` and existing integration tests.
 pub async fn build_app() -> impl poem::Endpoint<Output = poem::Response> {
-    let cfg = crate::config::env_to_cfg();
+    let cfg = cacos_pds_core::config::env_to_cfg();
     let state = types::SharedStateFromEnv::from_env(&cfg).await;
     build_app_with_state(state).await
 }

@@ -791,6 +791,7 @@ dependencies = [
  "cacos-migration",
  "cacos-pds",
  "cacos-pds-blobstore",
+ "cacos-pds-core",
  "cacos-pds-handle",
  "cacos-pds-identity",
  "cacos-pds-mailer",
@@ -858,6 +859,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bytes",
+ "cacos-pds-core",
  "camino-tempfile",
  "cid",
  "futures",
@@ -870,6 +872,37 @@ dependencies = [
  "sha2 0.10.9",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "cacos-pds-core"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "base64ct",
+ "cacos-migration",
+ "camino",
+ "camino-tempfile",
+ "cid",
+ "futures",
+ "metrics",
+ "metrics-exporter-prometheus",
+ "metrics-tracing-context",
+ "miette 7.6.0",
+ "poem",
+ "rand 0.8.7",
+ "rsky-common",
+ "sea-orm",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.19",
+ "time",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "tracing-timing",
+ "tracing-unwrap",
 ]
 
 [[package]]
@@ -889,6 +922,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "cacos-migration",
+ "cacos-pds-core",
  "camino-tempfile",
  "rsky-identity",
  "sea-orm",

@@ -10,7 +10,7 @@ use sea_orm::DatabaseConnection;
 
 /// Re-export `DatabaseKind` so callers can do
 /// `crate::actor_store::db::DatabaseKind::Actor.open(path)`.
-pub use crate::db::DatabaseKind;
+pub use cacos_pds_core::db::DatabaseKind;
 
 /// The per-actor database handle. A named alias over
 /// `sea_orm::DatabaseConnection` for readability.
@@ -20,7 +20,7 @@ pub type ActorDb = DatabaseConnection;
 // Models replace the plan's private row structs (`RepoBlock`, `Record`,
 // `Backlink`); every query that previously mapped a row struct now uses
 // `repo_block::Model` / `record::Model` / `backlink::Model` directly.
-pub use crate::db::entities::{account_pref, backlink, record, repo_block, repo_root};
+pub use cacos_pds_core::db::entities::{account_pref, backlink, record, repo_block, repo_root};
 
 #[cfg(test)]
 mod tests {

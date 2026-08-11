@@ -4,7 +4,7 @@
 //! `prepare_*` helper, then writes all of them in a single repo
 //! transaction so `seq_write` coincides with one commit.
 
-use crate::observability::timing::timed;
+use cacos_pds_core::observability::timing::timed;
 use crate::xrpc::com::atproto::repo::prepare::{
     PrepareCreateOpts, PrepareDeleteOpts, PrepareUpdateOpts, prepare_create, prepare_delete,
     prepare_update,

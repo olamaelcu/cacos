@@ -12,8 +12,8 @@
 
 use base64::Engine;
 use cacos_pds::account::oauth_store::DbBackedReplayStore;
-use cacos_pds::config::OAuthRemoteConfig;
-use cacos_pds::db::DatabaseKind;
+use cacos_pds_core::config::OAuthRemoteConfig;
+use cacos_pds_core::db::DatabaseKind;
 use cacos_pds::oauth::remote_create_account::MockRemoteCreateAccount;
 use cacos_pds::oauth::{SharedOAuthProvider, build_oauth_app, registered_provider};
 use cacos_pds_plc::{HttpPlcClient, PlcClient};

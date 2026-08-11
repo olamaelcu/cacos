@@ -3,7 +3,7 @@
 //! `RequestMetrics` is a poem [`Middleware`] that records request count,
 //! error count, and duration histograms keyed by the request's NSID (the
 //! full URL path under `/xrpc/`). The `/metrics` route itself is owned by
-//! the observability plan ([`crate::observability::http::metrics_route`])
+//! the observability plan ([`cacos_pds_core::observability::http::metrics_route`])
 //! and re-exported here for route assembly.
 
 use poem::middleware::Middleware;
@@ -51,5 +51,5 @@ impl<E: Endpoint> Endpoint for RequestMetricsEndpoint<E> {
 /// Mount the `/metrics` route on a fresh poem [`poem::Route`]. Owned by
 /// Plan 02; this module only contributes the request-middleware metrics.
 pub fn metrics_routes() -> poem::Route {
-    crate::observability::http::metrics_route()
+    cacos_pds_core::observability::http::metrics_route()
 }

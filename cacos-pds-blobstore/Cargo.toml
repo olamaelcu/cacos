@@ -28,7 +28,10 @@ hex = "0.4"
 # --- CID type from the atproto ecosystem ---
 lexicon_cid = { workspace = true }
 
-[dev-dependencies]
+# --- Step 2: observability constants + timing helper now come from core ---
+cacos-pds-core = { path = "../cacos-pds-core" }
+
+[dev-dependencies]                                                                                                                                                                                                                                                                                                                                                 
 tokio = { workspace = true }
 rsky-common = { workspace = true }
 sha2 = { workspace = true }

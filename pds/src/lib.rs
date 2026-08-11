@@ -14,13 +14,8 @@
 pub mod account;
 pub mod actor_store;
 pub mod auth;
-pub mod background;
-pub mod config;
 pub mod context;
-pub mod db;
-pub mod error;
 pub mod oauth;
-pub mod observability;
 pub mod sequencer;
 pub mod xrpc;
                                                                                                                                                                                                                                                                                                                                                  

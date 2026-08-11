@@ -4,7 +4,7 @@
 //! (one DID per actor DB), so `put` upserts by name.
 
 use crate::actor_store::db::account_pref;
-use crate::error::{PdsError, Result};
+use cacos_pds_core::error::{PdsError, Result};
 use sea_orm::{
     ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, Set,
     sea_query::OnConflict,
@@ -78,7 +78,7 @@ mod tests {
 
     async fn setup() -> (camino_tempfile::Utf8TempDir, PreferenceReader) {
         let dir = camino_tempfile::Utf8TempDir::new().unwrap();
-        let db = crate::db::DatabaseKind::Actor
+        let db = cacos_pds_core::db::DatabaseKind::Actor
             .open(dir.path().join("store.sqlite"))
             .await
             .unwrap();

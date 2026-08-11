@@ -15,11 +15,11 @@ pub mod events;
 pub mod outbox;
 pub mod ws_frames;
 
-use crate::db::entities::repo_seq;
-use crate::db::types::db_id::DbId;
-use crate::error::PdsError;
+use cacos_pds_core::db::entities::repo_seq;
+use cacos_pds_core::db::types::db_id::DbId;
+use cacos_pds_core::error::PdsError;
 
-use crate::observability::timing::timed;
+use cacos_pds_core::observability::timing::timed;
 use crate::sequencer::apalis_worker::{SeqEventJob, enqueue_seq_event_job};
 use crate::sequencer::crawlers::Crawlers;
 use crate::sequencer::events::{
@@ -218,7 +218,7 @@ impl Sequencer {
                 tracing::warn!("failed to push seq event job: {err}");
             }
         }
-        metrics::gauge!(crate::observability::metrics::LAST_SEQ,).set(seq.0.timestamp_ms() as f64);
+        metrics::gauge!(cacos_pds_core::observability::metrics::LAST_SEQ,).set(seq.0.timestamp_ms() as f64);
         Ok(seq)
     }
 
@@ -370,8 +370,8 @@ fn _sqlx_pool_marker(_: &SqlitePool) {}
 #[cfg(test)]
 pub(crate) mod test_util {
     use super::*;
-    use crate::db::DatabaseKind;
-    use crate::db::tests::TestDatabaseKind;
+    use cacos_pds_core::db::DatabaseKind;
+    use cacos_pds_core::db::tests::TestDatabaseKind;
     use crate::sequencer::crawlers::Crawlers;
 
     pub async fn _test_sequencer() -> Sequencer {
@@ -388,14 +388,14 @@ pub(crate) mod test_util {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::DatabaseKind;
-    use crate::db::tests::TestDatabaseKind;
-    use crate::db::types::did::Did;
+    use cacos_pds_core::db::DatabaseKind;
+    use cacos_pds_core::db::tests::TestDatabaseKind;
+    use cacos_pds_core::db::types::did::Did;
     use crate::sequencer::crawlers::Crawlers;
     use crate::sequencer::events::{CommitEvt, now_offset};
     use sea_orm::EntityTrait;
 
-    pub(crate) async fn test_sequencer() -> (Sequencer, crate::db::tests::TestDb) {
+    pub(crate) async fn test_sequencer() -> (Sequencer, cacos_pds_core::db::tests::TestDb) {
         let db = DatabaseKind::Sequencer.open_test_db().await;
         let seq = Sequencer::new(
             db.clone(),
@@ -485,7 +485,7 @@ mod tests {
 
     #[tokio::test]
     async fn request_seq_range_records_seq_poll_timing() {
-        crate::observability::metrics::init_metrics();
+        cacos_pds_core::observability::metrics::init_metrics();
         let (mut seq, _db) = test_sequencer().await;
         let did = Did::from("did:plc:seqpoll".to_string());
         let evt = RepoSeqNew::new(
@@ -508,7 +508,7 @@ mod tests {
             })
             .await
             .unwrap();
-        let snapshot = crate::observability::metrics::render();
+        let snapshot = cacos_pds_core::observability::metrics::render();
         let needle = "cacos_timing_seconds_count{stage=\"seq_poll\"}";
         assert!(
             snapshot.contains(needle),
