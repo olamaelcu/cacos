@@ -20,7 +20,7 @@ pub enum RepoHelperError {
     /// A retry attempted to write a `rev` that is strictly less than the
     /// already-persisted one. The persisted rev is the winner, and the
     /// loser's write was rejected so it cannot clobber state.
-    #[error("RevRegression: existing rev `{existing}` rejected attempted `{attempted}`")]
+    #[error("RevRegression: attempted `{attempted}` rejected by existing `{existing}`")]
     RevRegression { existing: String, attempted: String },
 }
 
@@ -73,6 +73,7 @@ pub async fn update_root(
         }
     };
 
+    // TODO: explicit rollback on execute_raw failure — matches delete_account's pre-existing pattern.
     tx.execute_raw(sql(sql_text, values)).await?;
     tx.commit().await?;
     Ok(())

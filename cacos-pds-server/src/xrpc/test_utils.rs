@@ -199,12 +199,19 @@ async fn read_repo_root(
         "SELECT cid, rev FROM repo_root WHERE did = ?1",
         vec![Value::from(did.to_owned())],
     );
-    let row: QueryResult = match state.account_manager.db.query_one_raw(stmt).await {
-        Ok(Some(r)) => r,
-        _ => return None,
-    };
-    let cid_str: String = row.try_get_by_index(0).ok()?;
-    let rev: String = row.try_get_by_index(1).ok()?;
+    let row: Option<QueryResult> = state
+        .account_manager
+        .db
+        .query_one_raw(stmt)
+        .await
+        .expect("read_repo_root: query repo_root");
+    let row = row?;
+    let cid_str: String = row
+        .try_get_by_index(0)
+        .expect("read_repo_root: cid column");
+    let rev: String = row
+        .try_get_by_index(1)
+        .expect("read_repo_root: rev column");
     let cid = lexicon_cid::Cid::from_str(&cid_str).ok()?;
     Some((cid, rev))
 }
