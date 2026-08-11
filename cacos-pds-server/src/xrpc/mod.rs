@@ -14,7 +14,7 @@ pub mod cors;
 pub mod error;
 pub mod health;
 pub mod metrics;
-// `rate_limit` moved to cacos-pds-oauth in Step 5.
+// `rate_limit` moved to cacos-pds-oauth.
 #[cfg(any(test, feature = "test-utils"))]
 pub mod test_utils;
 pub mod types;

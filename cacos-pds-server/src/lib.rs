@@ -13,7 +13,8 @@
 //!             bin targets (cacos-pds-server, cacos-pds-migrate — planned)
 //! ```
 //!
-//! Higher-layer crates (planned binaries in Step 7/8) import from this crate;
+//! Higher-layer binaries (`cacos-pds-server`, `cacos-pds-migrate`) link
+//! against this crate;
 //! this crate does not import from them.
 
 pub mod xrpc;

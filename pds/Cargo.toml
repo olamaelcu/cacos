@@ -107,23 +107,23 @@ zeroize = "1"
 # --- rate limiting (per-IP token bucket for sensitive endpoints) ---
 governor = "0.6"
 
-# --- Step 1 extraction: leaf crates pulled out of cacos-pds ---
+# --- Workspace siblings that host the atproto-specific code extracted from pds ---
 cacos-pds-blobstore = { path = "../cacos-pds-blobstore" }
 cacos-pds-plc = { path = "../cacos-pds-plc", features = ["test-utils"] }
 cacos-pds-identity = { path = "../cacos-pds-identity" }
 cacos-pds-handle = { path = "../cacos-pds-handle" }
 cacos-pds-mailer = { path = "../cacos-pds-mailer" }
 
-# --- Step 2 extraction: foundation crate (error, config, observability, db, background) ---
+# Foundation crate (error, config, observability, db, background)
 cacos-pds-core = { path = "../cacos-pds-core", features = ["test-utils"] }
-# --- Step 3 extraction: account manager + auth verifier (split into 5 submodules) ---
+# Account manager + auth verifier (split into 5 submodules)
 cacos-pds-account = { path = "../cacos-pds-account" }
-# --- Step 4 extraction: per-DID storage + firehose sequencer ---
+# Per-DID storage + firehose sequencer
 cacos-pds-actor-store = { path = "../cacos-pds-actor-store" }
 cacos-pds-sequencer = { path = "../cacos-pds-sequencer" }
-# --- Step 5 extraction: OAuth provider, remote API, rate-limit middleware ---
+# OAuth provider, remote API, rate-limit middleware
 cacos-pds-oauth = { path = "../cacos-pds-oauth", features = ["test-utils"] }
-# --- Step 6 extraction: XRPC handlers + auth_extractors + poem middleware ---
+# XRPC handlers + auth_extractors + poem middleware
 cacos-pds-server = { path = "../cacos-pds-server", features = ["test-utils"] }
 
 [dev-dependencies]                                                                                                                                                                                                                                                                                                                                                 

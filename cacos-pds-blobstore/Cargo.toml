@@ -28,7 +28,7 @@ hex = "0.4"
 # --- CID type from the atproto ecosystem ---
 lexicon_cid = { workspace = true }
 
-# --- Step 2: observability constants + timing helper now come from core ---
+# Observability constants + timing helper come from cacos-pds-core
 cacos-pds-core = { path = "../cacos-pds-core" }
 
 [dev-dependencies]                                                                                                                                                                                                                                                                                                                                                 
