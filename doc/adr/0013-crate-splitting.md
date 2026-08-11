@@ -53,11 +53,11 @@ ones; lower ones never reach upward. Reverse edges (e.g. server
 importing from actor-store importing from server) are impossible at
 the Cargo resolver level.
 
-The split landed across nine sequential merge commits
-(`Step 1` … `Step 8 + 9`), each independently green against the four
-project-rule verification gates (`cargo build`, `--lib` test,
-`--tests` integration test, `cargo clippy -D warnings`). The bin
-target that previously lived in `pds/src/main.rs` was split into two
+The split landed across nine sequential merge commits, each
+independently green against the four project-rule verification gates
+(`cargo build`, `--lib` test, `--tests` integration test,
+`cargo clippy -D warnings`). The bin target that previously lived
+in `pds/src/main.rs` was split into two
 binaries:
 
 - `cacos-pds-server` (HTTP daemon on `127.0.0.1:8080`), as the
@@ -147,7 +147,7 @@ Harder:
   per-crate `.gitignore`; the dedicated `Stop ignoring Cargo.lock`
   commit reversed those lines.
 - **`SharedSequencer` is still in `pds/src/context.rs`.** It has its
-  canonical home in `cacos-pds-sequencer::shared_sequencer`
-  (Step 4) but `pds/src/context` remains as a thin `pub mod context;`
-  shim for any callers that still reference `crate::context`. A
-  follow-up commit will retire it once every caller is rewired.
+  canonical home in `cacos-pds-sequencer::shared_sequencer` but
+  `pds/src/context` remains as a thin `pub mod context;` shim for any
+  callers that still reference `crate::context`. A follow-up commit
+  will retire it once every caller is rewired.
