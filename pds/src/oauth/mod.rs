@@ -184,7 +184,7 @@ pub struct OAuthConfig {
 /// sustained traffic, but long enough that the per-tick cost is
 /// negligible against the indexed column.
 fn schedule_dpop_replay_prune(store: Arc<crate::account::oauth_store::DbBackedReplayStore>) {
-    let queue = crate::background::BackgroundQueue::default();
+    let queue = cacos_pds_identity::background::BackgroundQueue::default();
     let store = store.clone();
     queue.add(async move {
         let interval = std::time::Duration::from_secs(5 * 60);
@@ -223,7 +223,7 @@ pub fn bootstrap_oauth_app(
     account_db: sea_orm::DatabaseConnection,
     account_manager: crate::account::AccountManager,
     actor_store: std::sync::Arc<crate::actor_store::ActorStore>,
-    plc_client: std::sync::Arc<dyn crate::plc::PlcClient>,
+    plc_client: std::sync::Arc<dyn cacos_pds_plc::PlcClient>,
 ) -> Option<OAuthBootstrap<impl poem::Endpoint<Output = poem::Response>>> {
     if std::env::var("PDS_JWT_KEY_K256_PRIVATE_KEY_HEX").is_err() {
         return None;

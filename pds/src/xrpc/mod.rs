@@ -24,10 +24,10 @@ pub use error::{ApiError, ApiResult, ErrorBody};
 
 use crate::account::AccountManager;
 use crate::actor_store::ActorStore;
-use crate::blobstore::{BlobStore, BoxedBlobStream};
+use cacos_pds_blobstore::{BlobStore, BoxedBlobStream};
 use crate::config::ServerConfig;
 use crate::context::SharedSequencer;
-use crate::plc::PlcClient;
+use cacos_pds_plc::PlcClient;
 use crate::sequencer::apalis_worker::SharedBroadcast;
 use cors::CorsPolicy;
 use poem::http::Method;

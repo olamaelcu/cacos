@@ -52,7 +52,7 @@ pub struct IdentityConfig {
 }
 
 /// Per-actor blob store configuration. The blobstore is built once at
-/// process startup (`crate::blobstore::init_operator`) and the per-DID
+/// process startup (`cacos_pds_blobstore::init_operator`) and the per-DID
 /// handle is handed out at actor construction time; `disk_location`
 /// captures the filesystem backend root (when S3 is not configured).
 #[derive(Debug, Clone)]

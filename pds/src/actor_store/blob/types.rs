@@ -1,8 +1,8 @@
 //! Shared types and row-mapping helpers for the blob module.
 
 use crate::actor_store::db::ActorDb;
-use crate::background::BackgroundQueue;
-use crate::blobstore::{BlobStore, BoxedBlobStream};
+use cacos_pds_identity::background::BackgroundQueue;
+use cacos_pds_blobstore::{BlobStore, BoxedBlobStream};
 use anyhow::Result;
 use lexicon_cid::Cid;
 use sea_orm::QueryResult;

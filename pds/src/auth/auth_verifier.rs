@@ -12,7 +12,7 @@
 //!    (which expects digest semantics). The previous port re-base64-encoded
 //!    the signature and passed the raw signing input.
 //! 4. `did_cache` timestamps are reported in **microseconds** to match
-//!    `rsky_identity::MemoryCache`; see `crate::identity::did_cache`.
+//!    `rsky_identity::MemoryCache`; see `cacos_pds_identity::did_cache`.
 //!
 //! Plus `is_user_or_admin` matches on `r#type == "admin_token"`, not on
 //!    `did`, so the admin guard works as documented.

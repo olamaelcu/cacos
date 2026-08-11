@@ -738,7 +738,7 @@ impl OAuthStore for PdsOAuthStore {
 /// race return `false` (replay detected), fresh inserts return `true`.
 ///
 /// A background task schedules [`DbBackedReplayStore::prune_expired`]
-/// every five minutes via [`crate::background::BackgroundQueue`]; the
+/// every five minutes via [`cacos_pds_identity::background::BackgroundQueue`]; the
 /// `expires_at` index keeps the prune cheap.
 pub struct DbBackedReplayStore {
     pub db: std::sync::Arc<sea_orm::DatabaseConnection>,

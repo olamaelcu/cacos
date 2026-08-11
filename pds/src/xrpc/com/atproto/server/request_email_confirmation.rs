@@ -1,7 +1,7 @@
 use crate::account::EmailTokenPurpose;
 use crate::account::helpers::account::AvailabilityFlags;
-use crate::mailer;
-use crate::mailer::TokenParam;
+use cacos_pds_mailer;
+use cacos_pds_mailer::TokenParam;
 use crate::xrpc::auth_extractors::AccessFull;
 use crate::xrpc::{ApiError, ApiResult, SharedState};
 use poem::web::Data;
@@ -29,7 +29,7 @@ async fn inner_request_email_confirmation(
                 .create_email_token(&did, EmailTokenPurpose::ConfirmEmail)
                 .await
                 .map_err(|_| ApiError::RuntimeError)?;
-            mailer::send_confirm_email(email, TokenParam { token })
+            cacos_pds_mailer::send_confirm_email(email, TokenParam { token })
                 .await
                 .map_err(|_| ApiError::RuntimeError)?;
             Ok(())

@@ -44,14 +44,14 @@ pub struct ActorStoreRemoteCreateAccount {
     #[allow(dead_code)]
     pub actor_store: Arc<crate::actor_store::ActorStore>,
     #[allow(dead_code)]
-    pub plc_client: Arc<dyn crate::plc::PlcClient>,
+    pub plc_client: Arc<dyn cacos_pds_plc::PlcClient>,
 }
 
 impl ActorStoreRemoteCreateAccount {
     pub fn new(
         account_manager: crate::account::AccountManager,
         actor_store: Arc<crate::actor_store::ActorStore>,
-        plc_client: Arc<dyn crate::plc::PlcClient>,
+        plc_client: Arc<dyn cacos_pds_plc::PlcClient>,
     ) -> Self {
         Self {
             account_manager: Arc::new(account_manager),

@@ -7,11 +7,11 @@
 
 use crate::account::AccountManager;
 use crate::actor_store::ActorStore;
-use crate::blobstore::OpenDALBlobStore;
+use cacos_pds_blobstore::OpenDALBlobStore;
 use crate::config::ServerConfig;
 use crate::context::SharedSequencer;
-use crate::identity::did_cache::DidSqliteCache;
-use crate::plc::PlcClient;
+use cacos_pds_identity::did_cache::DidSqliteCache;
+use cacos_pds_plc::PlcClient;
 use crate::sequencer::crawlers::Crawlers;
 use crate::xrpc::SharedState;
 use rsky_identity::IdResolver;
@@ -60,7 +60,7 @@ impl SharedStateFromEnv {
             plc_url: Some(cfg.identity.plc_url.clone()),
             did_cache: Some(Arc::new(DidSqliteCache::new(
                 did_cache_db,
-                crate::background::BackgroundQueue::default(),
+                cacos_pds_identity::background::BackgroundQueue::default(),
                 std::time::Duration::from_secs(60),
                 std::time::Duration::from_secs(60 * 60 * 24),
             ))),
@@ -68,7 +68,7 @@ impl SharedStateFromEnv {
         });
         let actor_store = Arc::new(ActorStore::new(&cfg.actor_store));
         let blobstore: Arc<
-            dyn crate::blobstore::BlobStore<Stream = crate::blobstore::BoxedBlobStream>,
+            dyn cacos_pds_blobstore::BlobStore<Stream = cacos_pds_blobstore::BoxedBlobStream>,
         > = Arc::new(
             OpenDALBlobStore::new_disk(
                 std::path::Path::new(&cfg.blobstore.disk_location),
@@ -76,7 +76,8 @@ impl SharedStateFromEnv {
             )
             .expect("build shared blobstore"),
         );
-        let plc_client: Arc<dyn PlcClient> = crate::plc::plc_client_from_env(cfg);
+        let plc_client: Arc<dyn PlcClient> =
+            cacos_pds_plc::plc_client_from_env(&cfg.identity.plc_url);
 
         crate::auth::auth_verifier::register_auth_dependencies(
             Arc::new(account_manager.clone()),

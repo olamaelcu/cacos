@@ -6,11 +6,11 @@
 
 use crate::account::AccountManager;
 use crate::actor_store::ActorStore;
-use crate::blobstore::{BlobStore, BoxedBlobStream, OpenDALBlobStore};
+use cacos_pds_blobstore::{BlobStore, BoxedBlobStream, OpenDALBlobStore};
 use crate::config::ServerConfig;
 use crate::context::SharedSequencer;
-use crate::identity::did_cache::DidSqliteCache;
-use crate::plc::MockPlcClient;
+use cacos_pds_identity::did_cache::DidSqliteCache;
+use cacos_pds_plc::MockPlcClient;
 use crate::sequencer::crawlers::Crawlers;
 use crate::sequencer::{Sequencer, apalis_worker::SharedBroadcast};
 use crate::xrpc::SharedState;
@@ -91,7 +91,7 @@ pub async fn test_state() -> (SharedState, Vec<tempfile::TempDir>) {
         plc_url: Some("https://plc.test".to_string()),
         did_cache: Some(Arc::new(DidSqliteCache::new(
             did_cache_db,
-            crate::background::BackgroundQueue::default(),
+            cacos_pds_identity::background::BackgroundQueue::default(),
             std::time::Duration::from_secs(60),
             std::time::Duration::from_secs(60 * 60 * 24),
         ))),
@@ -127,7 +127,7 @@ pub async fn test_state() -> (SharedState, Vec<tempfile::TempDir>) {
     let actor_store = Arc::new(ActorStore::new(&config.actor_store));
     let blobstore: Arc<dyn BlobStore<Stream = BoxedBlobStream>> =
         Arc::new(OpenDALBlobStore::new_disk(blob_dir.path(), "shared").expect("build blobstore"));
-    let plc_client: Arc<dyn crate::plc::PlcClient> = Arc::new(MockPlcClient::default());
+    let plc_client: Arc<dyn cacos_pds_plc::PlcClient> = Arc::new(MockPlcClient::default());
 
     // Plan 06: account-status checks inside validate_access_token need
     // the registered AccountManager.

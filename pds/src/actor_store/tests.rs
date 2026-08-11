@@ -1,7 +1,7 @@
 //! Integration tests for the actor store.
 
 use super::*;
-use crate::blobstore::opendal::OpenDALBlobStore;
+use cacos_pds_blobstore::opendal::OpenDALBlobStore;
 use rsky_crypto::utils::encode_did_key;
 use rsky_repo::block_map::BlockMap;
 use rsky_repo::cid_set::CidSet;

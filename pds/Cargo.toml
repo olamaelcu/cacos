@@ -107,7 +107,14 @@ zeroize = "1"
 # --- rate limiting (per-IP token bucket for sensitive endpoints) ---
 governor = "0.6"
 
-[dev-dependencies]
+# --- Step 1 extraction: leaf crates pulled out of cacos-pds ---
+cacos-pds-blobstore = { path = "../cacos-pds-blobstore" }
+cacos-pds-plc = { path = "../cacos-pds-plc", features = ["test-utils"] }
+cacos-pds-identity = { path = "../cacos-pds-identity" }
+cacos-pds-handle = { path = "../cacos-pds-handle" }
+cacos-pds-mailer = { path = "../cacos-pds-mailer" }
+
+[dev-dependencies]                                                                                                                                                                                                                                                                                                                                                 
 camino-tempfile = { workspace = true }
 poem = { workspace = true, features = ["test"] }
 metrics = { workspace = true }

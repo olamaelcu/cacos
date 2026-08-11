@@ -1,17 +1,7 @@
-# cacos-pds-plc/Cargo.toml
 [package]
 name = "cacos-pds-plc"
 version = "0.1.0"
 edition = "2024"
-
-[workspace]
-# Empty self-contained workspace. Keeps `cargo check -p cacos-pds-plc`
-# runnable from this directory in isolation, without yet being added to
-# the parent workspace's `members` array (planned for a follow-up step).
-# `workspace = true` would resolve to *this* workspace's
-# `[workspace.dependencies]`, so we pin the versions explicitly here
-# to mirror the parent.
-resolver = "2"
 
 [features]
 # Enables the `MockPlcClient` and its `PlcClient` impl for downstream
@@ -20,34 +10,27 @@ test-utils = []
 
 [dependencies]
 # --- atproto protocol crates (only rsky-common is used by this crate) ---
-# Mirrors parent workspace rsky-common pin.
-rsky-common = { git = "https://github.com/olamaelcu/rsky", rev = "aee5aec5ad9473d80232beab58ddba25a936298a" }
+rsky-common = { workspace = true }
 
 # --- http client for the PLC directory ---
 reqwest = { version = "0.12", features = ["json"] }
 url = "2"
 
 # --- serde ecosystem ---
-# Mirrors parent workspace serde pin (derive feature).
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde = { workspace = true }
+serde_json = { workspace = true }
 indexmap = { version = "2", features = ["serde"] }
-# Mirrors parent workspace serde_ipld_dagcbor pin.
-serde_ipld_dagcbor = { version = "0.6.1", features = ["codec"] }
+serde_ipld_dagcbor = { workspace = true }
 
 # --- crypto / encoding ---
-# Mirrors parent workspace secp256k1 pin.
-secp256k1 = { version = "0.28", features = ["global-context", "rand"] }
-# Mirrors parent workspace sha2 pin.
-sha2 = "0.10"
+secp256k1 = { workspace = true }
+sha2 = { workspace = true }
 data-encoding = "2"
 base64-url = "2.0.2"
 # hex is used by the `test-utils` feature for the mock client's secret key
 hex = "0.4"
 
 # --- runtime / traits ---
-# Mirrors parent workspace tokio pin (subset of features used by this crate).
-tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+tokio = { workspace = true }
 async-trait = "0.1"
-# Mirrors parent workspace anyhow pin.
-anyhow = "1.0.79"
+anyhow = { workspace = true }

@@ -26,7 +26,7 @@ pub mod update_email;
 
 use crate::actor_store::ActorStore;
 use crate::context::PDS_REPO_SIGNING_KEYPAIR;
-use crate::plc::PlcClient;
+use cacos_pds_plc::PlcClient;
 use crate::xrpc::types::SharedIdResolver;
 use anyhow::{Result, bail};
 use rand::Rng;

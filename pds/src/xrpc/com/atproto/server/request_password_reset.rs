@@ -1,7 +1,7 @@
 use crate::account::EmailTokenPurpose;
 use crate::account::helpers::account::AvailabilityFlags;
-use crate::mailer;
-use crate::mailer::IdentifierAndTokenParams;
+use cacos_pds_mailer;
+use cacos_pds_mailer::IdentifierAndTokenParams;
 use crate::xrpc::{ApiError, ApiResult, SharedState};
 use poem::web::{Data, Json};
 use rsky_lexicon::com::atproto::server::RequestPasswordResetInput;
@@ -41,13 +41,13 @@ async fn inner_request_password_reset(
                 .await
             {
                 Ok(token) => {
-                    if let Err(err) = mailer::send_reset_password(
+                    if let Err(err) = cacos_pds_mailer::send_reset_password(
                         account_email_clone,
                         IdentifierAndTokenParams { identifier, token },
                     )
                     .await
                     {
-                        tracing::error!("mailer::send_reset_password failed: {err:?}");
+                        tracing::error!("cacos_pds_mailer::send_reset_password failed: {err:?}");
                     }
                 }
                 Err(err) => {

@@ -790,6 +790,11 @@ dependencies = [
  "bytes",
  "cacos-migration",
  "cacos-pds",
+ "cacos-pds-blobstore",
+ "cacos-pds-handle",
+ "cacos-pds-identity",
+ "cacos-pds-mailer",
+ "cacos-pds-plc",
  "camino",
  "camino-tempfile",
  "chrono",
@@ -845,6 +850,82 @@ dependencies = [
  "url",
  "wiremock",
  "zeroize",
+]
+
+[[package]]
+name = "cacos-pds-blobstore"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bytes",
+ "camino-tempfile",
+ "cid",
+ "futures",
+ "hex",
+ "metrics",
+ "opendal",
+ "rand 0.8.7",
+ "rsky-blobstore",
+ "rsky-common",
+ "sha2 0.10.9",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "cacos-pds-handle"
+version = "0.1.0"
+dependencies = [
+ "rsky-common",
+ "rsky-syntax",
+ "thiserror 2.0.19",
+ "tokio",
+]
+
+[[package]]
+name = "cacos-pds-identity"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "cacos-migration",
+ "camino-tempfile",
+ "rsky-identity",
+ "sea-orm",
+ "serde_json",
+ "time",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "cacos-pds-mailer"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "tracing",
+]
+
+[[package]]
+name = "cacos-pds-plc"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "base64-url",
+ "data-encoding",
+ "hex",
+ "indexmap 2.14.0",
+ "reqwest",
+ "rsky-common",
+ "secp256k1",
+ "serde",
+ "serde_ipld_dagcbor",
+ "serde_json",
+ "sha2 0.10.9",
+ "tokio",
+ "url",
 ]
 
 [[package]]

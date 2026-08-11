@@ -29,7 +29,7 @@ async fn main() {
     // Build the shared OpenDAL operator (S3 if S3_ENDPOINT is set, else
     // disk) once for the process. Per-DID handles come from this via
     // `blobstore_for_did(did)` at the call site.
-    cacos_pds::blobstore::init_operator().expect_or_log("blobstore init failed");
+    cacos_pds_blobstore::init_operator().expect_or_log("blobstore init failed");
 
     let app = cacos_pds::xrpc::build_app().await;
     let listener = poem::listener::TcpListener::bind("127.0.0.1:8080");
@@ -175,9 +175,9 @@ async fn migrate_rotation_keys() -> anyhow::Result<()> {
 /// Pass `--dry-run` to log what would change without contacting PLC.
 /// Idempotent: actors already marked migrated are skipped.
 async fn migrate_plc_rotation_keys(dry_run: bool) -> anyhow::Result<()> {
-    use cacos_pds::plc::operations::CreateAtprotoUpdateOpOpts;
-    use cacos_pds::plc::operations::create_atproto_update_op;
-    use cacos_pds::plc::types::{CompatibleOp, CompatibleOpOrTombstone, OpOrTombstone};
+    use cacos_pds_plc::operations::CreateAtprotoUpdateOpOpts;
+    use cacos_pds_plc::operations::create_atproto_update_op;
+    use cacos_pds_plc::types::{CompatibleOp, CompatibleOpOrTombstone, OpOrTombstone};
     use cacos_pds::xrpc::com::atproto::server::PDS_PLC_ROTATION_KEYPAIR;
 
     let cfg = cacos_pds::config::env_to_cfg();

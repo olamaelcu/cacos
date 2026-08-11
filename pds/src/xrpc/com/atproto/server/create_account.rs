@@ -10,9 +10,9 @@
 use crate::account::CreateAccountOpts;
 use crate::account::helpers::account::AccountStatus;
 use crate::context::PDS_REPO_SIGNING_KEYPAIR;
-use crate::handle::{HandleValidationOpts, normalize_and_validate_handle};
-use crate::plc::operations::{CreateAtprotoOpInput, create_op};
-use crate::plc::types::{OpOrTombstone, Operation};
+use cacos_pds_handle::{HandleValidationOpts, normalize_and_validate_handle};
+use cacos_pds_plc::operations::{CreateAtprotoOpInput, create_op};
+use cacos_pds_plc::types::{OpOrTombstone, Operation};
 use crate::sequencer::events::sync_evt_data_from_commit;
 use crate::xrpc::auth_extractors::UserDidAuthOptional;
 use crate::xrpc::types::SharedIdResolver;
@@ -341,10 +341,10 @@ pub async fn validate_inputs_for_local_pds(
     )
     .await
     .map_err(|e| match e.kind {
-        crate::handle::errors::ErrorKind::InvalidHandle => ApiError::InvalidHandle,
-        crate::handle::errors::ErrorKind::HandleNotAvailable => ApiError::HandleNotAvailable,
-        crate::handle::errors::ErrorKind::UnsupportedDomain => ApiError::UnsupportedDomain,
-        crate::handle::errors::ErrorKind::InternalError => ApiError::RuntimeError,
+        cacos_pds_handle::errors::ErrorKind::InvalidHandle => ApiError::InvalidHandle,
+        cacos_pds_handle::errors::ErrorKind::HandleNotAvailable => ApiError::HandleNotAvailable,
+        cacos_pds_handle::errors::ErrorKind::UnsupportedDomain => ApiError::UnsupportedDomain,
+        cacos_pds_handle::errors::ErrorKind::InternalError => ApiError::RuntimeError,
     })?;
     if !super::validate_handle(&handle, &state.config.identity.service_handle_domains) {
         return Err(ApiError::InvalidHandle);
