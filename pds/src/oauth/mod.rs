@@ -7,6 +7,7 @@
 //! `PDS_OAUTH_TRUSTED_CLIENTS`) and wires it to the cacos backing store
 //! ([`crate::account::oauth_store::PdsOAuthStore`]).
 
+pub mod csrf;
 pub mod fetcher;
 pub mod remote;
 pub mod remote_create_account;
@@ -18,7 +19,7 @@ use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 #[allow(unused_imports)] // clippy false-positive: used by build_oauth_app's `.data()`
 use poem::EndpointExt;
 use poem::web::cookie::{Cookie, CookieJar, SameSite};
-use rsky_oauth::dpop::{DEFAULT_ROTATION_INTERVAL, DpopManager, DpopNonce, InMemoryReplayStore};
+use rsky_oauth::dpop::{DEFAULT_ROTATION_INTERVAL, DpopManager, DpopNonce, ReplayStore};
 use rsky_oauth::jwk::{EcCurve, Jwk};
 use rsky_oauth::store::DeviceData;
 use rsky_oauth::{OAuthError, OAuthProvider, OAuthProviderConfig};
@@ -117,7 +118,12 @@ pub struct SharedOAuthProvider {
 }
 
 impl SharedOAuthProvider {
-    pub fn new(account_db: DatabaseConnection, issuer: String, audience: String) -> Self {
+    pub fn new(
+        account_db: DatabaseConnection,
+        issuer: String,
+        audience: String,
+        replay_store: Box<dyn ReplayStore>,
+    ) -> Self {
         let private_key = std::env::var("PDS_JWT_KEY_K256_PRIVATE_KEY_HEX")
             .expect("PDS_JWT_KEY_K256_PRIVATE_KEY_HEX must be set");
         let key_bytes = hex::decode(private_key).expect("invalid provider signing key hex");
@@ -156,7 +162,7 @@ impl SharedOAuthProvider {
             signing_key,
             fetcher: Arc::new(HttpClientMetadataFetcher::new()),
             store: Arc::new(PdsOAuthStore::new(account_db)),
-            dpop: DpopManager::new(Some(nonce), Box::new(InMemoryReplayStore::default())),
+            dpop: DpopManager::new(Some(nonce), replay_store),
             trusted_clients,
         });
         Self {
@@ -170,6 +176,38 @@ impl SharedOAuthProvider {
 #[derive(Debug, Clone)]
 pub struct OAuthConfig {
     pub public_url: String,
+}
+
+/// Spawn the periodic DPoP-replay-row prune. Each tick deletes rows whose
+/// `expiresAt` is in the past and increments
+/// `cacos_dpop_replay_pruned_total` by the row count. The five-minute
+/// interval is short enough that the table stays bounded even under
+/// sustained traffic, but long enough that the per-tick cost is
+/// negligible against the indexed column.
+fn schedule_dpop_replay_prune(store: Arc<crate::account::oauth_store::DbBackedReplayStore>) {
+    let queue = crate::background::BackgroundQueue::default();
+    let store = store.clone();
+    queue.add(async move {
+        let interval = std::time::Duration::from_secs(5 * 60);
+        loop {
+            tokio::time::sleep(interval).await;
+            let now = now_secs();
+            match store.prune_expired(now).await {
+                Ok(0) => {}
+                Ok(pruned) => {
+                    metrics::counter!(crate::observability::metrics::DPOP_REPLAY_PRUNED_TOTAL)
+                        .increment(pruned as u64);
+                    tracing::debug!(pruned, "dpop replay rows pruned");
+                }
+                Err(err) => {
+                    tracing::warn!(?err, "dpop replay prune failed");
+                }
+            }
+        }
+    });
+    // Keep the queue alive for the lifetime of the process by leaking it;
+    // the spawned task is the only owner and it runs forever.
+    std::mem::forget(queue);
 }
 
 /// Environment-driven bootstrap for the OAuth route set, given an
@@ -197,7 +235,20 @@ pub fn bootstrap_oauth_app(
     let audience =
         std::env::var("PDS_SERVICE_DID").unwrap_or_else(|_| "did:web:localhost".to_string());
 
-    let shared = SharedOAuthProvider::new(account_db.clone(), issuer, audience);
+    let replay_store = Arc::new(crate::account::oauth_store::DbBackedReplayStore::new(
+        std::sync::Arc::new(account_db.clone()),
+    ));
+    schedule_dpop_replay_prune(replay_store.clone());
+    // Clone the store (cheap Arc clone of the inner DB handle) so the same
+    // logical store drives both the prune task and the DPoP manager. The
+    // DpopManager takes `Box<dyn ReplayStore>` because rsky-oauth's trait
+    // methods are sync.
+    let shared = SharedOAuthProvider::new(
+        account_db.clone(),
+        issuer,
+        audience,
+        Box::new((*replay_store).clone()),
+    );
     let provider = Arc::clone(&shared.provider);
     // Publish to the module-level handle so tests can mint tokens against
     // the same provider the resource server registered.
@@ -230,7 +281,27 @@ pub fn build_oauth_app(
     public_url: String,
     remote_create_account: Arc<dyn remote_create_account::RemoteCreateAccount>,
 ) -> impl poem::Endpoint<Output = poem::Response> {
-    use poem::{get, post};
+    use crate::xrpc::rate_limit::{RouteRateLimit, ip_limiter};
+    use poem::{Middleware, get, post};
+
+    // The headless-consent POSTs relay credentials (`sign-in`,
+    // `create-account`) and mutate authorization state, so they carry a
+    // per-IP budget on top of the bearer-token guard. The middleware runs
+    // before `TokenGuard`, so unauthenticated floods are shed too.
+    //
+    // NOTE: legitimate traffic here originates from the single configured
+    // RemoteClient, so every request shares one source IP. Operators
+    // fronting a busy PDS must raise `PDS_RATELIMIT_OAUTH_REMOTE_PER_MINUTE`
+    // — and 0 does not disable the limiter, `ip_limiter` clamps it to 1/min.
+    let remote_rl = RouteRateLimit {
+        limiter: ip_limiter(
+            std::env::var("PDS_RATELIMIT_OAUTH_REMOTE_PER_MINUTE")
+                .ok()
+                .and_then(|s| s.parse::<u32>().ok())
+                .unwrap_or(10),
+        ),
+    };
+
     poem::Route::new()
         .at("/oauth/par", post(routes::oauth_par))
         .at("/oauth/token", post(routes::oauth_token))
@@ -249,11 +320,26 @@ pub fn build_oauth_app(
             get(routes::oauth_authorize),
         )
         .at("/oauth/remote/request", get(remote::request))
-        .at("/oauth/remote/sign-in", post(remote::sign_in))
-        .at("/oauth/remote/select", post(remote::select_account))
-        .at("/oauth/remote/create-account", post(remote::create_account))
-        .at("/oauth/remote/accept", post(remote::accept))
-        .at("/oauth/remote/reject", post(remote::reject))
+        .at(
+            "/oauth/remote/sign-in",
+            post(remote_rl.transform(remote::sign_in)),
+        )
+        .at(
+            "/oauth/remote/select",
+            post(remote_rl.transform(remote::select_account)),
+        )
+        .at(
+            "/oauth/remote/create-account",
+            post(remote_rl.transform(remote::create_account)),
+        )
+        .at(
+            "/oauth/remote/accept",
+            post(remote_rl.transform(remote::accept)),
+        )
+        .at(
+            "/oauth/remote/reject",
+            post(remote_rl.transform(remote::reject)),
+        )
         .data(shared)
         .data(account_db)
         .data(remote_config)
@@ -369,7 +455,12 @@ mod tests {
         ))
         .await
         .unwrap();
-        let shared = SharedOAuthProvider::new(db, ISSUER.to_string(), AUDIENCE.to_string());
+        let shared = SharedOAuthProvider::new(
+            db,
+            ISSUER.to_string(),
+            AUDIENCE.to_string(),
+            Box::new(rsky_oauth::InMemoryReplayStore::default()),
+        );
         let provider = &shared.provider;
         assert_eq!(provider.issuer(), ISSUER);
         assert_eq!(provider.jwks().keys.len(), 1);

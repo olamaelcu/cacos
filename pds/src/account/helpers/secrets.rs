@@ -1,21 +1,20 @@
-//! Secret loading helpers: `*_FILE` indirection and password-strength validation.
+//! Secret loading helpers: backend-agnostic reads and password-strength
+//! validation.
 //!
-//! Standard Docker/Kubernetes/Vault convention: each secret env var `FOO`
-//! can be set directly OR via `FOO_FILE` pointing to a file containing
-//! the value. This lets operators mount secrets as files without putting
-//! them in process env.
+//! The actual lookup lives behind
+//! [`crate::account::helpers::secret_provider::SecretProvider`], selected by
+//! `PDS_SECRET_BACKEND`. The default `env` backend keeps the standard
+//! Docker/Kubernetes/Vault convention: each secret env var `FOO` can be set
+//! directly OR via `FOO_FILE` pointing to a file containing the value, so
+//! operators can mount secrets as files without putting them in process env.
 
 use std::env;
 
-/// Reads a secret from `name` (env var) or `name_FILE` (path to file).
+use crate::account::helpers::secret_provider::provider;
+
+/// Reads a secret by name from the configured secret backend.
 pub fn read_secret(name: &str) -> Result<String, String> {
-    let file_var = format!("{name}_FILE");
-    if let Ok(path) = env::var(&file_var) {
-        let value = std::fs::read_to_string(&path)
-            .map_err(|e| format!("failed to read {file_var}={path}: {e}"))?;
-        return Ok(value.trim_end_matches(['\n', '\r']).to_string());
-    }
-    env::var(name).map_err(|_| format!("{name} (or {file_var}) must be set"))
+    provider().and_then(|p| p.read(name).map_err(|e| e.to_string()))
 }
 
 /// Validates password strength: min 16 chars, ≥3 of {lower, upper, digit,

@@ -799,6 +799,7 @@ dependencies = [
  "futures",
  "governor",
  "hex",
+ "hmac 0.12.1",
  "indexmap 2.14.0",
  "ipld-core",
  "jwt-simple",
