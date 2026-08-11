@@ -28,7 +28,7 @@ async fn oauth_app_serves_jwks_and_metadata() {
         std::env::set_var("PDS_PUBLIC_URL", "https://pds.test");
     }
     cacos_pds_core::observability::metrics::init_metrics();
-    let client = TestClient::new(cacos_pds::xrpc::build_app().await);
+    let client = TestClient::new(cacos_pds_server::xrpc::build_app().await);
     let resp = client.get("/oauth/jwks").send().await;
     resp.assert_status_is_ok();
     let resp = client

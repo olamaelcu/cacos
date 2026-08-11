@@ -31,7 +31,7 @@ async fn main() {
     // `blobstore_for_did(did)` at the call site.
     cacos_pds_blobstore::init_operator().expect_or_log("blobstore init failed");
 
-    let app = cacos_pds::xrpc::build_app().await;
+    let app = cacos_pds_server::xrpc::build_app().await;
     let listener = poem::listener::TcpListener::bind("127.0.0.1:8080");
     tracing::info!("pds listening on http://127.0.0.1:8080");
     poem::Server::new(listener)
@@ -75,7 +75,7 @@ async fn migrate_rotation_keys() -> anyhow::Result<()> {
     use cacos_pds_account::auth::PDS_PLC_ROTATION_KEYPAIR;
 
     let cfg = cacos_pds_core::config::env_to_cfg();
-    let state = cacos_pds::xrpc::types::SharedStateFromEnv::from_env(&cfg).await;
+    let state = cacos_pds_server::xrpc::types::SharedStateFromEnv::from_env(&cfg).await;
 
     // Touching the static forces the env var to be parsed up-front; if
     // `PDS_PLC_ROTATION_KEY_K256_PRIVATE_KEY_HEX` is missing, the
@@ -181,7 +181,7 @@ async fn migrate_plc_rotation_keys(dry_run: bool) -> anyhow::Result<()> {
     use cacos_pds_account::auth::PDS_PLC_ROTATION_KEYPAIR;
 
     let cfg = cacos_pds_core::config::env_to_cfg();
-    let state = cacos_pds::xrpc::types::SharedStateFromEnv::from_env(&cfg).await;
+    let state = cacos_pds_server::xrpc::types::SharedStateFromEnv::from_env(&cfg).await;
 
     let dids = state
         .account_manager
@@ -197,7 +197,7 @@ async fn migrate_plc_rotation_keys(dry_run: bool) -> anyhow::Result<()> {
         n = dids.len()
     );
 
-    let global_rotation_did = cacos_pds::xrpc::com::atproto::server::global_plc_rotation_key_did();
+    let global_rotation_did = cacos_pds_server::xrpc::com::atproto::server::global_plc_rotation_key_did();
 
     let mut updated = 0usize;
     let mut skipped_no_key = 0usize;

@@ -498,7 +498,7 @@ mod admin_scope_extractors {
     use super::{AdminScope, clear_test_env, lock_env};
     use base64ct::Encoding;
     use cacos_pds_account::auth::verifier::verify_admin_token;
-    use cacos_pds::xrpc::auth_extractors::{
+    use cacos_pds_server::xrpc::auth_extractors::{
         RequireAccountAdmin, RequireInviteAdmin, RequireTakedownAdmin,
     };
     use poem::Route;

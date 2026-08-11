@@ -1,8 +1,8 @@
 //! Per-IP rate limiting, per-account login lockout, and password-reset
 //! enumeration-defense integration tests.
 
-use cacos_pds::xrpc::build_app_with_state;
-use cacos_pds::xrpc::test_utils::{create_test_account, test_state};
+use cacos_pds_server::xrpc::build_app_with_state;
+use cacos_pds_server::xrpc::test_utils::{create_test_account, test_state};
 use poem::test::TestClient;
 use serde_json::json;
 
