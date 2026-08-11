@@ -164,15 +164,15 @@ pub fn spawn_seq_event_worker(
 }
 
 #[allow(dead_code)]
-const _CRAWLERS_REF: fn() -> crate::sequencer::Crawlers =
-    || crate::sequencer::Crawlers::new(String::new(), vec![]);
+const _CRAWLERS_REF: fn() -> crate::Crawlers =
+    || crate::Crawlers::new(String::new(), vec![]);
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use cacos_pds_core::db::DatabaseKind;
-    use cacos_pds_core::db::entities::repo_seq;
-    use crate::sequencer::events::now_offset;
+    use migration::entities::repo_seq;
+    use crate::events::now_offset;
     use camino_tempfile::Utf8TempDir;
     use sea_orm::EntityTrait;
     use std::time::Duration;

@@ -902,6 +902,42 @@ dependencies = [
 ]
 
 [[package]]
+name = "cacos-pds-actor-store"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bytes",
+ "cacos-migration",
+ "cacos-pds-blobstore",
+ "cacos-pds-core",
+ "camino",
+ "camino-tempfile",
+ "cid",
+ "futures",
+ "hex",
+ "lru",
+ "metrics",
+ "metrics-exporter-prometheus",
+ "miette 7.6.0",
+ "rand 0.8.7",
+ "rsky-common",
+ "rsky-crypto",
+ "rsky-lexicon",
+ "rsky-repo",
+ "rsky-syntax",
+ "sea-orm",
+ "secp256k1",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "thiserror 2.0.19",
+ "time",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "cacos-pds-blobstore"
 version = "0.1.0"
 dependencies = [
@@ -1008,6 +1044,44 @@ dependencies = [
  "sha2 0.10.9",
  "tokio",
  "url",
+]
+
+[[package]]
+name = "cacos-pds-sequencer"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "apalis",
+ "apalis-sql",
+ "async-stream",
+ "cacos-migration",
+ "cacos-pds-actor-store",
+ "cacos-pds-core",
+ "camino-tempfile",
+ "cid",
+ "futures",
+ "ipld-core",
+ "metrics",
+ "metrics-exporter-prometheus",
+ "miette 7.6.0",
+ "poem",
+ "reqwest",
+ "rsky-common",
+ "rsky-lexicon",
+ "rsky-repo",
+ "sea-orm",
+ "serde",
+ "serde_bytes",
+ "serde_cbor",
+ "serde_ipld_dagcbor",
+ "serde_json",
+ "serde_repr",
+ "sqlx 0.8.6",
+ "thiserror 2.0.19",
+ "time",
+ "tokio",
+ "tracing",
+ "wiremock",
 ]
 
 [[package]]

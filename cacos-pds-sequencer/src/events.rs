@@ -7,9 +7,10 @@
 //! delegates to the git-pinned `rsky-repo` crate so the on-wire and on-disk
 //! formats stay byte-compatible with the reference implementation.
 
-use cacos_pds_core::db::entities::repo_seq;
-use cacos_pds_core::db::types;
+use migration::entities::repo_seq;
+use migration::types;
 use anyhow::Result;
+use cacos_pds_actor_store::repo::types::SyncEvtData;
 use lexicon_cid::Cid;
 use rsky_repo::block_map::BlockMap;
 use rsky_repo::car::blocks_to_car_file;
@@ -346,14 +347,14 @@ pub async fn format_seq_sync_evt(did: String, rev: String, blocks: BlockMap) -> 
 /// commit block is missing from the relevant blocks map.
 pub fn sync_evt_data_from_commit(
     commit_data: CommitDataWithOps,
-) -> Result<crate::actor_store::repo::types::SyncEvtData> {
+) -> Result<SyncEvtData> {
     let mut blocks = commit_data.commit_data.relevant_blocks.clone();
     let cid: Vec<Cid> = vec![commit_data.commit_data.cid];
     let blocks_and_missing = blocks.get_many(cid)?;
     if !blocks_and_missing.missing.is_empty() {
         anyhow::bail!("commit block was not found, could not build sync event");
     }
-    Ok(crate::actor_store::repo::types::SyncEvtData {
+    Ok(SyncEvtData {
         cid: commit_data.commit_data.cid,
         rev: commit_data.commit_data.rev,
         blocks: blocks_and_missing.blocks,

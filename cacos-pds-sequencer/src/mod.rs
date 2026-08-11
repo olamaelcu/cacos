@@ -1,31 +1,27 @@
-//! Sequencer + outbox for the firehose (subscribeRepos) endpoint.
-//!
-//! The sequencer persists a `repo_seq` row for every commit / identity /
-//! account / sync event, then enqueues an `SeqEventJob` to the apalis-sql
-//! worker. The worker publishes the serialized envelope to a
-//! `tokio::sync::broadcast` channel that the websocket subscribers drain.
-//!
-//! The `Outbox` provides a unified "backfill then live" stream that the
-//! subscribe-repos handler awaits.
+// Sequencer + outbox for the firehose (subscribeRepos) endpoint.
+//
+// The sequencer persists a `repo_seq` row for every commit / identity /
+// account / sync event, then enqueues an `SeqEventJob` to the apalis-sql
+// worker. The worker publishes the serialized envelope to a
+// `tokio::sync::broadcast` channel that the websocket subscribers drain.
+//
+// The `Outbox` provides a unified "backfill then live" stream that the
+// subscribe-repos handler awaits.
+//
+// This file is `include!`-ed by `src/lib.rs`, so the submodules are
+// declared in `lib.rs` (one canonical place). Do not re-declare them
+// here. (Inner doc comments (`//!`) would require an item to attach to.)
 
-pub mod apalis_worker;
-pub mod crawlers;
-pub mod db;
-pub mod events;
-pub mod outbox;
-pub mod ws_frames;
-
-use cacos_pds_core::db::entities::repo_seq;
-use cacos_pds_core::db::types::db_id::DbId;
 use cacos_pds_core::error::PdsError;
-
 use cacos_pds_core::observability::timing::timed;
-use crate::sequencer::apalis_worker::{SeqEventJob, enqueue_seq_event_job};
-use crate::sequencer::crawlers::Crawlers;
-use crate::sequencer::events::{
+use crate::apalis_worker::{SeqEventJob, enqueue_seq_event_job};
+use crate::crawlers::Crawlers;
+use crate::events::{
     RepoSeqNew, SeqEvt, TypedAccountEvt, TypedCommitEvt, TypedIdentityEvt, TypedSyncEvt,
     format_offset_datetime,
 };
+use migration::entities::repo_seq;
+use migration::types::db_id::DbId;
 use anyhow::Result;
 use rsky_lexicon::com::atproto::sync::AccountStatus as RskyLexiconAccountStatus;
 use rsky_repo::block_map::BlockMap;
@@ -372,7 +368,7 @@ pub(crate) mod test_util {
     use super::*;
     use cacos_pds_core::db::DatabaseKind;
     use cacos_pds_core::db::tests::TestDatabaseKind;
-    use crate::sequencer::crawlers::Crawlers;
+    use crate::crawlers::Crawlers;
 
     pub async fn _test_sequencer() -> Sequencer {
         let db = DatabaseKind::Sequencer.open_test_db().await;
@@ -390,9 +386,9 @@ mod tests {
     use super::*;
     use cacos_pds_core::db::DatabaseKind;
     use cacos_pds_core::db::tests::TestDatabaseKind;
-    use cacos_pds_core::db::types::did::Did;
-    use crate::sequencer::crawlers::Crawlers;
-    use crate::sequencer::events::{CommitEvt, now_offset};
+    use migration::types::did::Did;
+    use crate::crawlers::Crawlers;
+    use crate::events::{CommitEvt, now_offset};
     use sea_orm::EntityTrait;
 
     pub(crate) async fn test_sequencer() -> (Sequencer, cacos_pds_core::db::tests::TestDb) {

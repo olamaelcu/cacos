@@ -7,9 +7,9 @@
 
 use cacos_pds_core::observability::metrics::OUTBOX_BUFFER_LAG;
 use cacos_pds_core::observability::timing::timed;
-use crate::sequencer::Sequencer;
-use crate::sequencer::apalis_worker::SharedBroadcast;
-use crate::sequencer::events::SeqEvt;
+use crate::Sequencer;
+use crate::apalis_worker::SharedBroadcast;
+use crate::events::SeqEvt;
 use anyhow::Result;
 use futures::stream::{self, Stream, StreamExt};
 use std::pin::Pin;
@@ -161,7 +161,7 @@ impl Outbox {
         let start = std::cmp::max(self.last_seen, backfill_cursor);
         let rows = self
             .sequencer
-            .request_seq_range(crate::sequencer::RequestSeqRangeOpts {
+            .request_seq_range(crate::RequestSeqRangeOpts {
                 earliest_seq: None,
                 latest_seq: None,
                 earliest_time: None,
@@ -171,7 +171,7 @@ impl Outbox {
         let mut evts: Vec<SeqEvt> = Vec::new();
         if let Ok(rows) = rows {
             for row in rows.iter() {
-                if let Ok(typed) = crate::sequencer::typed_seq_evt(row) {
+                if let Ok(typed) = crate::typed_seq_evt(row) {
                     let seq = typed.seq();
                     if seq > start {
                         self.last_seen = seq;
@@ -223,9 +223,9 @@ mod tests {
     use super::*;
     use cacos_pds_core::db::DatabaseKind;
     use cacos_pds_core::db::tests::TestDatabaseKind;
-    use cacos_pds_core::db::types::did::Did;
-    use crate::sequencer::crawlers::Crawlers;
-    use crate::sequencer::events::{RepoSeqNew, now_offset};
+    use migration::types::did::Did;
+    use crate::crawlers::Crawlers;
+    use crate::events::{RepoSeqNew, now_offset};
     use futures::StreamExt;
 
     async fn test_sequencer() -> (Sequencer, cacos_pds_core::db::tests::TestDb) {
@@ -240,7 +240,7 @@ mod tests {
     }
 
     fn typed_event(did: &str, kind: &str) -> SeqEvt {
-        use crate::sequencer::events::{
+        use crate::events::{
             AccountEvt, IdentityEvt, TypedAccountEvt, TypedIdentityEvt,
         };
         match kind {
@@ -268,7 +268,7 @@ mod tests {
     }
 
     fn event_body(did: &str, kind: &str) -> Vec<u8> {
-        use crate::sequencer::events::{AccountEvt, IdentityEvt};
+        use crate::events::{AccountEvt, IdentityEvt};
         match kind {
             "identity" => serde_ipld_dagcbor::to_vec(&IdentityEvt {
                 did: did.to_string(),
