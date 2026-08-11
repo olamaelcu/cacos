@@ -26,7 +26,7 @@
 //! - `src/mod.rs` holds the `Sequencer` struct (formerly
 //!   `pds/src/sequencer/mod.rs`).
 //! - `src/shared_sequencer.rs` holds the `Arc<RwLock<Sequencer>>` wrapper
-//!   that mounts as poem state (formerly `pds/src/context.rs`).
+//!   that mounts as poem state.
 
 pub mod apalis_worker;
 pub mod crawlers;

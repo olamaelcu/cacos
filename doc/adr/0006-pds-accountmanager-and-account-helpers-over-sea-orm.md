@@ -29,7 +29,7 @@ Several constraints shape the design:
 
 5. **`PDS_JWT_KEYPAIR` lives at `pds/src/account/helpers/auth.rs`** as `pub static LazyLock<ES256kKeyPair>`, derived from `PDS_JWT_KEY_K256_PRIVATE_KEY_HEX`. Any future `auth_verifier.rs` must import this and delete any duplicate. The same module owns `AuthScope`; any duplicate copy elsewhere must go.
 
-6. **`PDS_REPO_SIGNING_KEYPAIR` lives at `pds/src/context.rs`** as `pub static LazyLock<secp256k1::Keypair>`, derived from `PDS_REPO_SIGNING_KEY_K256_PRIVATE_KEY_HEX`. The static lives under `crate::context` so the xrpc server handlers can import it.
+6. **`PDS_REPO_SIGNING_KEYPAIR` lives at `cacos-pds-account/src/auth/keypairs.rs`** as `pub static LazyLock<secp256k1::Keypair>`, derived from `PDS_REPO_SIGNING_KEY_K256_PRIVATE_KEY_HEX`. (Originally at `pds/src/context.rs`; moved to the account crate as part of the crate split.)
 
 7. **`DisableInviteCodesOpts` is defined in `helpers/invite.rs`** (next to its consumer) and re-exported from `crate::account` via `pub use`. This puts the public path at `crate::account::DisableInviteCodesOpts` without leaking the helper-internal layout.
 

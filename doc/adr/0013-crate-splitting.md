@@ -146,8 +146,7 @@ Harder:
   be tracked. Several subagents initially added `/Cargo.lock` to
   per-crate `.gitignore`; the dedicated `Stop ignoring Cargo.lock`
   commit reversed those lines.
-- **`SharedSequencer` is still in `pds/src/context.rs`.** It has its
-  canonical home in `cacos-pds-sequencer::shared_sequencer` but
-  `pds/src/context` remains as a thin `pub mod context;` shim for any
-  callers that still reference `crate::context`. A follow-up commit
-  will retire it once every caller is rewired.
+- **`SharedSequencer` lives in `cacos-pds-sequencer::shared_sequencer`.**
+  As of the post-split cleanup, `pds/src/context.rs` has been removed
+  and the only remaining references to `pds::context` are in docs that
+  called out the historical arc.

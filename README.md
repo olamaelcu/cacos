@@ -45,7 +45,7 @@ integration suite.
 | Crate                        | Layer | Kind   | Owns                                                                                  |
 |------------------------------|-------|--------|---------------------------------------------------------------------------------------|
 | `migration/`                 | L0    | lib    | [sea-orm](https://docs.rs/sea-orm) entities + migrators for every PDS database         |
-| `pds/`                       | L0    | lib    | `pds/tests/*.rs` integration suite; `cacos_pds::context::SharedSequencer` shim          |
+| `pds/`                       | L0    | lib    | `pds/tests/*.rs` integration suite (thin shell)                                         |
 | `cacos-pds-blobstore/`       | L1    | lib    | `BlobStore` trait re-export + OpenDAL backend                                          |
 | `cacos-pds-plc/`             | L1    | lib    | `PlcClient` trait + PLC operations (`create_op`, `create_atproto_update_op`, ...)        |
 | `cacos-pds-identity/`        | L1    | lib    | SQLite-backed `DidSqliteCache` for resolved DID documents                              |
