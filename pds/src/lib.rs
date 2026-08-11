@@ -21,5 +21,3 @@
 //! | cacos-pds-migrate       | operator migration binary                         |
 //!
 //! Integration tests under `pds/tests/` consume those crates directly.
-
-pub mod context;
