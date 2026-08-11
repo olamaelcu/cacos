@@ -1,0 +1,38 @@
+[package]
+name = "cacos-pds-blobstore"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+# --- atproto protocol crates (git-pinned rsky fork) ---
+rsky-blobstore = { workspace = true }
+
+# --- blob storage backend ---
+opendal = { workspace = true }
+
+# --- error handling ---
+anyhow = { workspace = true }
+
+# --- async / futures ---
+futures = { workspace = true }
+bytes = "1"
+
+# --- observability (metric counters + tracing) ---
+metrics = { workspace = true }
+tracing = { workspace = true }
+
+# --- crypto / encoding primitives ---
+rand = { workspace = true }
+hex = "0.4"
+
+# --- CID type from the atproto ecosystem ---
+lexicon_cid = { workspace = true }
+
+# --- Step 2: observability constants + timing helper now come from core ---
+cacos-pds-core = { path = "../cacos-pds-core" }
+
+[dev-dependencies]                                                                                                                                                                                                                                                                                                                                                 
+tokio = { workspace = true }
+rsky-common = { workspace = true }
+sha2 = { workspace = true }
+camino-tempfile = { workspace = true }

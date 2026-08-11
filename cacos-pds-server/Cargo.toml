@@ -1,0 +1,88 @@
+[package]
+name = "cacos-pds-server"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+# Exposes mock PLC + test helpers for downstream integration tests.
+test-utils = []
+
+[dependencies]
+# --- foundation + domain crates ---
+cacos-pds-core = { path = "../cacos-pds-core" }
+cacos-pds-account = { path = "../cacos-pds-account" }
+cacos-pds-actor-store = { path = "../cacos-pds-actor-store" }
+cacos-pds-sequencer = { path = "../cacos-pds-sequencer" }
+cacos-pds-oauth = { path = "../cacos-pds-oauth" }
+cacos-pds-blobstore = { path = "../cacos-pds-blobstore" }
+cacos-pds-plc = { path = "../cacos-pds-plc", features = ["test-utils"] }
+cacos-pds-identity = { path = "../cacos-pds-identity" }
+cacos-pds-handle = { path = "../cacos-pds-handle" }
+cacos-pds-mailer = { path = "../cacos-pds-mailer" }
+
+# --- atproto protocol crates ---
+rsky-lexicon = { workspace = true }
+rsky-common = { workspace = true }
+rsky-oauth = { workspace = true }
+rsky-identity = { workspace = true }
+rsky-crypto = { workspace = true }
+rsky-repo = { workspace = true }
+rsky-syntax = { workspace = true }
+
+# --- storage ---
+migration = { path = "../migration", package = "cacos-migration" }
+sea-orm = { workspace = true }
+
+# --- error handling ---
+anyhow = { workspace = true }
+miette = { workspace = true }
+thiserror = { workspace = true }
+
+# --- encoding / dates ---
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = "0.4"
+time = { workspace = true }
+lexicon_cid = { workspace = true }
+
+# --- HTTP (poem) ---
+poem = { workspace = true }
+governor = { workspace = true }
+
+# --- async / futures ---
+tokio = { workspace = true }
+async-trait = "0.1"
+futures = { workspace = true }
+tempfile = "3"
+
+# --- observability ---
+metrics = { workspace = true }
+tracing = { workspace = true }
+tracing-unwrap = { workspace = true }
+
+# --- at-rest hygiene ---
+secrecy = "0.10"
+zeroize = "1"
+
+# --- crypto / encoding primitives ---
+sha2 = { workspace = true }
+hex = "0.4"
+rand = { workspace = true }
+base64 = "0.22"
+secp256k1 = { version = "0.28", features = ["global-context", "rand"] }
+email_address = "0.2"
+camino = { workspace = true }
+serde_ipld_dagcbor = { workspace = true }
+serde_cbor = { workspace = true }
+ulid = { workspace = true }
+
+[dev-dependencies]
+camino-tempfile = { workspace = true }
+tempfile = "3"
+metrics-exporter-prometheus = { workspace = true }
+metrics-tracing-context = { workspace = true }
+tracing-subscriber = { workspace = true }
+serde_ipld_dagcbor = { workspace = true }
+wiremock = "0.6"
+tokio-tungstenite = "0.27"
+poem = { workspace = true, features = ["test"] }

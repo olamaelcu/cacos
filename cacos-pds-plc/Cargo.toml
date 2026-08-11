@@ -1,0 +1,36 @@
+[package]
+name = "cacos-pds-plc"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+# Enables the `MockPlcClient` and its `PlcClient` impl for downstream
+# integration tests. Mirrors the feature gate on cacos-pds itself.
+test-utils = []
+
+[dependencies]
+# --- atproto protocol crates (only rsky-common is used by this crate) ---
+rsky-common = { workspace = true }
+
+# --- http client for the PLC directory ---
+reqwest = { version = "0.12", features = ["json"] }
+url = "2"
+
+# --- serde ecosystem ---
+serde = { workspace = true }
+serde_json = { workspace = true }
+indexmap = { version = "2", features = ["serde"] }
+serde_ipld_dagcbor = { workspace = true }
+
+# --- crypto / encoding ---
+secp256k1 = { workspace = true }
+sha2 = { workspace = true }
+data-encoding = "2"
+base64-url = "2.0.2"
+# hex is used by the `test-utils` feature for the mock client's secret key
+hex = "0.4"
+
+# --- runtime / traits ---
+tokio = { workspace = true }
+async-trait = "0.1"
+anyhow = { workspace = true }

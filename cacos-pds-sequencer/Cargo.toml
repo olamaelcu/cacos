@@ -1,0 +1,62 @@
+[package]
+name = "cacos-pds-sequencer"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+# --- foundation ---
+cacos-pds-core = { path = "../cacos-pds-core", features = ["test-utils"] }
+migration = { path = "../migration", package = "cacos-migration" }
+
+# --- sea-orm (typed entity API) ---
+sea-orm = { workspace = true }
+
+# --- sibling layer-3 crate (SyncEvtData) ---
+cacos-pds-actor-store = { path = "../cacos-pds-actor-store" }
+
+# --- atproto protocol crates (git-pinned rsky fork) ---
+rsky-repo = { workspace = true }
+rsky-lexicon = { workspace = true }
+rsky-common = { workspace = true }
+lexicon_cid = { workspace = true }
+
+# --- runtime + sequencer backends ---
+tokio = { workspace = true }
+apalis = { workspace = true }
+apalis-sql = { workspace = true }
+sqlx_0_8 = { workspace = true }
+async-stream = "0.3"
+futures = { workspace = true }
+
+# --- encoding / DAG-CBOR ---
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_bytes = { workspace = true }
+serde_cbor = { workspace = true }
+serde_repr = { workspace = true }
+serde_ipld_dagcbor = { workspace = true }
+ipld-core = { workspace = true }
+
+# --- error handling ---
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+miette = { workspace = true }
+
+# --- time / dates ---
+time = { workspace = true }
+
+# --- observability ---
+metrics = { workspace = true }
+tracing = { workspace = true }
+
+# --- crawlers notify path uses reqwest (was on pds before extraction) ---
+reqwest = { version = "0.12", features = ["json"] }
+
+# --- poem: SharedSequencer is mounted as `Data<&SharedSequencer>` from
+#     pds/src/xrpc — pull in the version of poem the wiring uses.
+poem = { workspace = true }
+
+[dev-dependencies]
+camino-tempfile = { workspace = true }
+wiremock = "0.6"
+metrics-exporter-prometheus = { workspace = true }

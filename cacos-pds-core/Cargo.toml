@@ -1,0 +1,54 @@
+[package]
+name = "cacos-pds-core"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+# Exposes `db::tests` (TestDb / TestDatabaseKind) to downstream crates' tests.
+test-utils = ["dep:camino-tempfile"]
+
+[dependencies]
+# --- storage ---
+sea-orm = { workspace = true }
+migration = { path = "../migration", package = "cacos-migration" }
+
+# --- error handling ---
+anyhow = { workspace = true }
+miette = { workspace = true }
+thiserror = { workspace = true }
+
+# --- encoding / dates ---
+serde = { workspace = true }
+serde_json = { workspace = true }
+base64ct = "1.6.0"
+rand = { workspace = true }
+
+# --- atproto protocol crates ---
+rsky-common = { workspace = true }
+lexicon_cid = { workspace = true }
+
+# --- runtime ---
+tokio = { workspace = true }
+async-trait = "0.1"
+
+# --- observability ---
+metrics = { workspace = true }
+metrics-exporter-prometheus = { workspace = true }
+metrics-tracing-context = { workspace = true }
+poem = { workspace = true, features = ["cookie"] }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+tracing-timing = { workspace = true }
+tracing-unwrap = { workspace = true }
+
+# --- config ---
+camino = { workspace = true }
+
+# `tests` module behind the `test-utils` feature pulls in temp dirs.
+camino-tempfile = { workspace = true, optional = true }
+
+[dev-dependencies]
+camino-tempfile = { workspace = true }
+time = { workspace = true }
+futures = { workspace = true }
+metrics-exporter-prometheus = { workspace = true }

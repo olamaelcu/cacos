@@ -3,8 +3,8 @@
 //! Pins the build_app wiring against the live SharedState produced by
 //! [`crate::xrpc::test_utils::test_state`].
 
-use cacos_pds::xrpc::build_app_with_state;
-use cacos_pds::xrpc::test_utils;
+use cacos_pds_server::xrpc::build_app_with_state;
+use cacos_pds_server::xrpc::test_utils;
 use poem::test::TestClient;
 
 #[tokio::test]

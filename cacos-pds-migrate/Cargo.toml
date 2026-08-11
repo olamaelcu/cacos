@@ -1,0 +1,63 @@
+[package]
+name = "cacos-pds-migrate"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "cacos-pds-migrate"
+path = "src/main.rs"
+
+[dependencies]
+# --- foundation + domain crates ---
+cacos-pds-core = { path = "../cacos-pds-core" }
+cacos-pds-account = { path = "../cacos-pds-account" }
+cacos-pds-actor-store = { path = "../cacos-pds-actor-store" }
+cacos-pds-sequencer = { path = "../cacos-pds-sequencer" }
+cacos-pds-server = { path = "../cacos-pds-server" }
+cacos-pds-plc = { path = "../cacos-pds-plc" }
+cacos-pds-mailer = { path = "../cacos-pds-mailer" }
+cacos-pds-identity = { path = "../cacos-pds-identity" }
+
+# --- atproto protocol crates ---
+rsky-lexicon = { workspace = true }
+rsky-common = { workspace = true }
+rsky-crypto = { workspace = true }
+rsky-identity = { workspace = true }
+
+# --- storage ---
+migration = { path = "../migration", package = "cacos-migration" }
+sea-orm = { workspace = true }
+
+# --- error handling ---
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# --- encoding / dates ---
+serde = { workspace = true }
+serde_json = { workspace = true }
+time = { workspace = true }
+chrono = "0.4"
+
+# --- crypto / encoding ---
+hex = "0.4"
+secp256k1 = { version = "0.28", features = ["global-context", "rand"] }
+sha2 = { workspace = true }
+rand = { workspace = true }
+base64 = "0.22"
+base64-url = "2.0.2"
+
+# --- at-rest hygiene ---
+secrecy = "0.10"
+zeroize = "1"
+
+# --- async / futures ---
+tokio = { workspace = true }
+async-trait = "0.1"
+futures = { workspace = true }
+
+# --- observability ---
+tracing = { workspace = true }
+metrics = { workspace = true }
+
+# --- runtime env helpers ---
+once_cell = "1"

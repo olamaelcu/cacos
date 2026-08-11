@@ -1,6 +1,6 @@
 //! OAuth/PLC security regression tests.
 //!
-//! Pins the SSRF guard-rails on [`cacos_pds::plc::HttpPlcClient`] so the
+//! Pins the SSRF guard-rails on [`cacos_pds_plc::HttpPlcClient`] so the
 //! loopback / RFC1918 / link-local deny list cannot regress, and pins
 //! the OAuth provider wiring (R1), CORS allowlist (R2), and cookie
 //! hardening (R6) for the resource server.
@@ -11,14 +11,14 @@
 //! runs synchronously on the host string.
 
 use base64::Engine;
-use cacos_pds::account::oauth_store::DbBackedReplayStore;
-use cacos_pds::config::OAuthRemoteConfig;
-use cacos_pds::db::DatabaseKind;
-use cacos_pds::oauth::remote_create_account::MockRemoteCreateAccount;
-use cacos_pds::oauth::{SharedOAuthProvider, build_oauth_app, registered_provider};
-use cacos_pds::plc::{HttpPlcClient, PlcClient};
-use cacos_pds::xrpc::build_app_with_state;
-use cacos_pds::xrpc::test_utils::{create_test_account, test_state};
+use cacos_pds_account::account::oauth_store::DbBackedReplayStore;
+use cacos_pds_core::config::OAuthRemoteConfig;
+use cacos_pds_core::db::DatabaseKind;
+use cacos_pds_oauth::remote_create_account::MockRemoteCreateAccount;
+use cacos_pds_oauth::{SharedOAuthProvider, build_oauth_app, registered_provider};
+use cacos_pds_plc::{HttpPlcClient, PlcClient};
+use cacos_pds_server::xrpc::build_app_with_state;
+use cacos_pds_server::xrpc::test_utils::{create_test_account, test_state};
 use camino::Utf8Path;
 use poem::http::StatusCode;
 use poem::test::TestClient;

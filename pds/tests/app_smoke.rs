@@ -5,8 +5,8 @@ async fn stub_app_serves_metrics_route() {
     // Use the metrics route directly so this test never depends on the
     // process-global OAuth env that `oauth_app_serves_jwks_and_metadata`
     // mutates (tests within a binary may run in parallel threads).
-    cacos_pds::observability::metrics::init_metrics();
-    let client = TestClient::new(cacos_pds::observability::http::metrics_route());
+    cacos_pds_core::observability::metrics::init_metrics();
+    let client = TestClient::new(cacos_pds_core::observability::http::metrics_route());
     let resp = client.get("/metrics").send().await;
     resp.assert_status_is_ok();
 }
@@ -27,8 +27,8 @@ async fn oauth_app_serves_jwks_and_metadata() {
         std::env::set_var("PDS_DB_PATH", dir.path().join("account.sqlite").as_str());
         std::env::set_var("PDS_PUBLIC_URL", "https://pds.test");
     }
-    cacos_pds::observability::metrics::init_metrics();
-    let client = TestClient::new(cacos_pds::xrpc::build_app().await);
+    cacos_pds_core::observability::metrics::init_metrics();
+    let client = TestClient::new(cacos_pds_server::xrpc::build_app().await);
     let resp = client.get("/oauth/jwks").send().await;
     resp.assert_status_is_ok();
     let resp = client

@@ -1,0 +1,30 @@
+# cacos-pds-identity/Cargo.toml
+[package]
+name = "cacos-pds-identity"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+# --- storage / entities (did_doc entity + the typed `Did` column wrapper) ---
+migration = { path = "../migration", package = "cacos-migration" }
+# Step 2: BackgroundQueue moved into cacos-pds-core
+cacos-pds-core = { path = "../cacos-pds-core" }
+sea-orm = { workspace = true }
+
+# --- atproto protocol crates (DidCache trait, DidDocument, CacheResult) ---
+rsky-identity = { workspace = true }
+
+# --- runtime / time ---
+tokio = { workspace = true }
+time = { workspace = true }
+
+# --- error handling / serialization ---
+anyhow = { workspace = true }
+serde_json = { workspace = true }
+async-trait = "0.1"
+
+# --- observability ---
+tracing = { workspace = true }
+
+[dev-dependencies]
+camino-tempfile = { workspace = true }

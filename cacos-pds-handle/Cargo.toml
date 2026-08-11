@@ -1,0 +1,14 @@
+[package]
+name = "cacos-pds-handle"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+# Handle normalization + TLD validation
+rsky-syntax = { workspace = true }
+# Explicit-slur detection for handle validation
+rsky-common = { workspace = true }
+# Error derive on `HandleError`
+thiserror = { workspace = true }
+# `#[tokio::test]` in the unit tests; `macros` is part of the workspace's tokio feature set
+tokio = { workspace = true }

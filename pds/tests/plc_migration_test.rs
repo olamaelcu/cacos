@@ -7,10 +7,10 @@
 //! re-creates it if the file is removed, and the reader returns
 //! `NotFound` when nothing is on disk yet.
 
-use cacos_pds::context::PDS_REPO_SIGNING_KEYPAIR;
-use cacos_pds::error::PdsError;
-use cacos_pds::xrpc::build_app_with_state;
-use cacos_pds::xrpc::test_utils::{create_test_account, test_state};
+use cacos_pds_account::auth::PDS_REPO_SIGNING_KEYPAIR;
+use cacos_pds_core::error::PdsError;
+use cacos_pds_server::xrpc::build_app_with_state;
+use cacos_pds_server::xrpc::test_utils::{create_test_account, test_state};
 use poem::test::TestClient;
 use serde_json::json;
 
@@ -80,7 +80,7 @@ async fn migrate_rotation_keys_backfills_missing_files() {
 
     // Backfill via the same write API the production migration uses,
     // seeded with the shared server rotation key bytes.
-    use cacos_pds::xrpc::com::atproto::server::PDS_PLC_ROTATION_KEYPAIR;
+    use cacos_pds_account::auth::PDS_PLC_ROTATION_KEYPAIR;
     let secret_bytes = PDS_PLC_ROTATION_KEYPAIR.secret_bytes().to_vec();
     state
         .actor_store

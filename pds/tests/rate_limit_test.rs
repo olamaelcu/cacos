@@ -1,8 +1,8 @@
 //! Per-IP rate limiting, per-account login lockout, and password-reset
 //! enumeration-defense integration tests.
 
-use cacos_pds::xrpc::build_app_with_state;
-use cacos_pds::xrpc::test_utils::{create_test_account, test_state};
+use cacos_pds_server::xrpc::build_app_with_state;
+use cacos_pds_server::xrpc::test_utils::{create_test_account, test_state};
 use poem::test::TestClient;
 use serde_json::json;
 
@@ -160,7 +160,7 @@ async fn login_lockout_resets_after_successful_login() {
     );
     // The account must not be locked: `locked_until` is NULL.
     let (count, locked_until) =
-        cacos_pds::account::helpers::account::get_account_lockout_state("did:plc:resetlock", &db)
+        cacos_pds_account::account::helpers::account::get_account_lockout_state("did:plc:resetlock", &db)
             .await
             .unwrap();
     assert_eq!(
@@ -193,7 +193,7 @@ async fn password_reset_returns_200_for_missing_account() {
         "requestPasswordReset for missing account must return 200 OK"
     );
     // No email token should have been minted for the missing account.
-    let count: i64 = cacos_pds::account::helpers::account::count_email_tokens_for_email(
+    let count: i64 = cacos_pds_account::account::helpers::account::count_email_tokens_for_email(
         "nobody@example.com",
         &db,
     )

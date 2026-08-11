@@ -1,0 +1,10 @@
+# cacos-pds-mailer/Cargo.toml
+[package]
+name = "cacos-pds-mailer"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = { workspace = true }
+tracing = { workspace = true }
+serde = { workspace = true }

@@ -5,8 +5,8 @@
 //! through the assembled poem app. Test isolation: each test gets its
 //! own temp-directory-backed [`SharedState`] via [`test_state`].
 
-use cacos_pds::xrpc::build_app_with_state;
-use cacos_pds::xrpc::test_utils::test_state;
+use cacos_pds_server::xrpc::build_app_with_state;
+use cacos_pds_server::xrpc::test_utils::test_state;
 use poem::test::TestClient;
 use serde_json::json;
 

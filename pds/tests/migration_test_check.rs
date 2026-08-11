@@ -4,7 +4,7 @@
 
 #[tokio::test]
 async fn check_lockout_columns_present() {
-    let (state, _dirs) = cacos_pds::xrpc::test_utils::test_state().await;
+    let (state, _dirs) = cacos_pds_server::xrpc::test_utils::test_state().await;
     use sea_orm::{ConnectionTrait, DatabaseBackend, Statement};
     let db = state.account_manager.db.clone();
     let stmt = Statement::from_string(
