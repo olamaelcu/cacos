@@ -189,7 +189,7 @@ requests past the `TokenGuard`.
 
 #### R13 — rsky-oauth security audit / ADR 0011 (this PR)
 
-`docs/adr/0011-rsky-oauth-audit.md` documents the posture cacos inherits
+`doc/adr/0011-rsky-oauth-audit.md` documents the posture cacos inherits
 from `rsky-oauth` (PKCE-S256 required, exact-match `redirect_uri` with
 RFC 8252 §7.3 loopback wildcard, PAR + DPoP required), the three open
 upstream gaps (constant-time compare, token-endpoint wildcard,
