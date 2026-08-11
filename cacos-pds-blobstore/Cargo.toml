@@ -1,0 +1,44 @@
+[workspace]
+
+[package]
+name = "cacos-pds-blobstore"
+version = "0.1.0"
+edition = "2024"
+
+# Self-contained dependencies (absolute versions). The empty
+# `[workspace]` table above keeps this crate independent of the parent
+# workspace's resolver — it compiles and tests in isolation. When the
+# consolidation commit adds `members = [..., "cacos-pds-blobstore"]` to
+# the root `Cargo.toml`, this empty `[workspace]` table should be
+# removed and these deps migrated to `workspace = true`.
+
+[dependencies]
+# --- atproto protocol crates (git-pinned rsky fork) ---
+rsky-blobstore = { git = "https://github.com/olamaelcu/rsky", rev = "aee5aec5ad9473d80232beab58ddba25a936298a" }
+
+# --- blob storage backend ---
+opendal = { version = "0.53", default-features = false, features = ["services-fs", "services-s3", "services-memory"] }
+
+# --- error handling ---
+anyhow = "1.0.79"
+
+# --- async / futures ---
+bytes = "1"
+futures = "0.3"
+
+# --- observability (metric counters + tracing) ---
+metrics = "0.24.4"
+tracing = "0.1.41"
+
+# --- crypto / encoding primitives ---
+rand = "0.8"
+hex = "0.4"
+
+# --- CID type from the atproto ecosystem ---
+lexicon_cid = { package = "cid", version = "0.11.1", features = ["serde-codec"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+rsky-common = { git = "https://github.com/olamaelcu/rsky", rev = "aee5aec5ad9473d80232beab58ddba25a936298a" }
+sha2 = "0.10"
+camino-tempfile = "1"
