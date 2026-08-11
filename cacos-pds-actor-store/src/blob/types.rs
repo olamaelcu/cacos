@@ -1,9 +1,9 @@
 //! Shared types and row-mapping helpers for the blob module.
 
 use crate::db::ActorDb;
-use cacos_pds_core::background::BackgroundQueue;
-use cacos_pds_blobstore::{BlobStore, BoxedBlobStream};
 use anyhow::Result;
+use cacos_pds_blobstore::{BlobStore, BoxedBlobStream};
+use cacos_pds_core::background::BackgroundQueue;
 use lexicon_cid::Cid;
 use sea_orm::QueryResult;
 use std::sync::Arc;

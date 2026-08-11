@@ -5,12 +5,12 @@
 //! channel and the Stream interface. The consumer `next()`s on a unbuffered
 //! mpsc sender that we feed from the broadcast on a small background task.
 
-use cacos_pds_core::observability::metrics::OUTBOX_BUFFER_LAG;
-use cacos_pds_core::observability::timing::timed;
 use crate::Sequencer;
 use crate::apalis_worker::SharedBroadcast;
 use crate::events::SeqEvt;
 use anyhow::Result;
+use cacos_pds_core::observability::metrics::OUTBOX_BUFFER_LAG;
+use cacos_pds_core::observability::timing::timed;
 use futures::stream::{self, Stream, StreamExt};
 use std::pin::Pin;
 use std::sync::Arc;
@@ -221,12 +221,12 @@ impl Stream for OutboxStream {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cacos_pds_core::db::DatabaseKind;
-    use cacos_pds_core::db::tests::TestDatabaseKind;
-    use migration::types::did::Did;
     use crate::crawlers::Crawlers;
     use crate::events::{RepoSeqNew, now_offset};
+    use cacos_pds_core::db::DatabaseKind;
+    use cacos_pds_core::db::tests::TestDatabaseKind;
     use futures::StreamExt;
+    use migration::types::did::Did;
 
     async fn test_sequencer() -> (Sequencer, cacos_pds_core::db::tests::TestDb) {
         let db = DatabaseKind::Sequencer.open_test_db().await;
@@ -240,9 +240,7 @@ mod tests {
     }
 
     fn typed_event(did: &str, kind: &str) -> SeqEvt {
-        use crate::events::{
-            AccountEvt, IdentityEvt, TypedAccountEvt, TypedIdentityEvt,
-        };
+        use crate::events::{AccountEvt, IdentityEvt, TypedAccountEvt, TypedIdentityEvt};
         match kind {
             "identity" => SeqEvt::TypedIdentityEvt(TypedIdentityEvt {
                 r#type: "identity".to_string(),

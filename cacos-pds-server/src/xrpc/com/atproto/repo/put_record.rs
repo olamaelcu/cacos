@@ -1,10 +1,10 @@
 //! `com.atproto.repo.putRecord` handler.
 
-use cacos_pds_core::observability::timing::timed;
 use crate::xrpc::com::atproto::repo::prepare::{
     PrepareUpdateOpts, prepare_update, set_collection_name,
 };
 use crate::xrpc::{ApiError, ApiResult, SharedState};
+use cacos_pds_core::observability::timing::timed;
 use lexicon_cid::Cid;
 use poem::web::{Data, Json};
 use rsky_lexicon::com::atproto::repo::{PutRecordInput, PutRecordOutput};

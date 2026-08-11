@@ -1,9 +1,9 @@
 //! `com.atproto.server.deleteAccount` handler.
 
-use cacos_pds_account::account::EmailTokenPurpose;
-use cacos_pds_account::account::helpers::account::{AccountStatus, AvailabilityFlags};
 use crate::xrpc::auth_extractors::RequireAccountAdmin;
 use crate::xrpc::{ApiError, ApiResult, SharedState};
+use cacos_pds_account::account::EmailTokenPurpose;
+use cacos_pds_account::account::helpers::account::{AccountStatus, AvailabilityFlags};
 use poem::web::{Data, Json};
 use rsky_lexicon::com::atproto::server::DeleteAccountInput;
 use tracing_unwrap::ResultExt;

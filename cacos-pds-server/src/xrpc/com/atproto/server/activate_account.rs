@@ -1,10 +1,10 @@
 //! `com.atproto.server.activateAccount` handler.
 
-use cacos_pds_account::account::AccountManager;
-use cacos_pds_account::account::helpers::account::AvailabilityFlags;
 use crate::xrpc::auth_extractors::AccessFull;
 use crate::xrpc::com::atproto::server::assert_valid_did_documents_for_service;
 use crate::xrpc::{ApiError, ApiResult, SharedState};
+use cacos_pds_account::account::AccountManager;
+use cacos_pds_account::account::helpers::account::AvailabilityFlags;
 use poem::web::Data;
 use rsky_syntax::handle::INVALID_HANDLE;
 use tracing_unwrap::ResultExt;

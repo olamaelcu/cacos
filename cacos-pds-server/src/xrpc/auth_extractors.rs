@@ -12,12 +12,12 @@
 //! context from a thread-local, so every access-token validation is
 //! wrapped in `set_dpop_request_context` / `clear_dpop_request_context`.
 
+use crate::xrpc::ApiError;
 use cacos_pds_account::account::helpers::admin_tokens::AdminScope;
 use cacos_pds_account::account::helpers::auth::AuthScope;
 use cacos_pds_account::auth::verifier::{
     AccessOutput, AuthError, Credentials, DpopRequestContext, ValidateAccessTokenOpts,
 };
-use crate::xrpc::ApiError;
 use poem::IntoResponse;
 use poem::Request;
 use poem::RequestBody;
@@ -72,7 +72,9 @@ async fn validate_access(
             .filter_map(|v| v.to_str().ok().map(String::from))
             .collect(),
     });
-    let result = cacos_pds_account::auth::verifier::validate_access_token(auth_header(req), scopes, opts).await;
+    let result =
+        cacos_pds_account::auth::verifier::validate_access_token(auth_header(req), scopes, opts)
+            .await;
     cacos_pds_account::auth::verifier::clear_dpop_request_context();
     result
 }
@@ -368,12 +370,15 @@ impl<'a> FromRequest<'a> for OptionalAccessOrAdminToken {
                     Err(error) => Err(poem_error(auth_error_to_api_error(&error))),
                 }
             }
-            Some(_) => match cacos_pds_account::auth::verifier::verify_admin_token(auth_header(req)).await {
-                Ok(access) => Ok(OptionalAccessOrAdminToken {
-                    access: Some(access),
-                }),
-                Err(error) => Err(poem_error(auth_error_to_api_error(&error))),
-            },
+            Some(_) => {
+                match cacos_pds_account::auth::verifier::verify_admin_token(auth_header(req)).await
+                {
+                    Ok(access) => Ok(OptionalAccessOrAdminToken {
+                        access: Some(access),
+                    }),
+                    Err(error) => Err(poem_error(auth_error_to_api_error(&error))),
+                }
+            }
         }
     }
 }

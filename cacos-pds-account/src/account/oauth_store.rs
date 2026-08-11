@@ -710,7 +710,8 @@ impl OAuthStore for PdsOAuthStore {
         let row = cacos_pds_core::db::entities::authorized_client::Entity::find()
             .filter(cacos_pds_core::db::entities::authorized_client::Column::Did.eq(did_typed))
             .filter(
-                cacos_pds_core::db::entities::authorized_client::Column::ClientId.eq(client_id.to_owned()),
+                cacos_pds_core::db::entities::authorized_client::Column::ClientId
+                    .eq(client_id.to_owned()),
             )
             .one(&self.db)
             .await

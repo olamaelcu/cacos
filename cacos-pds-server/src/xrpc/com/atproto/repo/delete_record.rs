@@ -1,8 +1,8 @@
 //! `com.atproto.repo.deleteRecord` handler.
 
-use cacos_pds_core::observability::timing::timed;
 use crate::xrpc::com::atproto::repo::prepare::{PrepareDeleteOpts, prepare_delete};
 use crate::xrpc::{ApiError, ApiResult, SharedState};
+use cacos_pds_core::observability::timing::timed;
 use lexicon_cid::Cid;
 use poem::web::{Data, Json};
 use rsky_lexicon::com::atproto::repo::DeleteRecordInput;

@@ -4,11 +4,11 @@
 //! `seq_write`) with `timed()` so the stage histogram and the
 //! inter-event timing layer report them.
 
-use cacos_pds_core::observability::timing::timed;
 use crate::xrpc::com::atproto::repo::prepare::{
     PrepareCreateOpts, assert_valid_record, prepare_create, set_collection_name,
 };
 use crate::xrpc::{ApiError, ApiResult, SharedState};
+use cacos_pds_core::observability::timing::timed;
 use lexicon_cid::Cid;
 use poem::web::{Data, Json};
 use rsky_lexicon::com::atproto::repo::{CreateRecordInput, CreateRecordOutput};

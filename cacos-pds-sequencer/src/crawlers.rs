@@ -3,8 +3,8 @@
 //! Rate limited to once every 20 minutes (`NOTIFY_THRESHOLD`); subsequent
 //! calls within the window are no-ops. Port of `rsky-pds/src/crawlers.rs`.
 
-use cacos_pds_core::error::PdsError;
 use anyhow::Result;
+use cacos_pds_core::error::PdsError;
 use futures::stream::{self, StreamExt};
 use serde::{Deserialize, Serialize};
 use std::time::SystemTime;

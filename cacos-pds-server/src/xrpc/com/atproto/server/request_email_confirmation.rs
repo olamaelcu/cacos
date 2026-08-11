@@ -1,9 +1,9 @@
+use crate::xrpc::auth_extractors::AccessFull;
+use crate::xrpc::{ApiError, ApiResult, SharedState};
 use cacos_pds_account::account::EmailTokenPurpose;
 use cacos_pds_account::account::helpers::account::AvailabilityFlags;
 use cacos_pds_mailer;
 use cacos_pds_mailer::TokenParam;
-use crate::xrpc::auth_extractors::AccessFull;
-use crate::xrpc::{ApiError, ApiResult, SharedState};
 use poem::web::Data;
 
 async fn inner_request_email_confirmation(

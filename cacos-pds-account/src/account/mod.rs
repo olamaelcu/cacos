@@ -180,7 +180,8 @@ impl AccountManager {
         // Metrics (Plan 02 constants; no-ops without a recorder)
         metrics::counter!(cacos_pds_core::observability::metrics::SIGNUPS_TOTAL).increment(1);
         if invite_code.is_some() {
-            metrics::counter!(cacos_pds_core::observability::metrics::INVITE_USAGE_TOTAL).increment(1);
+            metrics::counter!(cacos_pds_core::observability::metrics::INVITE_USAGE_TOTAL)
+                .increment(1);
         }
         Ok((access_jwt, refresh_jwt))
     }

@@ -13,8 +13,8 @@
 //! underlying `did_doc` table stores `OffsetDateTime` via the typed entity
 //! column; the cache converts to/from micros at the boundary.
 
-use cacos_pds_core::background::BackgroundQueue;
 use anyhow::Result;
+use cacos_pds_core::background::BackgroundQueue;
 use migration::entities::did_doc;
 use migration::types::did::Did;
 use rsky_identity::types::{CacheResult, DidCache, DidDocument, GetDocFn};

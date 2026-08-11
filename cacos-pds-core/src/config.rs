@@ -138,7 +138,6 @@ pub fn env_to_cfg() -> ServerConfig {
     }
 }
 
-
 /// Per-actor storage configuration.
 #[derive(Debug, Clone)]
 pub struct ActorStoreConfig {

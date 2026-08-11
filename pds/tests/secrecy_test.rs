@@ -16,8 +16,8 @@
 use std::sync::Once;
 
 use cacos_pds_account::auth::PDS_JWT_KEYPAIR;
-use cacos_pds_account::auth::PDS_REPO_SIGNING_KEYPAIR;
 use cacos_pds_account::auth::PDS_PLC_ROTATION_KEYPAIR;
+use cacos_pds_account::auth::PDS_REPO_SIGNING_KEYPAIR;
 
 static INIT_ENV: Once = Once::new();
 

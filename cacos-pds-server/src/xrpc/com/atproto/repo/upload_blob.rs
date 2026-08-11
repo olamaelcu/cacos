@@ -4,9 +4,9 @@
 //! `blob_put` write with `timed()` so the stage histogram reflects
 //! upload duration.
 
-use cacos_pds_core::observability::timing::timed;
 use crate::xrpc::auth_extractors::AccessStandardIncludeChecks;
 use crate::xrpc::{ApiError, ApiResult, SharedState};
+use cacos_pds_core::observability::timing::timed;
 use poem::web::{Data, Json};
 use rsky_lexicon::com::atproto::repo::{Blob, BlobOutput};
 use sha2::{Digest, Sha256};

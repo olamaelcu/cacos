@@ -26,9 +26,9 @@ use cacos_pds_account::account::AccountManager;
 use cacos_pds_actor_store::ActorStore;
 use cacos_pds_blobstore::{BlobStore, BoxedBlobStream};
 use cacos_pds_core::config::ServerConfig;
-use cacos_pds_sequencer::shared_sequencer::SharedSequencer;
 use cacos_pds_plc::PlcClient;
 use cacos_pds_sequencer::apalis_worker::SharedBroadcast;
+use cacos_pds_sequencer::shared_sequencer::SharedSequencer;
 use cors::CorsPolicy;
 use poem::http::Method;
 use poem::middleware::{Cors, Middleware};
@@ -157,8 +157,8 @@ fn env_limit(name: &str, default: u32) -> u32 {
 }
 
 fn wire_server_routes_with_rate_limits(route: poem::Route) -> poem::Route {
-    use poem::{get, post};
     use cacos_pds_oauth::rate_limit::{RouteRateLimit, ip_limiter};
+    use poem::{get, post};
 
     // Defaults match the cacos-pds cacos-pds-OAuth security plan. A value of
     // 0 disables the per-route limiter.
@@ -170,7 +170,9 @@ fn wire_server_routes_with_rate_limits(route: poem::Route) -> poem::Route {
         ip_limiter(env_limit("PDS_RATELIMIT_PASSWORD_RESET_PER_MINUTE", 5));
     let email_ops_limiter = ip_limiter(env_limit("PDS_RATELIMIT_EMAIL_OPS_PER_MINUTE", 5));
 
-    let rl = |l: std::sync::Arc<cacos_pds_oauth::rate_limit::IpRateLimiter>| RouteRateLimit { limiter: l };
+    let rl = |l: std::sync::Arc<cacos_pds_oauth::rate_limit::IpRateLimiter>| RouteRateLimit {
+        limiter: l,
+    };
 
     route
         .at(

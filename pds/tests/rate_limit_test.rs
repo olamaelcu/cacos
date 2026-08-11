@@ -160,9 +160,12 @@ async fn login_lockout_resets_after_successful_login() {
     );
     // The account must not be locked: `locked_until` is NULL.
     let (count, locked_until) =
-        cacos_pds_account::account::helpers::account::get_account_lockout_state("did:plc:resetlock", &db)
-            .await
-            .unwrap();
+        cacos_pds_account::account::helpers::account::get_account_lockout_state(
+            "did:plc:resetlock",
+            &db,
+        )
+        .await
+        .unwrap();
     assert_eq!(
         count, 0,
         "successful login should reset failedLoginCount to 0"

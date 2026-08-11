@@ -1,7 +1,7 @@
-use cacos_pds_account::account::helpers::account::AvailabilityFlags;
-use cacos_pds_account::account::{AccountManager, EmailTokenPurpose, UpdateEmailOpts};
 use crate::xrpc::auth_extractors::AccessFull;
 use crate::xrpc::{ApiError, ApiResult, SharedState};
+use cacos_pds_account::account::helpers::account::AvailabilityFlags;
+use cacos_pds_account::account::{AccountManager, EmailTokenPurpose, UpdateEmailOpts};
 use poem::web::{Data, Json};
 use rsky_lexicon::com::atproto::server::UpdateEmailInput;
 

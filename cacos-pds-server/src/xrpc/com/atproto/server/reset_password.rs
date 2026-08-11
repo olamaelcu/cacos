@@ -1,5 +1,5 @@
-use cacos_pds_account::account::ResetPasswordOpts;
 use crate::xrpc::{ApiError, ApiResult, SharedState};
+use cacos_pds_account::account::ResetPasswordOpts;
 use poem::web::{Data, Json};
 use rsky_lexicon::com::atproto::server::ResetPasswordInput;
 

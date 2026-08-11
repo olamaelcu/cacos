@@ -40,12 +40,14 @@ async fn actor_store_remote_create_account_rejects_empty_handle_without_mutating
         Err(cacos_pds_oauth::remote_create_account::CreateAccountError::InvalidInput(message))
             if message == "handle must not be empty"
     ));
-    assert!(state
-        .account_manager
-        .get_account("alice.test", None)
-        .await
-        .expect("account lookup must not error")
-        .is_none());
+    assert!(
+        state
+            .account_manager
+            .get_account("alice.test", None)
+            .await
+            .expect("account lookup must not error")
+            .is_none()
+    );
 }
 
 #[tokio::test]

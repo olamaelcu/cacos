@@ -1,5 +1,5 @@
-use cacos_pds_account::account::helpers::account::AvailabilityFlags;
 use crate::xrpc::{ApiError, ApiResult, SharedState};
+use cacos_pds_account::account::helpers::account::AvailabilityFlags;
 use poem::web::{Data, Json};
 use rsky_lexicon::com::atproto::server::{CreateSessionInput, CreateSessionOutput};
 use rsky_syntax::handle::INVALID_HANDLE;

@@ -7,6 +7,9 @@
 //! through the injected [`PlcClient`] instead of a directly-constructed
 //! `plc::Client`, and account creation runs through the shared state.
 
+use crate::xrpc::auth_extractors::UserDidAuthOptional;
+use crate::xrpc::types::SharedIdResolver;
+use crate::xrpc::{ApiError, ApiResult, SharedState};
 use cacos_pds_account::account::CreateAccountOpts;
 use cacos_pds_account::account::helpers::account::AccountStatus;
 use cacos_pds_account::auth::PDS_REPO_SIGNING_KEYPAIR;
@@ -14,9 +17,6 @@ use cacos_pds_handle::{HandleValidationOpts, normalize_and_validate_handle};
 use cacos_pds_plc::operations::{CreateAtprotoOpInput, create_op};
 use cacos_pds_plc::types::{OpOrTombstone, Operation};
 use cacos_pds_sequencer::events::sync_evt_data_from_commit;
-use crate::xrpc::auth_extractors::UserDidAuthOptional;
-use crate::xrpc::types::SharedIdResolver;
-use crate::xrpc::{ApiError, ApiResult, SharedState};
 use email_address::EmailAddress;
 use poem::web::{Data, Json};
 use rsky_common::env::env_bool;

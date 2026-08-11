@@ -6,11 +6,11 @@
 //! `Authorization` header (`validate_access_token`) lives in this
 //! module.
 
-use super::admin::{
-    check_account_status, AccountStatus,
+use super::admin::{AccountStatus, check_account_status};
+use super::register::{
+    ACCOUNT_MANAGER, OAUTH_PROVIDER, SIGNING_KEY_RESOLVER, current_dpop_request_context,
 };
-use super::register::{current_dpop_request_context, ACCOUNT_MANAGER, OAUTH_PROVIDER, SIGNING_KEY_RESOLVER};
-use super::service_jwt::{service_did, verify_service_jwt, ServiceJwtOpts};
+use super::service_jwt::{ServiceJwtOpts, service_did, verify_service_jwt};
 
 use crate::account::helpers::account::{ActorAccount, AvailabilityFlags};
 use crate::account::helpers::admin_tokens::AdminScopeSet;
@@ -20,8 +20,8 @@ use crate::auth::PDS_JWT_KEYPAIR;
 use anyhow::{Result, bail};
 use base64ct::{Base64, Encoding as _};
 use jwt_simple::prelude::*;
-use rsky_oauth::dpop::DpopRequest;
 use rsky_oauth::VerifiedAccess;
+use rsky_oauth::dpop::DpopRequest;
 use std::str;
 use std::time::{SystemTime, UNIX_EPOCH};
 use thiserror::Error;

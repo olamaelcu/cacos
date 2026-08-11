@@ -5,9 +5,9 @@
 //! poem app, and asserts that the `repo_load`, `repo_write`,
 //! `seq_write`, and `blob_put` stage timing histograms are populated.
 
+use cacos_pds_account::auth::PDS_REPO_SIGNING_KEYPAIR;
 use cacos_pds_account::auth::verifier::_reset_auth_dependencies_for_tests;
 use cacos_pds_account::auth::verifier::register_auth_dependencies;
-use cacos_pds_account::auth::PDS_REPO_SIGNING_KEYPAIR;
 use cacos_pds_core::observability::metrics as obs_metrics;
 use cacos_pds_core::observability::metrics::TIMING_STAGE_SECONDS;
 use cacos_pds_server::xrpc::SharedState;

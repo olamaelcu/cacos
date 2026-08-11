@@ -24,12 +24,12 @@ pub mod reset_password;
 pub mod revoke_app_password;
 pub mod update_email;
 
-use cacos_pds_actor_store::ActorStore;
-use cacos_pds_account::auth::PDS_PLC_ROTATION_KEYPAIR;
-use cacos_pds_account::auth::PDS_REPO_SIGNING_KEYPAIR;
-use cacos_pds_plc::PlcClient;
 use crate::xrpc::types::SharedIdResolver;
 use anyhow::{Result, bail};
+use cacos_pds_account::auth::PDS_PLC_ROTATION_KEYPAIR;
+use cacos_pds_account::auth::PDS_REPO_SIGNING_KEYPAIR;
+use cacos_pds_actor_store::ActorStore;
+use cacos_pds_plc::PlcClient;
 use rand::Rng;
 use rsky_crypto::utils::encode_did_key;
 use rsky_identity::types::DidDocument;

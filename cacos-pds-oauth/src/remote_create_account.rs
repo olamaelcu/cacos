@@ -13,9 +13,9 @@ use cacos_pds_blobstore::{BlobStore, BoxedBlobStream};
 use cacos_pds_plc::operations::{CreateAtprotoOpInput, create_op};
 use cacos_pds_plc::types::{OpOrTombstone, Operation};
 use cacos_pds_sequencer::events::sync_evt_data_from_commit;
+use email_address::EmailAddress;
 use rsky_crypto::utils::encode_did_key;
 use rsky_oauth::OAuthError;
-use email_address::EmailAddress;
 use secp256k1::{Keypair, Secp256k1};
 use std::sync::Arc;
 
@@ -86,16 +86,22 @@ impl RemoteCreateAccount for ActorStoreRemoteCreateAccount {
         input: CreateAccountInput,
     ) -> Result<String, CreateAccountError> {
         if input.handle.trim().is_empty() {
-            return Err(CreateAccountError::InvalidInput("handle must not be empty".into()));
+            return Err(CreateAccountError::InvalidInput(
+                "handle must not be empty".into(),
+            ));
         }
         if input.handle.contains('@') {
-            return Err(CreateAccountError::InvalidInput("handle must not contain '@'".into()));
+            return Err(CreateAccountError::InvalidInput(
+                "handle must not contain '@'".into(),
+            ));
         }
         if input.email.trim().is_empty() || !EmailAddress::is_valid(&input.email) {
             return Err(CreateAccountError::InvalidInput("email is invalid".into()));
         }
         if input.password.is_empty() {
-            return Err(CreateAccountError::InvalidInput("password must not be empty".into()));
+            return Err(CreateAccountError::InvalidInput(
+                "password must not be empty".into(),
+            ));
         }
 
         let (did, plc_op, plc_rotation_key) = match build_did_and_plc_op(&input.handle).await {

@@ -5,15 +5,15 @@
 //! blobstore, PLC client, auth verifier) into the per-process
 //! [`crate::xrpc::SharedState`].
 
+use crate::xrpc::SharedState;
 use cacos_pds_account::account::AccountManager;
 use cacos_pds_actor_store::ActorStore;
 use cacos_pds_blobstore::OpenDALBlobStore;
 use cacos_pds_core::config::ServerConfig;
-use cacos_pds_sequencer::shared_sequencer::SharedSequencer;
 use cacos_pds_identity::did_cache::DidSqliteCache;
 use cacos_pds_plc::PlcClient;
 use cacos_pds_sequencer::crawlers::Crawlers;
-use crate::xrpc::SharedState;
+use cacos_pds_sequencer::shared_sequencer::SharedSequencer;
 use rsky_identity::IdResolver;
 use std::sync::Arc;
 use tokio::sync::RwLock;

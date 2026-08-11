@@ -179,7 +179,8 @@ async fn migrate_plc_rotation_keys(dry_run: bool) -> anyhow::Result<()> {
         n = dids.len()
     );
 
-    let global_rotation_did = cacos_pds_server::xrpc::com::atproto::server::global_plc_rotation_key_did();
+    let global_rotation_did =
+        cacos_pds_server::xrpc::com::atproto::server::global_plc_rotation_key_did();
 
     let mut updated = 0usize;
     let mut skipped_no_key = 0usize;

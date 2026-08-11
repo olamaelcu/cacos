@@ -637,20 +637,17 @@ impl SqlRepoReader {
             query = match cid_str {
                 Some(c) => query.filter(
                     sea_orm::Condition::any()
-                        .add(sea_orm::Condition::all().add(
-                            crate::db::repo_block::Column::RepoRev.lt(rev.clone()),
-                        ))
                         .add(
                             sea_orm::Condition::all()
-                                .add(
-                                    crate::db::repo_block::Column::RepoRev
-                                        .eq(rev.clone()),
-                                )
+                                .add(crate::db::repo_block::Column::RepoRev.lt(rev.clone())),
+                        )
+                        .add(
+                            sea_orm::Condition::all()
+                                .add(crate::db::repo_block::Column::RepoRev.eq(rev.clone()))
                                 .add(crate::db::repo_block::Column::Cid.lt(c)),
                         ),
                 ),
-                None => query
-                    .filter(crate::db::repo_block::Column::RepoRev.lt(rev.clone())),
+                None => query.filter(crate::db::repo_block::Column::RepoRev.lt(rev.clone())),
             };
         }
 

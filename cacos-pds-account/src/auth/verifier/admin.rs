@@ -61,9 +61,9 @@ pub fn is_user_or_admin(auth: &AccessOutput, did: &String) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use super::super::bearer::Credentials;
     use super::*;
     use crate::account::helpers::auth::AuthScope;
-    use super::super::bearer::Credentials;
 
     #[test]
     fn admin_password_prefers_upstream_env_name() {

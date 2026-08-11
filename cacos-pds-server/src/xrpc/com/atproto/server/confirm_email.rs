@@ -1,7 +1,7 @@
-use cacos_pds_account::account::helpers::account::AvailabilityFlags;
-use cacos_pds_account::account::{AccountManager, ConfirmEmailOpts};
 use crate::xrpc::auth_extractors::AccessFull;
 use crate::xrpc::{ApiError, ApiResult, SharedState};
+use cacos_pds_account::account::helpers::account::AvailabilityFlags;
+use cacos_pds_account::account::{AccountManager, ConfirmEmailOpts};
 use poem::web::{Data, Json};
 use rsky_lexicon::com::atproto::server::ConfirmEmailInput;
 

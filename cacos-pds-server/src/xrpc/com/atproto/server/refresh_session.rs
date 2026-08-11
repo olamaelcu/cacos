@@ -1,6 +1,6 @@
-use cacos_pds_account::account::helpers::account::AvailabilityFlags;
 use crate::xrpc::auth_extractors::Refresh;
 use crate::xrpc::{ApiError, ApiResult, SharedState};
+use cacos_pds_account::account::helpers::account::AvailabilityFlags;
 use poem::web::{Data, Json};
 use rsky_lexicon::com::atproto::server::RefreshSessionOutput;
 use rsky_syntax::handle::INVALID_HANDLE;

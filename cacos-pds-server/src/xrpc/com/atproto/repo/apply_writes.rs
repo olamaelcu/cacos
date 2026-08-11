@@ -4,12 +4,12 @@
 //! `prepare_*` helper, then writes all of them in a single repo
 //! transaction so `seq_write` coincides with one commit.
 
-use cacos_pds_core::observability::timing::timed;
 use crate::xrpc::com::atproto::repo::prepare::{
     PrepareCreateOpts, PrepareDeleteOpts, PrepareUpdateOpts, prepare_create, prepare_delete,
     prepare_update,
 };
 use crate::xrpc::{ApiError, ApiResult, SharedState};
+use cacos_pds_core::observability::timing::timed;
 use lexicon_cid::Cid;
 use poem::web::{Data, Json};
 use rsky_lexicon::com::atproto::repo::{

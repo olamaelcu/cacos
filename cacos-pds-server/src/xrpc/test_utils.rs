@@ -4,16 +4,16 @@
 //! directories. Callers must keep the returned temp dirs alive for the
 //! lifetime of the state.
 
+use crate::xrpc::SharedState;
 use cacos_pds_account::account::AccountManager;
 use cacos_pds_actor_store::ActorStore;
 use cacos_pds_blobstore::{BlobStore, BoxedBlobStream, OpenDALBlobStore};
 use cacos_pds_core::config::ServerConfig;
-use cacos_pds_sequencer::shared_sequencer::SharedSequencer;
 use cacos_pds_identity::did_cache::DidSqliteCache;
 use cacos_pds_plc::MockPlcClient;
 use cacos_pds_sequencer::crawlers::Crawlers;
+use cacos_pds_sequencer::shared_sequencer::SharedSequencer;
 use cacos_pds_sequencer::{Sequencer, apalis_worker::SharedBroadcast};
-use crate::xrpc::SharedState;
 use rsky_identity::IdResolver;
 use std::sync::{Arc, Once};
 use tokio::sync::RwLock;
@@ -131,7 +131,10 @@ pub async fn test_state() -> (SharedState, Vec<tempfile::TempDir>) {
 
     // Plan 06: account-status checks inside validate_access_token need
     // the registered AccountManager.
-    cacos_pds_account::auth::verifier::register_auth_dependencies(Arc::new(account_manager.clone()), None);
+    cacos_pds_account::auth::verifier::register_auth_dependencies(
+        Arc::new(account_manager.clone()),
+        None,
+    );
 
     let state = SharedState {
         account_manager,
@@ -187,10 +190,7 @@ pub async fn create_test_account(state: &SharedState, did: &str, handle: &str) -
         .unwrap()
 }
 
-async fn read_repo_root(
-    state: &SharedState,
-    did: &str,
-) -> Option<(lexicon_cid::Cid, String)> {
+async fn read_repo_root(state: &SharedState, did: &str) -> Option<(lexicon_cid::Cid, String)> {
     use sea_orm::{ConnectionTrait, QueryResult, Value};
     use std::str::FromStr;
 
@@ -206,12 +206,8 @@ async fn read_repo_root(
         .await
         .expect("read_repo_root: query repo_root");
     let row = row?;
-    let cid_str: String = row
-        .try_get_by_index(0)
-        .expect("read_repo_root: cid column");
-    let rev: String = row
-        .try_get_by_index(1)
-        .expect("read_repo_root: rev column");
+    let cid_str: String = row.try_get_by_index(0).expect("read_repo_root: cid column");
+    let rev: String = row.try_get_by_index(1).expect("read_repo_root: rev column");
     let cid = lexicon_cid::Cid::from_str(&cid_str).ok()?;
     Some((cid, rev))
 }

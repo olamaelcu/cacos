@@ -1,8 +1,8 @@
+use crate::xrpc::{ApiError, ApiResult, SharedState};
 use cacos_pds_account::account::EmailTokenPurpose;
 use cacos_pds_account::account::helpers::account::AvailabilityFlags;
 use cacos_pds_mailer;
 use cacos_pds_mailer::IdentifierAndTokenParams;
-use crate::xrpc::{ApiError, ApiResult, SharedState};
 use poem::web::{Data, Json};
 use rsky_lexicon::com::atproto::server::RequestPasswordResetInput;
 

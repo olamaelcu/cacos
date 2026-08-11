@@ -4,13 +4,13 @@
 //! subscribers. The handler validates the cursor, backfills from the
 //! sequencer DB if needed, then live-streams from the broadcast channel.
 
-use cacos_pds_sequencer::shared_sequencer::SharedSequencer;
 use cacos_pds_core::db::types::db_id::DbId;
 use cacos_pds_sequencer::apalis_worker::SharedBroadcast;
 use cacos_pds_sequencer::events::{
     SeqEvt, TypedAccountEvt, TypedCommitEvt, TypedIdentityEvt, TypedSyncEvt,
 };
 use cacos_pds_sequencer::outbox::{Outbox, OutboxOpts};
+use cacos_pds_sequencer::shared_sequencer::SharedSequencer;
 use cacos_pds_sequencer::ws_frames::{
     ErrorFrame, ErrorFrameBody, Frame, InfoFrameBody, MessageFrame, MessageFrameOpts,
 };
@@ -420,13 +420,13 @@ mod tests {
 #[cfg(test)]
 mod tcp_roundtrip_tests {
     use super::subscribe_repos;
-    use cacos_pds_sequencer::shared_sequencer::SharedSequencer;
     use cacos_pds_core::db::DatabaseKind;
     use cacos_pds_sequencer::Sequencer;
     use cacos_pds_sequencer::apalis_worker::{
         SharedBroadcast, connect_jobs_db, spawn_seq_event_worker,
     };
     use cacos_pds_sequencer::crawlers::Crawlers;
+    use cacos_pds_sequencer::shared_sequencer::SharedSequencer;
     use futures::StreamExt;
     use lexicon_cid::Cid;
     use rsky_repo::block_map::BlockMap;

@@ -16,8 +16,8 @@
 //!   finishes for every actor.
 
 use jwt_simple::algorithms::ES256kKeyPair;
-use secrecy::{ExposeSecret, ExposeSecretMut, SecretBox};
 use secp256k1::{Keypair, Secp256k1, SecretKey};
+use secrecy::{ExposeSecret, ExposeSecretMut, SecretBox};
 use std::env;
 use std::sync::LazyLock;
 use zeroize::Zeroize;
