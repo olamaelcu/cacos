@@ -37,12 +37,27 @@ serves the XRPC routes, `GET /metrics`, `GET /_health`, `GET /xrpc/_health`,
 
 ### Workspace
 
-A two-crate Cargo workspace:
+A 12-crate Cargo workspace. Foundation and leaves are pure libraries;
+`cacos-pds-server` and `cacos-pds-migrate` are the two binaries; `pds` is
+a thin shell whose only purpose is to host the `pds/tests/*.rs`
+integration suite.
 
-- `pds/` — the [cacos-pds](https://docs.rs/cacos-pds) binary crate. Runs a [poem](https://docs.rs/poem) HTTP server on
-  `127.0.0.1:8080`.
-- `migration/` — the [cacos-migration](https://docs.rs/cacos-migration) crate. Holds the [sea-orm](https://docs.rs/sea-orm) entities and
-  migrators for every PDS database.
+| Crate                        | Layer | Kind   | Owns                                                                                  |
+|------------------------------|-------|--------|---------------------------------------------------------------------------------------|
+| `migration/`                 | L0    | lib    | [sea-orm](https://docs.rs/sea-orm) entities + migrators for every PDS database         |
+| `pds/`                       | L0    | lib    | `pds/tests/*.rs` integration suite; `cacos_pds::context::SharedSequencer` shim          |
+| `cacos-pds-blobstore/`       | L1    | lib    | `BlobStore` trait re-export + OpenDAL backend                                          |
+| `cacos-pds-plc/`             | L1    | lib    | `PlcClient` trait + PLC operations (`create_op`, `create_atproto_update_op`, ...)        |
+| `cacos-pds-identity/`        | L1    | lib    | SQLite-backed `DidSqliteCache` for resolved DID documents                              |
+| `cacos-pds-handle/`          | L1    | lib    | Handle normalization + TLD validation                                                 |
+| `cacos-pds-mailer/`          | L1    | lib    | Templated mailer functions                                                            |
+| `cacos-pds-core/`             | L2    | lib    | `PdsError` + `ServerConfig` + observability (metrics, tracing, timing) + DB openers + `BackgroundQueue` |
+| `cacos-pds-account/`         | L3    | lib    | `AccountManager` + auth helpers + auth verifier (split into `register`/`bearer`/`dpop`/`admin`/`service_jwt`) + service-signing keypairs |
+| `cacos-pds-actor-store/`     | L3    | lib    | Per-DID SQLite store, blob/record/repo/preference readers                              |
+| `cacos-pds-sequencer/`       | L3    | lib    | `Sequencer` + apalis-shaped worker + `SharedSequencer`                                |
+| `cacos-pds-oauth/`           | L4    | lib    | OAuth provider + remote API + per-IP `governor` rate-limit middleware                   |
+| `cacos-pds-server/`          | L4    | lib+bin| XRPC HTTP surface + `auth_extractors` + the `cacos-pds-server` binary (HTTP daemon)    |
+| `cacos-pds-migrate/`         | L4    | bin    | Operator migration CLI: `cacos-pds-migrate {rotation-keys,plc-rotation-keys}`         |
 
 The workspace pins the [rsky][rsky] ATProto protocol crates from a fork at a
 specific git rev, so updates pull a known revision rather than whatever
@@ -186,6 +201,6 @@ lives at exactly one call site per variant today.
 | `mise run dup`       | `nose` duplication report (excludes migration files) |
 | `mise run infra-up`  | Start MinIO in the background                 |
 | `mise run infra-down`| Stop MinIO                                    |
-| `mise run dev`       | `cargo run -p cacos-pds` (depends on `infra-up`) |
+| `mise run dev`       | `cargo run -p cacos-pds-server` (depends on `infra-up`) |
 
 `docker-compose.yaml` runs MinIO plus a `mc-init` sidecar that creates the `cacos` bucket on first boot.
