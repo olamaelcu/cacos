@@ -1030,6 +1030,46 @@ dependencies = [
 ]
 
 [[package]]
+name = "cacos-pds-migrate"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "base64 0.22.1",
+ "base64-url",
+ "cacos-migration",
+ "cacos-pds-account",
+ "cacos-pds-actor-store",
+ "cacos-pds-core",
+ "cacos-pds-identity",
+ "cacos-pds-mailer",
+ "cacos-pds-plc",
+ "cacos-pds-sequencer",
+ "cacos-pds-server",
+ "chrono",
+ "futures",
+ "hex",
+ "metrics",
+ "once_cell",
+ "rand 0.8.7",
+ "rsky-common",
+ "rsky-crypto",
+ "rsky-identity",
+ "rsky-lexicon",
+ "sea-orm",
+ "secp256k1",
+ "secrecy",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "thiserror 2.0.19",
+ "time",
+ "tokio",
+ "tracing",
+ "zeroize",
+]
+
+[[package]]
 name = "cacos-pds-oauth"
 version = "0.1.0"
 dependencies = [

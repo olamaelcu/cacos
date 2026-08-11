@@ -15,6 +15,7 @@ members = [
     "cacos-pds-sequencer",
     "cacos-pds-oauth",
     "cacos-pds-server",
+    "cacos-pds-migrate",
 ]
 
 

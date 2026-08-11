@@ -1,26 +1,29 @@
-// pds/src/main.rs
+//! cacos-pds-migrate: operator migration tool.
 //!
-//! Operator migration binary. The HTTP server boot has moved to
-//! `cacos-pds-server/src/main.rs`; the only thing left in this binary
-//! is the `migrate { rotation-keys | plc-rotation-keys }` dispatch
-//! (Step 8 will move this into a new `cacos-pds-migrate` binary).
+//! Two subcommands:
+//!
+//! - `cacos-pds-migrate rotation-keys` — walks the actor store directory
+//!   and, for every DID with a `store.sqlite` but no `rotation_key` file,
+//!   writes the global `PDS_PLC_ROTATION_KEYPAIR` secret bytes as the
+//!   per-DID rotation key. Idempotent: DIDs that already have a rotation
+//!   key are skipped.
+//!
+//! - `cacos-pds-migrate plc-rotation-keys [--dry-run]` — walks every DID
+//!   whose PLC document still lists the shared server rotation key,
+//!   fetches the per-DID rotation key from the actor store, builds a
+//!   minimal PLC update op that replaces `rotation_keys` with just the
+//!   per-DID key, signs and submits it, and marks the actor row as
+//!   migrated on success. Idempotent: actors already marked migrated
+//!   are skipped.
 
 #[tokio::main]
 async fn main() {
-    // Subcommand dispatch. `cacos-pds migrate rotation-keys` backfills
-    // per-DID rotation keys for legacy actors; `cacos-pds migrate
-    // plc-rotation-keys` rewrites each DID document to drop the shared
-    // server rotation key.
     let args: Vec<String> = std::env::args().collect();
-    if args.len() < 2 || args[1] != "migrate" {
-        eprintln!("usage: cacos-pds migrate rotation-keys|plc-rotation-keys [--dry-run]");
+    if args.len() < 2 {
+        eprintln!("usage: cacos-pds-migrate rotation-keys|plc-rotation-keys [--dry-run]");
         std::process::exit(2);
     }
-    run_migrate_subcommand(&args[2..]).await;
-}
-
-async fn run_migrate_subcommand(args: &[String]) {
-    let sub = args.first().map(String::as_str).unwrap_or("");
+    let sub = args[1].as_str();
     match sub {
         "rotation-keys" => {
             if let Err(err) = migrate_rotation_keys().await {
@@ -36,7 +39,7 @@ async fn run_migrate_subcommand(args: &[String]) {
             }
         }
         _ => {
-            eprintln!("usage: cacos-pds migrate rotation-keys|plc-rotation-keys [--dry-run]");
+            eprintln!("usage: cacos-pds-migrate rotation-keys|plc-rotation-keys [--dry-run]");
             std::process::exit(2);
         }
     }
