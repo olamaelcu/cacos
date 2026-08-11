@@ -15,7 +15,7 @@ use cacos_pds::account::oauth_store::DbBackedReplayStore;
 use cacos_pds::config::OAuthRemoteConfig;
 use cacos_pds::db::DatabaseKind;
 use cacos_pds::oauth::remote_create_account::MockRemoteCreateAccount;
-use cacos_pds::oauth::{SharedOAuthProvider, build_oauth_app, csrf, registered_provider};
+use cacos_pds::oauth::{SharedOAuthProvider, build_oauth_app, registered_provider};
 use cacos_pds::plc::{HttpPlcClient, PlcClient};
 use cacos_pds::xrpc::build_app_with_state;
 use cacos_pds::xrpc::test_utils::{create_test_account, test_state};
@@ -553,61 +553,6 @@ async fn oauth_remote_post_requires_bearer_token() {
 
     // SAFETY: integration tests run sequentially.
     unsafe { std::env::remove_var("PDS_RATELIMIT_OAUTH_REMOTE_PER_MINUTE") };
-}
-
-// ---------------------------------------------------------------------------
-// R13: keyed CSRF primitive.
-//
-// NOTE: these cover `oauth::csrf` as a primitive only. It is deliberately
-// NOT wired into `/oauth/remote/*`: those endpoints are server-to-server
-// (bearer token, `device_id` in the JSON body) and the PDS sets no cookie
-// on that path, so there is no ambient credential to defend and requiring
-// a CSRF cookie there would reject every legitimate RemoteClient call.
-// See the module docs on `cacos_pds::oauth::csrf`.
-// ---------------------------------------------------------------------------
-
-const CSRF_SECRET: &[u8] = b"integration-test-csrf-secret";
-
-#[test]
-fn csrf_token_round_trip() {
-    let token = csrf::issue("dev-abc", CSRF_SECRET);
-    assert!(
-        csrf::verify("dev-abc", &token, CSRF_SECRET),
-        "a freshly issued token must verify for its own device id"
-    );
-    // Issuance is deterministic for a fixed (device, secret) pair.
-    assert_eq!(token, csrf::issue("dev-abc", CSRF_SECRET));
-    // ...and opaque: the device id must not be recoverable from the token.
-    assert!(!token.contains("dev-abc"));
-}
-
-#[test]
-fn csrf_rejects_wrong_device_id() {
-    let token = csrf::issue("dev-abc", CSRF_SECRET);
-    assert!(!csrf::verify("dev-xyz", &token, CSRF_SECRET));
-    assert!(!csrf::verify("", &token, CSRF_SECRET));
-}
-
-#[test]
-fn csrf_rejects_tampered_token() {
-    let token = csrf::issue("dev-abc", CSRF_SECRET);
-
-    // Flip the first base64 character: it carries significant bits of
-    // byte 0, so the decoded tag definitely differs.
-    let mut chars: Vec<char> = token.chars().collect();
-    chars[0] = if chars[0] == 'A' { 'B' } else { 'A' };
-    let tampered: String = chars.into_iter().collect();
-    assert_ne!(tampered, token);
-    assert!(!csrf::verify("dev-abc", &tampered, CSRF_SECRET));
-
-    // Malformed input is rejected, never panics.
-    assert!(!csrf::verify("dev-abc", "!!!not-base64!!!", CSRF_SECRET));
-    assert!(!csrf::verify("dev-abc", "", CSRF_SECRET));
-    assert!(!csrf::verify(
-        "dev-abc",
-        &token[..token.len() - 4],
-        CSRF_SECRET
-    ));
 }
 
 // ---------------------------------------------------------------------------

@@ -7,7 +7,6 @@
 //! `PDS_OAUTH_TRUSTED_CLIENTS`) and wires it to the cacos backing store
 //! ([`crate::account::oauth_store::PdsOAuthStore`]).
 
-pub mod csrf;
 pub mod fetcher;
 pub mod remote;
 pub mod remote_create_account;
