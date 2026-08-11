@@ -148,21 +148,63 @@ pub async fn test_state() -> (SharedState, Vec<tempfile::TempDir>) {
 
 /// Creates an account directly through the AccountManager and returns its
 /// (access_jwt, refresh_jwt) — the same tokens `createSession` would issue.
+///
+/// If a `repo_root` row already exists for the DID (some tests pre-create a
+/// repo via the actor store), the (cid, rev) used to satisfy the repo-root
+/// guard is whatever the actor store wrote, so the equality no-op succeeds.
+/// Otherwise we fall back to a small placeholder (cid, rev) for tests that
+/// don't drive a real repo first.
 pub async fn create_test_account(state: &SharedState, did: &str, handle: &str) -> (String, String) {
+    use cacos_pds_account::account::CreateAccountOpts;
+
+    // If a repo row already exists (e.g., the test created a repo via
+    // the actor store first), reuse its (cid, rev) so the repo-root
+    // guard's equality no-op (`existing.rev <= new.rev`) lets the
+    // `create_account` call through.
+    let (repo_cid, repo_rev) = match read_repo_root(state, did).await {
+        Some((cid, rev)) => (cid, rev),
+        None => (
+            "bafkreibjfgx2gprinfvicegelk5kosd6y2frmqpqzwqkg7usac74l3t2v4"
+                .parse()
+                .unwrap(),
+            "3jzfcijpj2z2a".to_owned(),
+        ),
+    };
+
     state
         .account_manager
-        .create_account(cacos_pds_account::account::CreateAccountOpts {
+        .create_account(CreateAccountOpts {
             did: did.to_owned(),
             handle: handle.to_owned(),
             email: Some(format!("{handle}@example.com")),
             password: Some("password123".to_owned()),
-            repo_cid: "bafkreibjfgx2gprinfvicegelk5kosd6y2frmqpqzwqkg7usac74l3t2v4"
-                .parse()
-                .unwrap(),
-            repo_rev: "3jzfcijpj2z2a".to_owned(),
+            repo_cid,
+            repo_rev,
             invite_code: None,
             deactivated: None,
         })
         .await
         .unwrap()
+}
+
+async fn read_repo_root(
+    state: &SharedState,
+    did: &str,
+) -> Option<(lexicon_cid::Cid, String)> {
+    use sea_orm::{ConnectionTrait, QueryResult, Value};
+    use std::str::FromStr;
+
+    let stmt = sea_orm::Statement::from_sql_and_values(
+        sea_orm::DatabaseBackend::Sqlite,
+        "SELECT cid, rev FROM repo_root WHERE did = ?1",
+        vec![Value::from(did.to_owned())],
+    );
+    let row: QueryResult = match state.account_manager.db.query_one_raw(stmt).await {
+        Ok(Some(r)) => r,
+        _ => return None,
+    };
+    let cid_str: String = row.try_get_by_index(0).ok()?;
+    let rev: String = row.try_get_by_index(1).ok()?;
+    let cid = lexicon_cid::Cid::from_str(&cid_str).ok()?;
+    Some((cid, rev))
 }
