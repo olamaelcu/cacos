@@ -18,6 +18,11 @@ pub type SigningKeyResolver = Box<dyn Fn(String, bool) -> Result<String> + Send 
 pub(crate) static OAUTH_PROVIDER: RwLock<Option<Arc<OAuthProvider>>> = RwLock::new(None);
 pub(crate) static ACCOUNT_MANAGER: RwLock<Option<Arc<AccountManager>>> = RwLock::new(None);
 pub(crate) static SIGNING_KEY_RESOLVER: OnceLock<SigningKeyResolver> = OnceLock::new();
+/// Service DID the verifier uses as the audience for inbound service
+/// JWTs. Registered at startup from `ServerConfig.service.service_did`
+/// so the verifier no longer reads `PDS_SERVICE_DID` from the process
+/// environment at request time.
+pub(crate) static SERVICE_DID: OnceLock<String> = OnceLock::new();
 
 /// Register the shared OAuth provider (for DPoP-bound access-token
 /// validation) and the `AccountManager` (for account-status checks). Called
@@ -35,6 +40,21 @@ pub fn register_auth_dependencies(
     if let Ok(mut g) = ACCOUNT_MANAGER.write() {
         *g = Some(account_manager);
     }
+}
+
+/// Register the service DID so the verifier (and any callers that
+/// previously read `PDS_SERVICE_DID` from the environment) can resolve
+/// the audience for inbound service JWTs. Called from the XRPC bootstrap
+/// after `SharedStateFromEnv::from_env` constructs the typed config.
+pub fn register_service_did(did: String) {
+    let _ = SERVICE_DID.set(did);
+}
+
+/// Returns the registered service DID, or an empty string if the bootstrap
+/// did not register one. Replaces the direct `env::var("PDS_SERVICE_DID")`
+/// read that the verifier used to do at request time.
+pub(crate) fn service_did_from_registry() -> String {
+    SERVICE_DID.get().cloned().unwrap_or_default()
 }
 
 /// Test-only: clear the registered OAuth provider and AccountManager so

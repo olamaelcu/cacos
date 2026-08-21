@@ -27,7 +27,7 @@ pub async fn health(state: Data<&SharedState>) -> ApiResult<Response> {
         .await;
     match ok {
         Ok(_) => {
-            let version = std::env::var("PDS_VERSION").unwrap_or_else(|_| "0.0.0-test".into());
+            let version = state.config.health.version.clone();
             Ok(Response::builder()
                 .status(StatusCode::OK)
                 .content_type("application/json")

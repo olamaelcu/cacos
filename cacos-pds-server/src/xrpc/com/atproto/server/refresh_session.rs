@@ -39,7 +39,7 @@ async fn inner_refresh_session(
         }
         let rotated = state
             .account_manager
-            .rotate_refresh_token(&token_id)
+            .rotate_refresh_token(&token_id, state.config.service.service_did.clone())
             .await
             .map_err(|e| {
                 tracing::error!("{e:?}");

@@ -29,11 +29,11 @@ use anyhow::{Result, bail};
 use cacos_pds_account::auth::PDS_PLC_ROTATION_KEYPAIR;
 use cacos_pds_account::auth::PDS_REPO_SIGNING_KEYPAIR;
 use cacos_pds_actor_store::ActorStore;
+use cacos_pds_core::config::ServiceConfig;
 use cacos_pds_plc::PlcClient;
 use rand::Rng;
 use rsky_crypto::utils::encode_did_key;
 use rsky_identity::types::DidDocument;
-use std::env;
 
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub struct AssertionContents {
@@ -52,7 +52,7 @@ pub struct AssertionContents {
 ///
 /// Wraps [`PDS_PLC_ROTATION_KEYPAIR`], which panics on a missing env var.
 pub fn global_plc_rotation_key_did() -> Option<String> {
-    env::var("PDS_PLC_ROTATION_KEY_K256_PRIVATE_KEY_HEX")
+    std::env::var("PDS_PLC_ROTATION_KEY_K256_PRIVATE_KEY_HEX")
         .ok()
         .map(|_| encode_did_key(&PDS_PLC_ROTATION_KEYPAIR.public_key()))
 }
@@ -85,18 +85,14 @@ pub async fn safe_resolve_did_doc(
 }
 
 /// generate an invite code preceded by the hostname with '.'s replaced by '-'s
-pub fn gen_invite_code() -> String {
-    env::var("PDS_HOSTNAME")
-        .unwrap_or("localhost".to_owned())
-        .replace('.', "-")
-        + "-"
-        + &get_random_token().to_lowercase()
+pub fn gen_invite_code(hostname: &str) -> String {
+    hostname.replace('.', "-") + "-" + &get_random_token().to_lowercase()
 }
 
-pub fn gen_invite_codes(count: i32) -> Vec<String> {
+pub fn gen_invite_codes(count: i32, hostname: &str) -> Vec<String> {
     let mut codes = Vec::new();
     for _i in 0..count {
-        codes.push(gen_invite_code());
+        codes.push(gen_invite_code(hostname));
     }
     codes
 }
@@ -114,8 +110,12 @@ pub fn validate_handle(handle: &str, service_handle_domains: &[String]) -> bool 
     })
 }
 
-pub async fn is_valid_did_doc_for_service(did: String, plc: &dyn PlcClient) -> Result<bool> {
-    match assert_valid_did_documents_for_service(did, plc).await {
+pub async fn is_valid_did_doc_for_service(
+    did: String,
+    plc: &dyn PlcClient,
+    service: &ServiceConfig,
+) -> Result<bool> {
+    match assert_valid_did_documents_for_service(did, plc, service).await {
         Ok(()) => Ok(true),
         Err(_) => Ok(false),
     }
@@ -124,8 +124,9 @@ pub async fn is_valid_did_doc_for_service(did: String, plc: &dyn PlcClient) -> R
 pub async fn assert_valid_did_documents_for_service(
     did: String,
     plc: &dyn PlcClient,
+    service: &ServiceConfig,
 ) -> Result<()> {
-    assert_valid_did_documents_for_service_with_store(did, plc, None).await
+    assert_valid_did_documents_for_service_with_store(did, plc, None, service).await
 }
 
 /// As [`assert_valid_did_documents_for_service`], but resolves the DID's own
@@ -135,6 +136,7 @@ pub async fn assert_valid_did_documents_for_service_with_store(
     did: String,
     plc: &dyn PlcClient,
     actor_store: Option<&ActorStore>,
+    service: &ServiceConfig,
 ) -> Result<()> {
     if did.starts_with("did:plc") {
         let resolved = plc.get_document_data(&did).await?;
@@ -151,12 +153,15 @@ pub async fn assert_valid_did_documents_for_service_with_store(
                 .map(|keypair| encode_did_key(&keypair.public_key())),
             None => None,
         };
-        assert_valid_doc_contents(AssertionContents {
-            pds_endpoint,
-            signing_key,
-            rotation_keys: Some(resolved.rotation_keys),
-            per_did_rotation_key,
-        })
+        assert_valid_doc_contents(
+            AssertionContents {
+                pds_endpoint,
+                signing_key,
+                rotation_keys: Some(resolved.rotation_keys),
+                per_did_rotation_key,
+            },
+            service,
+        )
         .await?;
     } else {
         bail!("Not yet supporting did:web")
@@ -164,7 +169,10 @@ pub async fn assert_valid_did_documents_for_service_with_store(
     Ok(())
 }
 
-pub async fn assert_valid_doc_contents(contents: AssertionContents) -> Result<()> {
+pub async fn assert_valid_doc_contents(
+    contents: AssertionContents,
+    service: &ServiceConfig,
+) -> Result<()> {
     let AssertionContents {
         signing_key,
         pds_endpoint,
@@ -185,18 +193,9 @@ pub async fn assert_valid_doc_contents(contents: AssertionContents) -> Result<()
             bail!("No rotation key controlled by this PDS is included in PLC DID data")
         }
     }
-    let port = std::env::var("PDS_PORT")
-        .ok()
-        .and_then(|p| p.parse::<usize>().ok())
-        .unwrap_or(2583);
-    let hostname = std::env::var("PDS_HOSTNAME").unwrap_or("localhost".to_owned());
-    let public_url = if hostname == "localhost" {
-        format!("http://localhost:{port}")
-    } else {
-        format!("https://{hostname}")
-    };
+    let public_url = &service.public_url;
 
-    if pds_endpoint.is_none() || pds_endpoint.unwrap() != public_url {
+    if pds_endpoint.is_none() || pds_endpoint.as_deref() != Some(public_url.as_str()) {
         bail!("DID document atproto_pds service endpoint does not match PDS public url")
     }
 

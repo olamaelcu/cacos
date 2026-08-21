@@ -77,13 +77,17 @@ impl SharedStateFromEnv {
             )
             .expect_or_log("build shared blobstore"),
         );
-        let plc_client: Arc<dyn PlcClient> =
-            cacos_pds_plc::plc_client_from_env(&cfg.identity.plc_url);
+        let plc_client: Arc<dyn PlcClient> = cacos_pds_plc::plc_client_from_env(&cfg.identity);
 
         cacos_pds_account::auth::verifier::register_auth_dependencies(
             Arc::new(account_manager.clone()),
             None,
         );
+        // Register the service DID so the verifier (and any downstream
+        // service-JWT consumers) resolve the audience from the typed
+        // config rather than reading `PDS_SERVICE_DID` off the process
+        // environment at request time.
+        cacos_pds_account::auth::verifier::register_service_did(cfg.service.service_did.clone());
 
         SharedState {
             account_manager,

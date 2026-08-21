@@ -494,7 +494,11 @@ mod tests {
         // an app password session has AppPass scope; AccessFull requires Access
         let (app_pass_access, _) = state
             .account_manager
-            .create_session("did:plc:carol".to_owned(), Some("my app".to_owned()))
+            .create_session(
+                "did:plc:carol".to_owned(),
+                state.config.service.service_did.clone(),
+                Some("my app".to_owned()),
+            )
             .await
             .unwrap();
         let app = Route::new().at("/full", get(full_only)).data(state);

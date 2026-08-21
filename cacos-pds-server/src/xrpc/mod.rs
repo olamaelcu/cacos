@@ -61,7 +61,7 @@ pub struct SharedState {
 pub async fn build_app_with_state(
     state: SharedState,
 ) -> impl poem::Endpoint<Output = poem::Response> {
-    let cors_policy = CorsPolicy::from_env(&state.config.service.public_url);
+    let cors_policy = CorsPolicy::from_config(&state.config.cors, &state.config.service.public_url);
     let cors = Cors::new()
         .allow_origins_fn(move |origin| cors_policy.allows(Some(origin)))
         .allow_methods([
@@ -81,7 +81,7 @@ pub async fn build_app_with_state(
     // unmatched paths get the XRPC `{error,message}` shape.
     let mut xrpc_routes = Route::new();
     xrpc_routes = com::atproto::sync::routes(xrpc_routes);
-    xrpc_routes = wire_server_routes_with_rate_limits(xrpc_routes);
+    xrpc_routes = wire_server_routes_with_rate_limits(xrpc_routes, &state.config.rate_limit);
     xrpc_routes = com::atproto::repo::routes(xrpc_routes);
     xrpc_routes = com::atproto::identity::routes(xrpc_routes);
     xrpc_routes = com::atproto::admin::routes(xrpc_routes);
@@ -105,8 +105,7 @@ pub async fn build_app_with_state(
     );
 
     if std::env::var("PDS_JWT_KEY_K256_PRIVATE_KEY_HEX").is_ok() {
-        let db_path =
-            std::env::var("PDS_DB_PATH").unwrap_or_else(|_| "./account.sqlite".to_string());
+        let db_path = state.config.service_db.account_db_location.clone();
         let oauth_app = match cacos_pds_core::db::DatabaseKind::Account
             .open(camino::Utf8Path::new(&db_path))
             .await
@@ -118,6 +117,7 @@ pub async fn build_app_with_state(
                 state.plc_client.clone(),
                 state.blobstore.clone(),
                 state.sequencer.clone(),
+                state.config.clone(),
             ),
             Err(err) => {
                 tracing::error!(%err, "failed to open account database for OAuth");
@@ -149,26 +149,19 @@ pub async fn build_app() -> impl poem::Endpoint<Output = poem::Response> {
     build_app_with_state(state).await
 }
 
-fn env_limit(name: &str, default: u32) -> u32 {
-    std::env::var(name)
-        .ok()
-        .and_then(|s| s.parse::<u32>().ok())
-        .unwrap_or(default)
-}
-
-fn wire_server_routes_with_rate_limits(route: poem::Route) -> poem::Route {
+fn wire_server_routes_with_rate_limits(
+    route: poem::Route,
+    rate_limit: &cacos_pds_core::config::RateLimitConfig,
+) -> poem::Route {
     use cacos_pds_oauth::rate_limit::{RouteRateLimit, ip_limiter};
     use poem::{get, post};
 
-    // Defaults match the cacos-pds cacos-pds-OAuth security plan. A value of
-    // 0 disables the per-route limiter.
-    let create_session_limiter =
-        ip_limiter(env_limit("PDS_RATELIMIT_CREATE_SESSION_PER_MINUTE", 10));
-    let create_account_limiter =
-        ip_limiter(env_limit("PDS_RATELIMIT_CREATE_ACCOUNT_PER_MINUTE", 10));
-    let password_reset_limiter =
-        ip_limiter(env_limit("PDS_RATELIMIT_PASSWORD_RESET_PER_MINUTE", 5));
-    let email_ops_limiter = ip_limiter(env_limit("PDS_RATELIMIT_EMAIL_OPS_PER_MINUTE", 5));
+    // Per-route per-IP token-bucket caps come from `ServerConfig.rate_limit`.
+    // A value of 0 does not disable the limiter, `ip_limiter` clamps it to 1/min.
+    let create_session_limiter = ip_limiter(rate_limit.create_session_per_minute);
+    let create_account_limiter = ip_limiter(rate_limit.create_account_per_minute);
+    let password_reset_limiter = ip_limiter(rate_limit.password_reset_per_minute);
+    let email_ops_limiter = ip_limiter(rate_limit.email_ops_per_minute);
 
     let rl = |l: std::sync::Arc<cacos_pds_oauth::rate_limit::IpRateLimiter>| RouteRateLimit {
         limiter: l,

@@ -74,9 +74,13 @@ async fn inner_check_account_status(
                 .map_err(|_| ApiError::RuntimeError)
         },
         async {
-            is_valid_did_doc_for_service(requester.clone(), state.plc_client.as_ref())
-                .await
-                .map_err(|_| ApiError::RuntimeError)
+            is_valid_did_doc_for_service(
+                requester.clone(),
+                state.plc_client.as_ref(),
+                &state.config.service,
+            )
+            .await
+            .map_err(|_| ApiError::RuntimeError)
         },
     )
     .map_err(|_: ApiError| ApiError::RuntimeError)?;

@@ -1118,6 +1118,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "base64-url",
+ "cacos-pds-core",
  "data-encoding",
  "hex",
  "indexmap 2.14.0",

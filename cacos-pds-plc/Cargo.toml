@@ -9,6 +9,9 @@ edition = "2024"
 test-utils = []
 
 [dependencies]
+# --- foundation crates ---
+cacos-pds-core = { path = "../cacos-pds-core" }
+
 # --- atproto protocol crates (only rsky-common is used by this crate) ---
 rsky-common = { workspace = true }
 

@@ -8,6 +8,7 @@
 // ([`cacos_pds_account::account::oauth_store::PdsOAuthStore`]).
 
 use cacos_pds_account::account::oauth_store::PdsOAuthStore;
+use cacos_pds_core::config::ServerConfig;
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 #[allow(unused_imports)] // clippy false-positive: used by build_oauth_app's `.data()`
@@ -77,8 +78,11 @@ pub fn device_cookie_secure(public_url: &str) -> bool {
     public_url.starts_with("https://")
 }
 
-/// Lazily-built `HashSet<String>` of `PDS_OAUTH_TRUSTED_CLIENTS` values,
-/// used by `is_trusted_oauth_client` for constant-time membership checks.
+/// Lazily-built `HashSet<String>` of the OAuth trusted-client list
+/// (`ServerConfig.oauth.trusted_clients`), used by
+/// `is_trusted_oauth_client` for constant-time membership checks.
+/// Rebuilt from a freshly-loaded config when the bootstrap updates the
+/// active set (see [`set_trusted_clients_override`]).
 fn trusted_clients_set() -> &'static HashSet<String> {
     static SET: OnceLock<HashSet<String>> = OnceLock::new();
     SET.get_or_init(|| {
@@ -116,15 +120,13 @@ impl SharedOAuthProvider {
         account_db: DatabaseConnection,
         issuer: String,
         audience: String,
+        trusted_clients: Vec<String>,
         replay_store: Box<dyn ReplayStore>,
+        signing_key: Jwk,
+        dpop_secret_hex: Option<String>,
     ) -> Self {
-        let private_key = std::env::var("PDS_JWT_KEY_K256_PRIVATE_KEY_HEX")
-            .expect("PDS_JWT_KEY_K256_PRIVATE_KEY_HEX must be set");
-        let key_bytes = hex::decode(private_key).expect("invalid provider signing key hex");
-        let signing_key = Jwk::from_private_key_bytes(EcCurve::K256, &key_bytes)
-            .expect("invalid provider signing key");
-        let nonce = match std::env::var("PDS_DPOP_SECRET") {
-            Ok(secret_hex) => {
+        let nonce = match dpop_secret_hex {
+            Some(secret_hex) => {
                 let secret: [u8; 32] = hex::decode(secret_hex)
                     .expect("PDS_DPOP_SECRET must be hex")
                     .try_into()
@@ -134,18 +136,9 @@ impl SharedOAuthProvider {
                 secret_box.expose_secret_mut().zeroize();
                 nonce
             }
-            Err(_) => DpopNonce::new_random(DEFAULT_ROTATION_INTERVAL),
+            None => DpopNonce::new_random(DEFAULT_ROTATION_INTERVAL),
         }
         .expect("valid DPoP nonce rotation interval");
-        let trusted_clients: Vec<String> = std::env::var("PDS_OAUTH_TRUSTED_CLIENTS")
-            .ok()
-            .map(|raw| {
-                raw.split(',')
-                    .map(|s| s.trim().to_string())
-                    .filter(|s| !s.is_empty())
-                    .collect()
-            })
-            .unwrap_or_default();
         // Touch the lazy-cached set so it is materialised alongside the
         // provider (avoids a cold-start miss in callers using
         // `is_trusted_oauth_client`).
@@ -204,16 +197,18 @@ fn schedule_dpop_replay_prune(store: Arc<cacos_pds_account::account::oauth_store
     std::mem::forget(queue);
 }
 
-/// Environment-driven bootstrap for the OAuth route set, given an
-/// already-opened (and migrated) account DB. Returns `None` when
-/// `PDS_JWT_KEY_K256_PRIVATE_KEY_HEX` is unset (the server still runs with
-/// `/metrics` only).
+/// Build the OAuth route set, given an already-opened (and migrated)
+/// account DB and the assembled server config. Returns `None` when the
+/// OAuth provider signing key (`PDS_JWT_KEY_K256_PRIVATE_KEY_HEX`) is
+/// unset — the server still runs with `/metrics` only.
 ///
-/// Env:
-/// - `PDS_PUBLIC_URL` (default `http://localhost:8080`): absolute base URL
-///   used to build DPoP `htu` values and OAuth metadata.
-/// - `PDS_OAUTH_REMOTE_CLIENT_URL` / `PDS_OAUTH_REMOTE_CLIENT_TOKEN`:
-///   headless-consent RemoteClient config (see [`cacos_pds_core::config`]).
+/// `ServerConfig` is the canonical source for `service.public_url` (DPoP
+/// `htu` + OAuth metadata), `service.service_did` (JWT audience),
+/// `oauth.trusted_clients` (provider allow-list), and
+/// `oauth.rate_limit_per_minute` (headless-consent per-IP budget).
+/// The bootstrap still reads `PDS_JWT_KEY_K256_PRIVATE_KEY_HEX` /
+/// `PDS_DPOP_SECRET` directly: those are secrets and the secret
+/// provider migration is the focus of a later commit.
 pub fn bootstrap_oauth_app(
     account_db: sea_orm::DatabaseConnection,
     account_manager: cacos_pds_account::account::AccountManager,
@@ -223,15 +218,20 @@ pub fn bootstrap_oauth_app(
         dyn cacos_pds_blobstore::BlobStore<Stream = cacos_pds_blobstore::BoxedBlobStream>,
     >,
     sequencer: cacos_pds_sequencer::shared_sequencer::SharedSequencer,
+    config: ServerConfig,
 ) -> Option<OAuthBootstrap<impl poem::Endpoint<Output = poem::Response>>> {
     if std::env::var("PDS_JWT_KEY_K256_PRIVATE_KEY_HEX").is_err() {
         return None;
     }
-    let public_url =
-        std::env::var("PDS_PUBLIC_URL").unwrap_or_else(|_| "http://localhost:8080".to_string());
+    let public_url = config.service.public_url.clone();
     let issuer = public_url.clone();
-    let audience =
-        std::env::var("PDS_SERVICE_DID").unwrap_or_else(|_| "did:web:localhost".to_string());
+    let audience = config.service.service_did.clone();
+
+    let private_key = std::env::var("PDS_JWT_KEY_K256_PRIVATE_KEY_HEX")
+        .expect("PDS_JWT_KEY_K256_PRIVATE_KEY_HEX must be set");
+    let key_bytes = hex::decode(private_key).expect("invalid provider signing key hex");
+    let signing_key = Jwk::from_private_key_bytes(EcCurve::K256, &key_bytes)
+        .expect("invalid provider signing key");
 
     let replay_store = Arc::new(cacos_pds_account::account::oauth_store::DbBackedReplayStore::new(
         std::sync::Arc::new(account_db.clone()),
@@ -245,7 +245,10 @@ pub fn bootstrap_oauth_app(
         account_db.clone(),
         issuer,
         audience,
+        config.oauth.trusted_clients.clone(),
         Box::new((*replay_store).clone()),
+        signing_key,
+        std::env::var("PDS_DPOP_SECRET").ok(),
     );
     let provider = Arc::clone(&shared.provider);
     // Publish to the module-level handle so tests can mint tokens against
@@ -259,12 +262,14 @@ pub fn bootstrap_oauth_app(
             plc_client,
             blobstore,
             sequencer,
+            config.clone(),
         ));
     let endpoint = build_oauth_app(
         shared,
         account_db,
         remote_config,
         public_url,
+        config.oauth.rate_limit_per_minute,
         remote_create_account,
     );
     Some(OAuthBootstrap { endpoint, provider })
@@ -279,6 +284,7 @@ pub fn build_oauth_app(
     account_db: sea_orm::DatabaseConnection,
     remote_config: cacos_pds_core::config::OAuthRemoteConfig,
     public_url: String,
+    remote_per_minute: u32,
     remote_create_account: Arc<dyn remote_create_account::RemoteCreateAccount>,
 ) -> impl poem::Endpoint<Output = poem::Response> {
     use crate::rate_limit::{RouteRateLimit, ip_limiter};
@@ -291,15 +297,10 @@ pub fn build_oauth_app(
     //
     // NOTE: legitimate traffic here originates from the single configured
     // RemoteClient, so every request shares one source IP. Operators
-    // fronting a busy PDS must raise `PDS_RATELIMIT_OAUTH_REMOTE_PER_MINUTE`
+    // fronting a busy PDS must raise `OauthConfig.rate_limit_per_minute`
     // — and 0 does not disable the limiter, `ip_limiter` clamps it to 1/min.
     let remote_rl = RouteRateLimit {
-        limiter: ip_limiter(
-            std::env::var("PDS_RATELIMIT_OAUTH_REMOTE_PER_MINUTE")
-                .ok()
-                .and_then(|s| s.parse::<u32>().ok())
-                .unwrap_or(10),
-        ),
+        limiter: ip_limiter(remote_per_minute),
     };
 
     poem::Route::new()
@@ -455,11 +456,19 @@ mod tests {
         ))
         .await
         .unwrap();
+        let key = rsky_oauth::Jwk::from_private_key_bytes(
+            rsky_oauth::EcCurve::K256,
+            &hex::decode(TEST_KEY_HEX).unwrap(),
+        )
+        .unwrap();
         let shared = SharedOAuthProvider::new(
             db,
             ISSUER.to_string(),
             AUDIENCE.to_string(),
+            vec![],
             Box::new(rsky_oauth::InMemoryReplayStore::default()),
+            key,
+            None,
         );
         let provider = &shared.provider;
         assert_eq!(provider.issuer(), ISSUER);

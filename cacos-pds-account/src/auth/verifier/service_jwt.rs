@@ -13,12 +13,12 @@
 //!    the signature and passed the raw signing input.
 
 use super::bearer::now_secs;
+use super::register::service_did_from_registry;
 use anyhow::{Result, bail};
 use base64ct::{Base64UrlUnpadded, Encoding};
 use jwt_simple::prelude::Duration;
 use rsky_crypto::verify::verify_signature_digest;
 use sha2::{Digest, Sha256};
-use std::env;
 
 pub struct ServiceJwtOpts {
     pub aud: Option<String>,
@@ -38,10 +38,12 @@ pub struct ServiceJwtPayload {
     pub exp: Option<Duration>,
 }
 
-/// Returns the configured service did (the audience other services will sign
-/// for). Reads `PDS_SERVICE_DID`; empty string if unset.
+/// Returns the configured service DID (the audience other services will
+/// sign for). Reads from the auth-dependency registry that the XRPC
+/// bootstrap populates from `ServerConfig.service.service_did`; empty
+/// string if the registry was never populated.
 pub(crate) fn service_did() -> String {
-    env::var("PDS_SERVICE_DID").unwrap_or_default()
+    service_did_from_registry()
 }
 
 /// Raw claims of a service JWT (for parsing the base64url payload segment).

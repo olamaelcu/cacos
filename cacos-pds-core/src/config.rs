@@ -166,8 +166,9 @@ pub fn env_to_cfg() -> ServerConfig {
                 .collect()
         })
         .unwrap_or_default();
-    let oauth_remote_rate_limit =
-        env_or("PDS_RATELIMIT_OAUTH_REMOTE_PER_MINUTE", "50").parse().unwrap_or(50);
+    let oauth_remote_rate_limit = env_or("PDS_RATELIMIT_OAUTH_REMOTE_PER_MINUTE", "50")
+        .parse()
+        .unwrap_or(50);
 
     let allowed_origins: HashSet<String> = env::var("PDS_CORS_ALLOWED_ORIGINS")
         .ok()

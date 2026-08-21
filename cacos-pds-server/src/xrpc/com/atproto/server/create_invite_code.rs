@@ -14,7 +14,7 @@ async fn inner_create_invite_code(
         use_count,
         for_account,
     } = body;
-    let code = gen_invite_code();
+    let code = gen_invite_code(&state.config.service.hostname);
 
     match state
         .account_manager

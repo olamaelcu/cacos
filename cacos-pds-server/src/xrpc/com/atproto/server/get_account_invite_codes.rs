@@ -96,7 +96,7 @@ async fn inner_get_account_invite_codes(
                 interval: env_int("PDS_INVITE_INTERVAL").unwrap(),
             })?;
             if to_create > 0 {
-                let codes = gen_invite_codes(to_create as i32);
+                let codes = gen_invite_codes(to_create as i32, &state.config.service.hostname);
                 created = state
                     .account_manager
                     .create_account_invite_codes(

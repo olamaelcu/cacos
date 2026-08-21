@@ -29,7 +29,6 @@ use rsky_common::time::from_str_to_micros;
 use rsky_lexicon::com::atproto::admin::StatusAttr;
 use rsky_lexicon::com::atproto::server::CreateAppPasswordOutput;
 use sea_orm::DatabaseConnection;
-use std::env;
 use std::time::SystemTime;
 
 /// Refresh-token grace period in milliseconds. rsky-common's `HOUR` is in
@@ -63,6 +62,11 @@ pub struct CreateAccountOpts {
     pub repo_rev: String,
     pub invite_code: Option<String>,
     pub deactivated: Option<bool>,
+    /// Service DID minted into the audience claim of the access/refresh
+    /// JWTs this call issues. Sourced from `ServerConfig.service.service_did`
+    /// at the call site so production code never reads `PDS_SERVICE_DID`
+    /// off the process environment.
+    pub service_did: String,
 }
 
 pub struct ConfirmEmailOpts<'em> {
@@ -149,6 +153,7 @@ impl AccountManager {
             repo_rev,
             invite_code,
             deactivated,
+            service_did,
         } = opts;
         let password_encrypted: Option<String> = match password {
             Some(password) => Some(password::gen_salt_and_hash(password)?),
@@ -157,7 +162,7 @@ impl AccountManager {
 
         let (access_jwt, refresh_jwt) = auth::create_tokens(CreateTokensOpts {
             did: did.clone(),
-            service_did: env::var("PDS_SERVICE_DID").unwrap(),
+            service_did: service_did.clone(),
             scope: Some(AuthScope::Access),
             jti: None,
             expires_in: None,
@@ -279,6 +284,7 @@ impl AccountManager {
     pub async fn create_session(
         &self,
         did: String,
+        service_did: String,
         app_password_name: Option<String>,
     ) -> Result<(String, String)> {
         if self.is_account_locked(&did).await? {
@@ -293,7 +299,7 @@ impl AccountManager {
         };
         let (access_jwt, refresh_jwt) = auth::create_tokens(CreateTokensOpts {
             did,
-            service_did: env::var("PDS_SERVICE_DID").unwrap(),
+            service_did,
             scope: Some(scope),
             jti: None,
             expires_in: None,
@@ -304,7 +310,11 @@ impl AccountManager {
         Ok((access_jwt, refresh_jwt))
     }
 
-    pub async fn rotate_refresh_token(&self, id: &String) -> Result<Option<(String, String)>> {
+    pub async fn rotate_refresh_token(
+        &self,
+        id: &String,
+        service_did: String,
+    ) -> Result<Option<(String, String)>> {
         let token = auth::get_refresh_token(id, &self.db).await?;
         if let Some(token) = token {
             let system_time = SystemTime::now();
@@ -337,7 +347,7 @@ impl AccountManager {
 
             let (access_jwt, refresh_jwt) = auth::create_tokens(CreateTokensOpts {
                 did: token.did,
-                service_did: env::var("PDS_SERVICE_DID").unwrap(),
+                service_did: service_did.clone(),
                 scope: Some(if token.app_password_name.is_none() {
                     AuthScope::Access
                 } else {
@@ -361,7 +371,7 @@ impl AccountManager {
                 Ok(_) => Ok(Some((access_jwt, refresh_jwt))),
                 Err(e) => match e.downcast_ref() {
                     Some(AuthHelperError::ConcurrentRefresh) => {
-                        Box::pin(self.rotate_refresh_token(id)).await
+                        Box::pin(self.rotate_refresh_token(id, service_did.clone())).await
                     }
                     _ => Err(e),
                 },

@@ -29,6 +29,7 @@ async fn actor_store_remote_create_account_rejects_empty_handle_without_mutating
         state.plc_client.clone(),
         state.blobstore.clone(),
         state.sequencer.clone(),
+        state.config.clone(),
     );
     let mut invalid_input = input();
     invalid_input.handle = "  ".into();
@@ -59,6 +60,7 @@ async fn actor_store_remote_create_account_produces_did_and_account() {
         state.plc_client.clone(),
         state.blobstore.clone(),
         state.sequencer.clone(),
+        state.config.clone(),
     );
     let result = impl_.create_account(input()).await;
     let did = result.expect("create_account should produce a did:plc, not a stub error");

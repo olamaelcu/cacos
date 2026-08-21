@@ -153,6 +153,10 @@ pub async fn test_state() -> (SharedState, Vec<tempfile::TempDir>) {
         Arc::new(account_manager.clone()),
         None,
     );
+    // Register the service DID so the verifier resolves the audience from
+    // the typed config (the verifier no longer reads `PDS_SERVICE_DID` off
+    // the process environment).
+    cacos_pds_account::auth::verifier::register_service_did(config.service.service_did.clone());
 
     let state = SharedState {
         account_manager,
@@ -203,6 +207,7 @@ pub async fn create_test_account(state: &SharedState, did: &str, handle: &str) -
             repo_rev,
             invite_code: None,
             deactivated: None,
+            service_did: state.config.service.service_did.clone(),
         })
         .await
         .unwrap()

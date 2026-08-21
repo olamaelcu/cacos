@@ -48,7 +48,7 @@ pub use bearer::{
 pub use register::_reset_auth_dependencies_for_tests;
 pub use register::{
     DpopRequestContext, SigningKeyResolver, clear_dpop_request_context, register_auth_dependencies,
-    register_signing_key_resolver, set_dpop_request_context,
+    register_service_did, register_signing_key_resolver, set_dpop_request_context,
 };
 
 // service_jwt.rs

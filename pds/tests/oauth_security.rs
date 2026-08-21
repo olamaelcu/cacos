@@ -344,10 +344,11 @@ async fn oauth_dpop_token_validates_against_resource_server() {
 
 #[tokio::test]
 async fn cors_allows_configured_origin() {
-    // SAFETY: integration tests run sequentially.
-    unsafe { std::env::set_var("PDS_CORS_ALLOWED_ORIGINS", "https://app.example") };
-
-    let (state, _dirs) = test_state().await;
+    let (mut state, _dirs) = test_state().await;
+    // The previous env-var seam (`PDS_CORS_ALLOWED_ORIGINS`) is gone; the
+    // allowlist now lives in the typed config the test fixture constructs.
+    state.config.cors.allowed_origins =
+        std::collections::HashSet::from(["https://app.example".to_string()]);
     let app = build_app_with_state(state).await;
     let cli = TestClient::new(app);
 
@@ -372,9 +373,6 @@ async fn cors_allows_configured_origin() {
 
 #[tokio::test]
 async fn cors_echoes_public_url_origin() {
-    // SAFETY: integration tests run sequentially.
-    unsafe { std::env::remove_var("PDS_CORS_ALLOWED_ORIGINS") };
-
     let (state, _dirs) = test_state().await;
     let app = build_app_with_state(state).await;
     let cli = TestClient::new(app);
@@ -400,9 +398,6 @@ async fn cors_echoes_public_url_origin() {
 
 #[tokio::test]
 async fn cors_denies_unknown_origin() {
-    // SAFETY: integration tests run sequentially.
-    unsafe { std::env::remove_var("PDS_CORS_ALLOWED_ORIGINS") };
-
     let (state, _dirs) = test_state().await;
     let app = build_app_with_state(state).await;
     let cli = TestClient::new(app);
@@ -429,20 +424,40 @@ async fn cors_denies_unknown_origin() {
 // R12: per-IP rate limit on the headless-consent POST endpoints.
 // ---------------------------------------------------------------------------
 
-/// Builds a standalone OAuth route tree so the test controls
-/// `PDS_RATELIMIT_OAUTH_REMOTE_PER_MINUTE` before the limiter is built.
+/// Builds a standalone OAuth route tree with the default 10/min remote
+/// rate limit.
 async fn oauth_app_with_temp_db(
     dir: &camino_tempfile::Utf8TempDir,
+) -> impl poem::Endpoint<Output = poem::Response> {
+    oauth_app_with_temp_db_remote_per_minute(dir, 10).await
+}
+
+/// Builds a standalone OAuth route tree whose headless-consent per-IP
+/// token-bucket budget is `remote_per_minute`. Replaces the previous
+/// `PDS_RATELIMIT_OAUTH_REMOTE_PER_MINUTE` env-var seam: the limiter is
+/// now sized from the typed config in production, so the test pins the
+/// budget directly through this helper.
+async fn oauth_app_with_temp_db_remote_per_minute(
+    dir: &camino_tempfile::Utf8TempDir,
+    remote_per_minute: u32,
 ) -> impl poem::Endpoint<Output = poem::Response> {
     let db = DatabaseKind::Account
         .open(dir.path().join("account.sqlite"))
         .await
         .expect("test setup: open account db");
+    let key = rsky_oauth::Jwk::from_private_key_bytes(
+        rsky_oauth::EcCurve::K256,
+        &hex::decode(PDS_TEST_KEY_HEX).unwrap(),
+    )
+    .unwrap();
     let shared = SharedOAuthProvider::new(
         db.clone(),
         "https://pds.test".to_string(),
         PDS_TEST_AUDIENCE.to_string(),
+        vec![],
         Box::new(rsky_oauth::InMemoryReplayStore::default()),
+        key,
+        None,
     );
     build_oauth_app(
         shared,
@@ -452,6 +467,7 @@ async fn oauth_app_with_temp_db(
             token: Some("secret-token".to_string()),
         },
         "https://pds.test".to_string(),
+        remote_per_minute,
         Arc::new(MockRemoteCreateAccount::default()),
     )
 }
@@ -472,11 +488,10 @@ async fn oauth_remote_rate_limit_blocks_after_threshold() {
     // SAFETY: integration tests run sequentially (`--test-threads=1`).
     unsafe {
         std::env::set_var("PDS_JWT_KEY_K256_PRIVATE_KEY_HEX", PDS_TEST_KEY_HEX);
-        std::env::set_var("PDS_RATELIMIT_OAUTH_REMOTE_PER_MINUTE", "2");
     }
 
     let dir = camino_tempfile::Utf8TempDir::new().unwrap();
-    let cli = TestClient::new(oauth_app_with_temp_db(&dir).await);
+    let cli = TestClient::new(oauth_app_with_temp_db_remote_per_minute(&dir, 2).await);
 
     let mut statuses = Vec::new();
     for _ in 0..3 {

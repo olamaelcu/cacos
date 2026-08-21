@@ -27,6 +27,7 @@ fn create_opts(did: &str, handle: &str, invite_code: Option<String>) -> CreateAc
         repo_rev: "3jzfcijpj2z2a".to_owned(),
         invite_code,
         deactivated: None,
+        service_did: "did:web:localho.st".to_owned(),
     }
 }
 

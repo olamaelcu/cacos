@@ -98,7 +98,11 @@ async fn inner_create_session(
         let (access_jwt, refresh_jwt);
         match state
             .account_manager
-            .create_session(user.did.clone(), app_password_name)
+            .create_session(
+                user.did.clone(),
+                state.config.service.service_did.clone(),
+                app_password_name,
+            )
             .await
         {
             Ok(res) => {

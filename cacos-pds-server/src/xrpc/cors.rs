@@ -1,9 +1,9 @@
 //! CORS origin allowlist policy.
 //!
-//! [`CorsPolicy::from_env`] reads the comma-separated
-//! `PDS_CORS_ALLOWED_ORIGINS` env var; if unset/empty it falls back to
-//! echoing the configured `public_url` origin, and if the URL has no
-//! parseable origin it falls through to [`CorsPolicy::DenyAll`].
+//! [`CorsPolicy::from_config`] reads the allowlist from a
+//! `ServerConfig`-style [`CorsConfig`]; if empty it falls back to echoing
+//! the configured `public_url` origin, and if the URL has no parseable
+//! origin it falls through to [`CorsPolicy::DenyAll`].
 //!
 //! [`CorsPolicy::allows`] is the single source of truth for whether a
 //! given request `Origin` header value should be reflected in
@@ -13,7 +13,7 @@ use std::collections::HashSet;
 
 #[derive(Debug, Clone)]
 pub enum CorsPolicy {
-    /// Explicit operator allowlist from `PDS_CORS_ALLOWED_ORIGINS`.
+    /// Explicit operator allowlist.
     Allowlist(HashSet<String>),
     /// No allowlist configured: echo the public-URL origin so the PDS's
     /// own web surfaces can call it. Any other origin is denied.
@@ -23,19 +23,12 @@ pub enum CorsPolicy {
 }
 
 impl CorsPolicy {
-    pub fn from_env(public_url: &str) -> Self {
-        let allowlist: HashSet<String> = std::env::var("PDS_CORS_ALLOWED_ORIGINS")
-            .ok()
-            .map(|raw| {
-                raw.split(',')
-                    .map(str::trim)
-                    .filter(|s| !s.is_empty())
-                    .map(String::from)
-                    .collect()
-            })
-            .unwrap_or_default();
-        if !allowlist.is_empty() {
-            return Self::Allowlist(allowlist);
+    /// Build the policy from a `ServerConfig`-style `CorsConfig`. Empty
+    /// `allowed_origins` falls back to echoing the configured `public_url`
+    /// origin (or denying all when the URL has no parseable origin).
+    pub fn from_config(config: &cacos_pds_core::config::CorsConfig, public_url: &str) -> Self {
+        if !config.allowed_origins.is_empty() {
+            return Self::Allowlist(config.allowed_origins.clone());
         }
         match parse_origin(public_url) {
             Some(origin) => Self::EchoPublicUrl(origin),

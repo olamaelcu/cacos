@@ -903,6 +903,7 @@ pub mod helpers {
                     deactivated: None,
                     repo_cid: Cid::from_str(TEST_CID).unwrap(),
                     repo_rev: "3jzfcijpj2z2a".to_owned(),
+                    service_did: "did:web:localho.st".to_owned(),
                 })
                 .await
                 .unwrap();

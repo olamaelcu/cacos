@@ -23,7 +23,6 @@ use rsky_common::env::env_bool;
 use rsky_crypto::utils::encode_did_key;
 use rsky_lexicon::com::atproto::server::{CreateAccountInput, CreateAccountOutput};
 use secp256k1::{Keypair, Secp256k1};
-use std::env;
 use tracing_unwrap::ResultExt;
 
 #[derive(Debug, serde::Deserialize, serde::Serialize, Clone)]
@@ -189,6 +188,7 @@ async fn inner_create_account(
             repo_rev: commit.commit_data.rev.clone(),
             invite_code,
             deactivated: Some(deactivated),
+            service_did: state.config.service.service_did.clone(),
         })
         .await
     {
@@ -385,7 +385,7 @@ pub async fn validate_inputs_for_local_pds(
             plc_rotation_key = None;
         }
         None => {
-            let res = format_did_and_plc_op(input).await?;
+            let res = format_did_and_plc_op(input, &state.config.service.hostname).await?;
             did = res.0;
             plc_op = Some(res.1);
             plc_rotation_key = Some(res.2);
@@ -421,6 +421,7 @@ pub async fn validate_inputs_for_local_pds(
 /// takes over every account the PDS ever created.
 async fn format_did_and_plc_op(
     input: CreateAccountInput,
+    hostname: &str,
 ) -> Result<(String, Operation, Keypair), ApiError> {
     let mut rotation_keys: Vec<String> = Vec::new();
 
@@ -436,10 +437,7 @@ async fn format_did_and_plc_op(
     let create_op_input = CreateAtprotoOpInput {
         signing_key: encode_did_key(&PDS_REPO_SIGNING_KEYPAIR.public_key()),
         handle: input.handle,
-        pds: format!(
-            "https://{}",
-            env::var("PDS_HOSTNAME").unwrap_or("localhost".to_owned())
-        ),
+        pds: format!("https://{hostname}"),
         rotation_keys,
     };
     let response = match create_op(create_op_input, secret_key).await {

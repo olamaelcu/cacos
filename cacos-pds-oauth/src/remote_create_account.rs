@@ -10,6 +10,7 @@ use cacos_pds_account::account::CreateAccountOpts;
 use cacos_pds_account::account::helpers::account::AccountStatus;
 use cacos_pds_account::auth::PDS_REPO_SIGNING_KEYPAIR;
 use cacos_pds_blobstore::{BlobStore, BoxedBlobStream};
+use cacos_pds_core::config::ServerConfig;
 use cacos_pds_plc::operations::{CreateAtprotoOpInput, create_op};
 use cacos_pds_plc::types::{OpOrTombstone, Operation};
 use cacos_pds_sequencer::events::sync_evt_data_from_commit;
@@ -59,6 +60,12 @@ pub struct ActorStoreRemoteCreateAccount {
     pub plc_client: Arc<dyn cacos_pds_plc::PlcClient>,
     pub blobstore: Arc<dyn BlobStore<Stream = BoxedBlobStream>>,
     pub sequencer: cacos_pds_sequencer::shared_sequencer::SharedSequencer,
+    /// Cached server config. The remote-create-account route only
+    /// consumes `service.hostname` (for the PLC op's `pds` field) and
+    /// `service.service_did` (for the access/refresh JWT audience), but
+    /// carrying the full struct keeps the constructor trivial and
+    /// mirrors `SharedState`.
+    pub config: ServerConfig,
 }
 
 impl ActorStoreRemoteCreateAccount {
@@ -68,6 +75,7 @@ impl ActorStoreRemoteCreateAccount {
         plc_client: Arc<dyn cacos_pds_plc::PlcClient>,
         blobstore: Arc<dyn BlobStore<Stream = BoxedBlobStream>>,
         sequencer: cacos_pds_sequencer::shared_sequencer::SharedSequencer,
+        config: ServerConfig,
     ) -> Self {
         Self {
             account_manager: Arc::new(account_manager),
@@ -75,6 +83,7 @@ impl ActorStoreRemoteCreateAccount {
             plc_client,
             blobstore,
             sequencer,
+            config,
         }
     }
 }
@@ -104,7 +113,12 @@ impl RemoteCreateAccount for ActorStoreRemoteCreateAccount {
             ));
         }
 
-        let (did, plc_op, plc_rotation_key) = match build_did_and_plc_op(&input.handle).await {
+        let (did, plc_op, plc_rotation_key) = match build_did_and_plc_op(
+            &input.handle,
+            self.config.service.hostname.as_str(),
+        )
+        .await
+        {
             Ok(v) => v,
             Err(err) => {
                 tracing::error!("Failed to build did:plc and PLC operation: {err}");
@@ -202,6 +216,7 @@ impl RemoteCreateAccount for ActorStoreRemoteCreateAccount {
                 repo_rev: commit.commit_data.rev.clone(),
                 invite_code: input.invite_code.clone(),
                 deactivated: Some(false),
+                service_did: self.config.service.service_did.clone(),
             })
             .await
         {
@@ -280,7 +295,10 @@ impl RemoteCreateAccount for ActorStoreRemoteCreateAccount {
 /// rotation key necessarily predates the DID it gets filed under;
 /// mirroring the canonical handler, the caller persists the rotation
 /// key into the actor store once the DID is known.
-async fn build_did_and_plc_op(handle: &str) -> Result<(String, Operation, Keypair), String> {
+async fn build_did_and_plc_op(
+    handle: &str,
+    hostname: &str,
+) -> Result<(String, Operation, Keypair), String> {
     let secp = Secp256k1::new();
     let (secret_key, public_key) = secp.generate_keypair(&mut rand::thread_rng());
     let rotation_keypair = Keypair::from_secret_key(&secp, &secret_key);
@@ -289,10 +307,7 @@ async fn build_did_and_plc_op(handle: &str) -> Result<(String, Operation, Keypai
     let create_op_input = CreateAtprotoOpInput {
         signing_key: encode_did_key(&PDS_REPO_SIGNING_KEYPAIR.public_key()),
         handle: handle.to_string(),
-        pds: format!(
-            "https://{}",
-            std::env::var("PDS_HOSTNAME").unwrap_or("localhost".to_owned())
-        ),
+        pds: format!("https://{hostname}"),
         rotation_keys,
     };
     let (did, op) = create_op(create_op_input, secret_key)

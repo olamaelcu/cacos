@@ -8,31 +8,22 @@ use serde_json::json;
 
 const TEST_IP: std::net::IpAddr = std::net::IpAddr::V4(std::net::Ipv4Addr::new(10, 0, 0, 1));
 
-fn set_test_ratelimits() {
+fn apply_test_ratelimits(state: &mut cacos_pds_server::xrpc::SharedState) {
     // Generous budget so the lockout tests can exercise 5 failed logins
     // without tripping the per-IP cap. The rate_limit_blocks_after_threshold
-    // test bumps PDS_RATELIMIT_CREATE_SESSION_PER_MINUTE down to a tight
-    // value locally to verify the 429 path.
-    // SAFETY: tests run sequentially within a process.
-    unsafe {
-        std::env::set_var("PDS_RATELIMIT_CREATE_SESSION_PER_MINUTE", "100");
-        std::env::set_var("PDS_RATELIMIT_CREATE_ACCOUNT_PER_MINUTE", "100");
-        std::env::set_var("PDS_RATELIMIT_PASSWORD_RESET_PER_MINUTE", "100");
-        std::env::set_var("PDS_RATELIMIT_EMAIL_OPS_PER_MINUTE", "100");
-    }
-}
-
-fn set_tight_session_ratelimit() {
-    unsafe {
-        std::env::set_var("PDS_RATELIMIT_CREATE_SESSION_PER_MINUTE", "2");
-    }
+    // test bumps `create_session_per_minute` down to a tight value locally
+    // to verify the 429 path.
+    state.config.rate_limit.create_session_per_minute = 100;
+    state.config.rate_limit.create_account_per_minute = 100;
+    state.config.rate_limit.password_reset_per_minute = 100;
+    state.config.rate_limit.email_ops_per_minute = 100;
 }
 
 #[tokio::test]
 async fn rate_limit_blocks_after_threshold() {
-    set_test_ratelimits();
-    set_tight_session_ratelimit();
-    let (state, _dirs) = test_state().await;
+    let (mut state, _dirs) = test_state().await;
+    apply_test_ratelimits(&mut state);
+    state.config.rate_limit.create_session_per_minute = 2;
     let (_access, _refresh) =
         create_test_account(&state, "did:plc:ratelimit", "ratelimit.test").await;
     let app = build_app_with_state(state).await;
@@ -77,8 +68,8 @@ async fn rate_limit_blocks_after_threshold() {
 
 #[tokio::test]
 async fn login_lockout_triggers_after_5_failures() {
-    set_test_ratelimits();
-    let (state, _dirs) = test_state().await;
+    let (mut state, _dirs) = test_state().await;
+    apply_test_ratelimits(&mut state);
     let (_access, _refresh) = create_test_account(&state, "did:plc:lockout", "lockout.test").await;
     // Rebuild the app per attempt so each gets a fresh per-IP budget.
     for attempt in 1..=5 {
@@ -121,8 +112,8 @@ async fn login_lockout_triggers_after_5_failures() {
 
 #[tokio::test]
 async fn login_lockout_resets_after_successful_login() {
-    set_test_ratelimits();
-    let (state, _dirs) = test_state().await;
+    let (mut state, _dirs) = test_state().await;
+    apply_test_ratelimits(&mut state);
     let db = state.account_manager.db.clone();
     let (_access, _refresh) =
         create_test_account(&state, "did:plc:resetlock", "resetlock.test").await;
@@ -178,8 +169,8 @@ async fn login_lockout_resets_after_successful_login() {
 
 #[tokio::test]
 async fn password_reset_returns_200_for_missing_account() {
-    set_test_ratelimits();
-    let (state, _dirs) = test_state().await;
+    let (mut state, _dirs) = test_state().await;
+    apply_test_ratelimits(&mut state);
     let db = state.account_manager.db.clone();
     let app = build_app_with_state(state).await;
     let cli = TestClient::new(app);

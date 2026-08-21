@@ -275,16 +275,16 @@ impl PlcClient for HttpPlcClient {
     }
 }
 
+use cacos_pds_core::config::IdentityConfig;
 use std::net::ToSocketAddrs;
 
 /// Selects the production PLC client (HTTP with SSRF guard) by default,
-/// or the mock for tests when `PDS_PLC_CLIENT_MODE=mock` is set.
+/// or the mock for tests when `IdentityConfig.plc_client_mode == "mock"`.
 ///
-/// `plc_url` is the directory URL (e.g. `https://plc.directory`); callers
-/// in `cacos-pds` pass `cfg.identity.plc_url` here.
-pub fn plc_client_from_env(plc_url: &str) -> std::sync::Arc<dyn PlcClient> {
-    let mode = std::env::var("PDS_PLC_CLIENT_MODE").unwrap_or_else(|_| "http".to_string());
-    if mode == "mock" {
+/// `config` carries the directory URL and the client-mode selector; callers
+/// in `cacos-pds` pass `state.config.identity` here.
+pub fn plc_client_from_env(config: &IdentityConfig) -> std::sync::Arc<dyn PlcClient> {
+    if config.plc_client_mode == "mock" {
         #[cfg(any(test, feature = "test-utils"))]
         {
             return std::sync::Arc::new(MockPlcClient::default());
@@ -294,7 +294,7 @@ pub fn plc_client_from_env(plc_url: &str) -> std::sync::Arc<dyn PlcClient> {
             panic!("PDS_PLC_CLIENT_MODE=mock is only available with --features test-utils");
         }
     }
-    let url = plc_url.to_string();
+    let url = config.plc_url.clone();
     let url_for_err = url.clone();
     HttpPlcClient::new(url)
         .and_then(|c| {

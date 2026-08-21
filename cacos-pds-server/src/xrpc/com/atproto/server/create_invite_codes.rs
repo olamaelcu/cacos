@@ -19,7 +19,7 @@ async fn inner_create_invite_codes(
 
     let mut account_codes: Vec<AccountCodes> = Vec::new();
     for account in for_accounts {
-        let codes = gen_invite_codes(code_count);
+        let codes = gen_invite_codes(code_count, &state.config.service.hostname);
         account_codes.push(AccountCodes { account, codes });
     }
 

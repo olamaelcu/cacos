@@ -20,9 +20,13 @@ async fn inner_activate_account(auth: AccessFull, state: &SharedState) -> Result
         .ok_or(ApiError::InvalidRequest(
             "Missing did on access token".to_string(),
         ))?;
-    assert_valid_did_documents_for_service(requester.clone(), state.plc_client.as_ref())
-        .await
-        .map_err(|_| ApiError::RuntimeError)?;
+    assert_valid_did_documents_for_service(
+        requester.clone(),
+        state.plc_client.as_ref(),
+        &state.config.service,
+    )
+    .await
+    .map_err(|_| ApiError::RuntimeError)?;
 
     let account = state
         .account_manager
