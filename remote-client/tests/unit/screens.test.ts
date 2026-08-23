@@ -25,6 +25,21 @@ describe('Screens render', () => {
     expect(container.querySelector('wa-input[name=password]')?.getAttribute('label')).toMatch(/password/i);
   });
 
+  it('SignIn disables passkey button when PublicKeyCredential is unsupported', () => {
+    const original = (window as any).PublicKeyCredential;
+    const originalGet = navigator.credentials?.get;
+    delete (window as any).PublicKeyCredential;
+    Object.defineProperty(navigator, 'credentials', { value: undefined, configurable: true });
+    try {
+      const { container } = render(SignIn, { props: { ...baseProps, loginHint: null, error: null } });
+      const passkeyBtn = container.querySelectorAll('wa-button')[1];
+      expect(passkeyBtn?.hasAttribute('disabled')).toBe(true);
+    } finally {
+      (window as any).PublicKeyCredential = original;
+      Object.defineProperty(navigator, 'credentials', { value: { get: originalGet }, configurable: true });
+    }
+  });
+
   it('Consent renders client + Allow/Deny', () => {
     const { container } = render(Consent, { props: { ...baseProps, scopes: ['atproto'], session: { did: 'did:plc:x', handle: 'a', email: null } } });
     expect(container.textContent).toMatch(/Example/);

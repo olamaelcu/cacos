@@ -8,7 +8,16 @@
   } = $props();
 
   let passkeyError = $state<string | null>(null);
+  let passkeySupported = $state(true);
+  let passkeyDisabled = $state(false);
   let errorDialogEl: HTMLElement | undefined = $state();
+  let passkeyBlocked = $derived(!passkeySupported || passkeyDisabled);
+
+  $effect(() => {
+    passkeySupported =
+      typeof window.PublicKeyCredential !== 'undefined' &&
+      typeof navigator.credentials?.get === 'function';
+  });
 
   $effect(() => {
     const el = errorDialogEl;
@@ -56,10 +65,26 @@
   <wa-button
     appearance="outlined"
     style="width: 100%; margin-block-start: var(--wa-space-s);"
+    disabled={passkeyBlocked}
     onclick={async () => {
-      const start = await fetch('/api/passkey/start', { method: 'POST', headers: {'content-type':'application/json'}, body: JSON.stringify({ rqid, state: flowState, mode: 'entryway' }) }).then(r => r.json());
+      const startRes = await fetch('/api/passkey/start', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ rqid, state: flowState, mode: 'entryway' }),
+      });
+      if (!startRes.ok) {
+        passkeyDisabled = true;
+        passkeyError = 'Passkey sign-in is unavailable. Please refresh the page to try again.';
+        return;
+      }
+      const start = await startRes.json();
       const { beginAuth, authToFinishBody } = await import('$lib/passkey/client');
-      const r = await beginAuth(start);
+      let r;
+      try {
+        r = await beginAuth(start);
+      } catch {
+        return;
+      }
       const body = authToFinishBody(rqid, flowState, deviceId, r);
       const res = await fetch('/api/passkey/finish', { method: 'POST', headers: {'content-type':'application/json'}, body: JSON.stringify(body) });
       if (!res.ok) {
