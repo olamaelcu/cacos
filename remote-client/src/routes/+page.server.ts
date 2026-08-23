@@ -1,10 +1,20 @@
 // src/routes/+page.server.ts
 import { fail, redirect, type Actions } from '@sveltejs/kit';
 import { pds } from '$lib/pds-instance';
+import {
+  isMockScreen, MOCK_RQID, MOCK_STATE, mockAcceptRedirect, mockPayload, mockRejectRedirect,
+} from '$lib/server/mock-data';
 import { InvalidStateError, PdsError } from '$lib/server/pds/types';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ url, locals }) => {
+  if (import.meta.env.DEV) {
+    const mock = url.searchParams.get('mock');
+    if (mock && isMockScreen(mock)) {
+      const payload = mockPayload(mock);
+      return { rqid: MOCK_RQID, state: MOCK_STATE, payload, deviceId: locals.deviceId };
+    }
+  }
   const rqid = url.searchParams.get('rqid');
   const state = url.searchParams.get('state');
   if (!rqid || !state) {
@@ -31,24 +41,27 @@ async function callAndRerender(fn: () => Promise<unknown>) {
 }
 
 export const actions: Actions = {
-  signIn: async ({ request, locals }) => {
+  signIn: async ({ request }) => {
     const f = await request.formData();
+    if (String(f.get('state')) === MOCK_STATE) throw redirect(302, '/?mock=consent');
     const body = {
       rqid: String(f.get('rqid')), state: String(f.get('state')), device_id: String(f.get('device_id')),
       identifier: String(f.get('identifier')), password: String(f.get('password')),
     };
     return callAndRerender(() => pds().signIn(body));
   },
-  select: async ({ request, locals }) => {
+  select: async ({ request }) => {
     const f = await request.formData();
+    if (String(f.get('state')) === MOCK_STATE) throw redirect(302, '/?mock=consent');
     const body = {
       rqid: String(f.get('rqid')), state: String(f.get('state')), device_id: String(f.get('device_id')),
       did: String(f.get('did')),
     };
     return callAndRerender(() => pds().select(body));
   },
-  createAccount: async ({ request, locals }) => {
+  createAccount: async ({ request }) => {
     const f = await request.formData();
+    if (String(f.get('state')) === MOCK_STATE) throw redirect(302, '/?mock=consent');
     const invite = f.get('invite_code');
     const body = {
       rqid: String(f.get('rqid')), state: String(f.get('state')), device_id: String(f.get('device_id')),
@@ -59,6 +72,7 @@ export const actions: Actions = {
   },
   accept: async ({ request }) => {
     const f = await request.formData();
+    if (String(f.get('state')) === MOCK_STATE) throw redirect(302, mockAcceptRedirect());
     const body = {
       rqid: String(f.get('rqid')), state: String(f.get('state')), device_id: String(f.get('device_id')),
       did: String(f.get('did')),
@@ -68,6 +82,7 @@ export const actions: Actions = {
   },
   reject: async ({ request }) => {
     const f = await request.formData();
+    if (String(f.get('state')) === MOCK_STATE) throw redirect(302, mockRejectRedirect());
     const body = {
       rqid: String(f.get('rqid')), state: String(f.get('state')), device_id: String(f.get('device_id')),
     };
