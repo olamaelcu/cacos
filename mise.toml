@@ -43,10 +43,32 @@ run = "docker compose up -d --wait minio && docker compose up mc-init"
 description = "Stop MinIO containers"
 run = "docker compose down"
 
+[tasks.gen-secrets]
+description = "Generate dev-only secrets into .env.local (idempotent)"
+run = '''
+if [ ! -f .env.local ]; then
+  JWT_KEY=$(openssl rand -hex 32)
+  cat > .env.local <<EOF
+PDS_ACCESS_JWT_KEY_K256_PRIVATE_KEY_HEX=${JWT_KEY}
+PDS_JWT_KEY_K256_PRIVATE_KEY_HEX=${JWT_KEY}
+PDS_OAUTH_SIGNING_KEY_K256_PRIVATE_KEY_HEX=${JWT_KEY}
+PDS_REPO_SIGNING_KEY_K256_PRIVATE_KEY_HEX=$(openssl rand -hex 32)
+PDS_PLC_ROTATION_KEY_K256_PRIVATE_KEY_HEX=$(openssl rand -hex 32)
+PDS_DPOP_SECRET=$(openssl rand -hex 32)
+PDS_OAUTH_TRUSTED_CLIENTS=https://local.example/client.json
+PDS_SERVICE_DID=did:web:localhost
+PDS_SERVICE_HANDLE_DOMAINS=.localhost
+PDS_ADMIN_PASSWORD=LocalDev7AdminQxfK3mZx
+PDS_ALLOW_INSECURE_ADMIN=true
+EOF
+  echo "wrote .env.local"
+fi
+'''
+
 [tasks.dev]
 description = "Run the PDS with MinIO up"
-depends = ["infra-up"]
-run = "cargo run -p cacos-pds"
+depends = ["infra-up", "gen-secrets"]
+run = "set -a && . ./.env.local && set +a && cargo run -p cacos-pds-server"
 
 [tasks.pds-dev]
 description = "Run the frontend remote client"

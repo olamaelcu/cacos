@@ -5,3 +5,4 @@ docs/superpowers/
 *.sqlite-wal
 *.sqlite-shm
 .cortexkit/
+.env.local
