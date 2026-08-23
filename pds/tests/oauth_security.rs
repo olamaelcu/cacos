@@ -275,6 +275,7 @@ async fn oauth_dpop_token_validates_against_resource_server() {
         parameters: AuthorizationRequestParameters {
             client_id: "https://app.example/client.json".to_string(),
             response_type: "code".to_string(),
+            response_mode: None,
             redirect_uri: "https://app.example/callback".to_string(),
             scope: "atproto".to_string(),
             state: None,

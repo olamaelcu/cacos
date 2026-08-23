@@ -50,7 +50,7 @@ metrics = { workspace = true }
 tracing = { workspace = true }
 
 # --- crawlers notify path uses reqwest (was on pds before extraction) ---
-reqwest = { version = "0.12", features = ["json"] }
+reqwest = { workspace = true }
 
 # --- poem: SharedSequencer is mounted as `Data<&SharedSequencer>` from
 #     pds/src/xrpc — pull in the version of poem the wiring uses.

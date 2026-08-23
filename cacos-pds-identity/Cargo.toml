@@ -21,7 +21,7 @@ time = { workspace = true }
 # --- error handling / serialization ---
 anyhow = { workspace = true }
 serde_json = { workspace = true }
-async-trait = "0.1"
+async-trait = { workspace = true }
 
 # --- observability ---
 tracing = { workspace = true }

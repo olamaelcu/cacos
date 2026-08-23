@@ -27,7 +27,7 @@ sea-orm = { workspace = true }
 
 # --- error handling ---
 anyhow = { workspace = true }
-email_address = "0.2"
+email_address = { workspace = true }
 thiserror = { workspace = true }
 
 # --- encoding / dates ---
@@ -41,25 +41,25 @@ governor = { workspace = true }
 
 # --- crypto / encoding ---
 sha2 = { workspace = true }
-base64 = "0.22"
-hex = "0.4"
+base64 = { workspace = true }
+hex = { workspace = true }
 subtle = { workspace = true }
-secp256k1 = { version = "0.28", features = ["global-context", "rand"] }
+secp256k1 = { workspace = true }
 rsky-crypto = { workspace = true }
 rand = { workspace = true }
 # subtle already in workspace.dependencies
 
 # --- http / metadata fetch ---
-reqwest = { version = "0.12", features = ["json"] }
-url = "2"
+reqwest = { workspace = true }
+url = { workspace = true }
 
 # --- at-rest hygiene ---
-secrecy = "0.10"
-zeroize = "1"
+secrecy = { workspace = true }
+zeroize = { workspace = true }
 
 # --- runtime / traits ---
 tokio = { workspace = true }
-async-trait = "0.1"
+async-trait = { workspace = true }
 
 # --- observability ---
 tracing = { workspace = true }

@@ -16,24 +16,24 @@ cacos-pds-core = { path = "../cacos-pds-core" }
 rsky-common = { workspace = true }
 
 # --- http client for the PLC directory ---
-reqwest = { version = "0.12", features = ["json"] }
-url = "2"
+reqwest = { workspace = true }
+url = { workspace = true }
 
 # --- serde ecosystem ---
 serde = { workspace = true }
 serde_json = { workspace = true }
-indexmap = { version = "2", features = ["serde"] }
+indexmap = { workspace = true }
 serde_ipld_dagcbor = { workspace = true }
 
 # --- crypto / encoding ---
 secp256k1 = { workspace = true }
 sha2 = { workspace = true }
-data-encoding = "2"
+data-encoding = { workspace = true }
 base64-url = "2.0.2"
 # hex is used by the `test-utils` feature for the mock client's secret key
-hex = "0.4"
+hex = { workspace = true }
 
 # --- runtime / traits ---
 tokio = { workspace = true }
-async-trait = "0.1"
+async-trait = { workspace = true }
 anyhow = { workspace = true }

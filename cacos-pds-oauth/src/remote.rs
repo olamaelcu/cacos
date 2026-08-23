@@ -571,6 +571,7 @@ mod tests {
                 Box::new(rsky_oauth::InMemoryReplayStore::default()),
             ),
             trusted_clients: vec![],
+            scope_expander: None,
         }))
     }
 

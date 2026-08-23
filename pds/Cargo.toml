@@ -15,9 +15,9 @@ sea-orm = { workspace = true }
 tokio = { workspace = true }
 camino = { workspace = true }
 time = { workspace = true }
-serde_json = "1"
-async-trait = "0.1"
-base64 = "0.22"
+serde_json = { workspace = true }
+async-trait = { workspace = true }
+base64 = { workspace = true }
 
 # --- error handling ---
 anyhow = { workspace = true }
@@ -26,7 +26,7 @@ thiserror = { workspace = true }
 
 # --- encoding / dates / time ---
 serde = { workspace = true }
-chrono = "0.4"
+chrono = { workspace = true }
 
 # --- atproto protocol crates ---
 lexicon_cid = { workspace = true }
@@ -42,27 +42,27 @@ futures = { workspace = true }
 opendal = { workspace = true }
 
 # --- crypto / encoding (Plan 03) ---
-lru = "0.12"
+lru = { workspace = true }
 sha2 = "0.10"
 hmac = "0.12"
-hex = "0.4"
+hex = { workspace = true }
 secp256k1 = { version = "0.28", features = ["global-context", "rand"] }
 rand = "0.8"
 
 # --- plc client port (Plan 08 task 18) ---
-indexmap = { version = "2", features = ["serde"] }
-data-encoding = "2"
+indexmap = { workspace = true }
+data-encoding = { workspace = true }
 
 # --- auth helper (Plan 05 task 5) ---
 base64-url = "2.0.2"
 jwt-simple = { version = "0.12.9", default-features = false, features = ["pure-rust"] }
 
 # --- passwords / app passwords (Plan 05 task 2) ---
-argon2 = "0.5.3"
-base64ct = "1.6.0"
+argon2 = { workspace = true }
+base64ct = { workspace = true }
 
 # --- email validation (Plan 08 task 7) ---
-email_address = "0.2"
+email_address = { workspace = true }
 
 # --- observability (Plan 02) ---
 metrics = { workspace = true }
@@ -75,11 +75,11 @@ tracing-timing = { workspace = true }
 tracing-unwrap = { workspace = true }
 
 # --- encoding primitives used by blobstore ---
-bytes = "1"
+bytes = { workspace = true }
 
 # --- client metadata fetcher (Task 6) ---
-reqwest = { version = "0.12", features = ["json"] }
-url = "2"
+reqwest = { workspace = true }
+url = { workspace = true }
 
 # --- sequencer (Plan 07) ---
 serde_bytes = { workspace = true }
@@ -94,15 +94,15 @@ ipld-core = { workspace = true }
 ulid = { workspace = true }
 
 # --- temp paths (test_utils runs in lib) ---
-tempfile = "3"
+tempfile = { workspace = true }
 
 # --- constant-time comparisons (admin auth + secret comparison hardening) ---
-subtle = "2"
+subtle = { workspace = true }
 
 # --- at-rest hygiene for key material (PDS_JWT_KEYPAIR, PDS_REPO_SIGNING_KEYPAIR,
 #     PDS_PLC_ROTATION_KEYPAIR, PDS_DPOP_SECRET) ---
-secrecy = "0.10"
-zeroize = "1"
+secrecy = { workspace = true }
+zeroize = { workspace = true }
 
 # --- rate limiting (per-IP token bucket for sensitive endpoints) ---
 governor = "0.6"

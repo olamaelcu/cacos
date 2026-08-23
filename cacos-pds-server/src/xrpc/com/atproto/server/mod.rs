@@ -31,7 +31,7 @@ use cacos_pds_account::auth::PDS_REPO_SIGNING_KEYPAIR;
 use cacos_pds_actor_store::ActorStore;
 use cacos_pds_core::config::ServiceConfig;
 use cacos_pds_plc::PlcClient;
-use rand::Rng;
+use secp256k1::rand::Rng;
 use rsky_crypto::utils::encode_did_key;
 use rsky_identity::types::DidDocument;
 
@@ -59,8 +59,8 @@ pub fn global_plc_rotation_key_did() -> Option<String> {
 
 /// Formatted xxxxx-xxxxx
 pub fn get_random_token() -> String {
-    let token: String = rand::thread_rng()
-        .sample_iter(&rand::distributions::Alphanumeric)
+    let token: String = secp256k1::rand::thread_rng()
+        .sample_iter(&secp256k1::rand::distributions::Alphanumeric)
         .take(50)
         .map(char::from)
         .collect();

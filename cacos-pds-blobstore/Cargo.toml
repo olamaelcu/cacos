@@ -15,7 +15,7 @@ anyhow = { workspace = true }
 
 # --- async / futures ---
 futures = { workspace = true }
-bytes = "1"
+bytes = { workspace = true }
 
 # --- observability (metric counters + tracing) ---
 metrics = { workspace = true }
@@ -23,7 +23,7 @@ tracing = { workspace = true }
 
 # --- crypto / encoding primitives ---
 rand = { workspace = true }
-hex = "0.4"
+hex = { workspace = true }
 
 # --- CID type from the atproto ecosystem ---
 lexicon_cid = { workspace = true }

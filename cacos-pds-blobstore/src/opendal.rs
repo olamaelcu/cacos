@@ -41,7 +41,7 @@ use futures::stream::{StreamExt, TryStreamExt};
 use lexicon_cid::Cid;
 pub use opendal::Operator;
 use opendal::{ErrorKind, services};
-use rand::RngCore;
+use rand::Rng;
 
 use crate::{BlobNotFoundError, BlobStore, BoxedBlobStream};
 
@@ -75,8 +75,7 @@ impl OpenDALBlobStore {
     /// Build an in-memory store suitable for tests.
     pub fn new_memory(did: &str) -> Result<Self> {
         let op = Operator::new(services::Memory::default())
-            .context("build memory operator")?
-            .finish();
+            .context("build memory operator")?;
         Ok(Self::new(op, did.to_owned()))
     }
 
@@ -85,8 +84,7 @@ impl OpenDALBlobStore {
         let op = Operator::new(
             services::Fs::default().root(location.as_ref().to_string_lossy().as_ref()),
         )
-        .context("build fs operator")?
-        .finish();
+        .context("build fs operator")?;
         Ok(Self::new(op, did.to_owned()))
     }
 
@@ -106,8 +104,7 @@ impl OpenDALBlobStore {
                 .access_key_id(access_key_id)
                 .secret_access_key(secret_access_key),
         )
-        .context("build s3 operator")?
-        .finish();
+        .context("build s3 operator")?;
         Ok(Self::new(op, did.to_owned()))
     }
 
@@ -142,13 +139,11 @@ impl OpenDALBlobStore {
                     .secret_access_key(&secret_access_key),
             )
             .context("build s3 operator from env")?
-            .finish()
         } else {
             let location = std::env::var("PDS_BLOBSTORE_DISK_LOCATION")
                 .unwrap_or_else(|_| "./blobs".to_owned());
             Operator::new(services::Fs::default().root(&location))
                 .context("build fs operator from env")?
-                .finish()
         };
         Ok(op)
     }
@@ -156,7 +151,7 @@ impl OpenDALBlobStore {
     /// Generate a 40-char hex temp key. Random, opaque, unique across actors.
     fn tmp_key() -> String {
         let mut bytes = [0u8; 20];
-        rand::thread_rng().fill_bytes(&mut bytes);
+        rand::rng().fill_bytes(&mut bytes);
         hex::encode(bytes)
     }
 
@@ -375,7 +370,7 @@ impl BlobStore for OpenDALBlobStore {
                 format!("blocks/{did}"),
                 format!("quarantine/{did}"),
             ] {
-                if let Err(err) = op.remove_all(&prefix).await
+                if let Err(err) = op.delete_with(&prefix).recursive(true).await
                     && err.kind() != ErrorKind::NotFound
                 {
                     return Err(anyhow::Error::from(err));

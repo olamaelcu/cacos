@@ -27,14 +27,14 @@ thiserror = { workspace = true }
 
 # --- runtime / traits ---
 tokio = { workspace = true }
-async-trait = "0.1"
+async-trait = { workspace = true }
 futures = { workspace = true }
 sha2 = { workspace = true }
-hex = "0.4"
+hex = { workspace = true }
 
 # --- lru cache for blob/per-record ---
-lru = "0.12"
-secp256k1 = { version = "0.28", features = ["global-context", "rand"] }
+lru = { workspace = true }
+secp256k1 = { workspace = true }
 
 # --- encoding / dates ---
 serde = { workspace = true }

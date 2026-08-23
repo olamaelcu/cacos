@@ -7,7 +7,7 @@
 use crate::db::entities::consent_state;
 use anyhow::{Result, bail};
 use base64ct::{Base64Url, Encoding};
-use rand::RngCore;
+use rand::Rng;
 use rsky_common::now as rfc3339_now;
 use rsky_common::time::{from_micros_to_str, from_str_to_micros};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
@@ -27,7 +27,7 @@ fn expires_at(now_str: &str) -> String {
 /// 32 random bytes, base64url-encoded without padding — the one-time nonce.
 pub fn new_nonce() -> String {
     let mut bytes = [0u8; 32];
-    rand::rngs::OsRng.fill_bytes(&mut bytes);
+    rand::rng().fill_bytes(&mut bytes);
     Base64Url::encode_string(&bytes).replace('=', "")
 }
 

@@ -2,43 +2,55 @@
 [workspace]
 resolver = "2"
 members = [
-    "migration",
-    "pds",
-    "cacos-pds-account",
-    "cacos-pds-core",
-    "cacos-pds-blobstore",
-    "cacos-pds-plc",
-    "cacos-pds-identity",
-    "cacos-pds-handle",
-    "cacos-pds-mailer",
-    "cacos-pds-actor-store",
-    "cacos-pds-sequencer",
-    "cacos-pds-oauth",
-    "cacos-pds-server",
-    "cacos-pds-migrate",
+  "migration",
+  "pds",
+  "cacos-pds-account",
+  "cacos-pds-core",
+  "cacos-pds-blobstore",
+  "cacos-pds-plc",
+  "cacos-pds-identity",
+  "cacos-pds-handle",
+  "cacos-pds-mailer",
+  "cacos-pds-actor-store",
+  "cacos-pds-sequencer",
+  "cacos-pds-oauth",
+  "cacos-pds-server",
+  "cacos-pds-migrate",
 ]
 
 
-[workspace.dependencies]                                                                                                                                                                                                                                                                                                                                                 
+[workspace.dependencies]
 # --- atproto protocol crates (git-pinned rsky fork) ---
-rsky-repo = { git = "https://github.com/olamaelcu/rsky", rev = "aee5aec5ad9473d80232beab58ddba25a936298a" }
-rsky-crypto = { git = "https://github.com/olamaelcu/rsky", rev = "aee5aec5ad9473d80232beab58ddba25a936298a" }
-rsky-syntax = { git = "https://github.com/olamaelcu/rsky", rev = "aee5aec5ad9473d80232beab58ddba25a936298a" }
-rsky-common = { git = "https://github.com/olamaelcu/rsky", rev = "aee5aec5ad9473d80232beab58ddba25a936298a" }
-rsky-blobstore = { git = "https://github.com/olamaelcu/rsky", rev = "aee5aec5ad9473d80232beab58ddba25a936298a" }
-rsky-lexicon = { git = "https://github.com/olamaelcu/rsky", rev = "aee5aec5ad9473d80232beab58ddba25a936298a" }
-rsky-oauth = { git = "https://github.com/olamaelcu/rsky", rev = "aee5aec5ad9473d80232beab58ddba25a936298a" }
-rsky-identity = { git = "https://github.com/olamaelcu/rsky", rev = "aee5aec5ad9473d80232beab58ddba25a936298a" }
+rsky-repo = { git = "https://github.com/olamaelcu/rsky", rev = "2185a0726aefd2b1735c2249ab8636260bde1354" }
+rsky-crypto = { git = "https://github.com/olamaelcu/rsky", rev = "2185a0726aefd2b1735c2249ab8636260bde1354" }
+rsky-syntax = { git = "https://github.com/olamaelcu/rsky", rev = "2185a0726aefd2b1735c2249ab8636260bde1354" }
+rsky-common = { git = "https://github.com/olamaelcu/rsky", rev = "2185a0726aefd2b1735c2249ab8636260bde1354" }
+rsky-blobstore = { git = "https://github.com/olamaelcu/rsky", rev = "2185a0726aefd2b1735c2249ab8636260bde1354" }
+rsky-lexicon = { git = "https://github.com/olamaelcu/rsky", rev = "2185a0726aefd2b1735c2249ab8636260bde1354" }
+rsky-oauth = { git = "https://github.com/olamaelcu/rsky", rev = "2185a0726aefd2b1735c2249ab8636260bde1354" }
+rsky-identity = { git = "https://github.com/olamaelcu/rsky", rev = "2185a0726aefd2b1735c2249ab8636260bde1354" }
 futures = "0.3"
-opendal = { version = "0.53", default-features = false, features = ["services-fs", "services-s3", "services-memory"] }
+opendal = { version = "0.58", default-features = false, features = [
+  "services-fs",
+  "services-s3",
+  "services-memory",
+] }
 
 # --- atproto ecosystem ---
-atrium-api = "0.24.6"
-lexicon_cid = { package = "cid", version = "0.11.1", features = ["serde-codec"] }
-serde_ipld_dagcbor = { version = "0.6.1", features = ["codec"] }
+atrium-api = "0.25.8"
+lexicon_cid = { package = "cid", version = "0.11.1", features = [
+  "serde-codec",
+] }
+serde_ipld_dagcbor = { version = "0.7.0" }
 
 # --- storage (this plan) ---
-sea-orm = { version = "2.0", features = ["sqlx-sqlite", "runtime-tokio-rustls", "macros", "with-time", "sqlite-use-returning-for-3_35"] }
+sea-orm = { version = "2.0", features = [
+  "sqlx-sqlite",
+  "runtime-tokio-rustls",
+  "macros",
+  "with-time",
+  "sqlite-use-returning-for-3_35",
+] }
 sea-orm-migration = "2.0"
 sqlx = "0.9"
 miette = { version = "7", features = ["derive"] }
@@ -51,8 +63,18 @@ time = { version = "0.3", features = ["serde", "formatting", "parsing"] }
 serde = { version = "1", features = ["derive"] }
 serde_repr = "0.1"
 apalis = { version = "0.6", default-features = false }
-apalis-sql = { version = "0.6", default-features = false, features = ["sqlite", "tokio-comp", "migrate"] }
-sqlx_0_8 = { package = "sqlx", version = "0.8", features = ["sqlite", "runtime-tokio-rustls", "json", "macros", "migrate"] }
+apalis-sql = { version = "0.6", default-features = false, features = [
+  "sqlite",
+  "tokio-comp",
+  "migrate",
+] }
+sqlx_0_8 = { package = "sqlx", version = "0.8", features = [
+  "sqlite",
+  "runtime-tokio-rustls",
+  "json",
+  "macros",
+  "migrate",
+] }
 async-stream = "0.3"
 ipld-core = "0.4"
 
@@ -61,18 +83,43 @@ serde_bytes = "0.11"
 serde_cbor = "0.11"
 serde_derive = "1"
 serde_json = "1"
-rand = "0.8"
-rand_core = "0.6"
+rand = "0.10"
+rand_core = "0.10"
 secp256k1 = { version = "0.28", features = ["global-context", "rand"] }
-sha2 = "0.10"
+sha2 = "0.11"
+
+# --- lifted duplicates (defined in 2+ crates) ---
+chrono = "0.4"
+hex = "0.4"
+argon2 = "0.5.3"
+base64ct = "1.6.0"
+email_address = "0.2"
+secrecy = "0.10"
+zeroize = "1"
+async-trait = "0.1"
+lru = "0.12"
+base64 = "0.22"
+reqwest = { version = "0.12", features = ["json"] }
+url = "2"
+indexmap = { version = "2", features = ["serde"] }
+data-encoding = "2"
+tempfile = "3"
+bytes = "1"
 
 # --- http / runtime ---
 poem = { version = "3", features = ["tower-compat", "websocket"] }
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync", "net", "fs"] }
+tokio = { version = "1", features = [
+  "rt-multi-thread",
+  "macros",
+  "time",
+  "sync",
+  "net",
+  "fs",
+] }
 
 # --- observability (pins locked in Plan 02, verified against docs.rs) ---
 metrics = "0.24.4"
-metrics-exporter-prometheus = { version = "0.17.2", default-features = false }
+metrics-exporter-prometheus = { version = "0.18", default-features = false }
 metrics-tracing-context = "0.18"
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter", "fmt"] }
@@ -80,9 +127,7 @@ tracing-timing = { version = "0.7", features = ["layer"] }
 tracing-unwrap = "1.0"
 
 # --- rate limiting (governor) ---
-governor = "0.6"
+governor = "0.10"
 
 # --- constant-time comparisons ---
 subtle = "2"
-
-# --- misc ---

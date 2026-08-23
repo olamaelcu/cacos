@@ -430,7 +430,7 @@ async fn format_did_and_plc_op(
     }
 
     let secp = Secp256k1::new();
-    let (secret_key, public_key) = secp.generate_keypair(&mut rand::thread_rng());
+    let (secret_key, public_key) = secp.generate_keypair(&mut secp256k1::rand::thread_rng());
     let rotation_keypair = Keypair::from_secret_key(&secp, &secret_key);
     rotation_keys.push(encode_did_key(&public_key));
 

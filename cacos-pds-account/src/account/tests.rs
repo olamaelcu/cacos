@@ -424,7 +424,7 @@ async fn manages_sessions_and_refresh_tokens() {
     // rotating the original refresh token grants a new one
     let refresh_payload = auth::decode_refresh_token(refresh_jwt).unwrap();
     let rotated = am
-        .rotate_refresh_token(&refresh_payload.jti)
+        .rotate_refresh_token(&refresh_payload.jti, "did:web:localho.st".to_owned())
         .await
         .unwrap()
         .unwrap();
@@ -433,7 +433,7 @@ async fn manages_sessions_and_refresh_tokens() {
 
     // reuse within the grace period re-issues the same next token id
     let reused = am
-        .rotate_refresh_token(&refresh_payload.jti)
+        .rotate_refresh_token(&refresh_payload.jti, "did:web:localho.st".to_owned())
         .await
         .unwrap()
         .unwrap();
@@ -442,7 +442,7 @@ async fn manages_sessions_and_refresh_tokens() {
 
     // rotating an unknown token yields None
     assert!(
-        am.rotate_refresh_token(&"unknown-token-id".to_string())
+        am.rotate_refresh_token(&"unknown-token-id".to_string(), "did:web:localho.st".to_owned())
             .await
             .unwrap()
             .is_none()
@@ -461,7 +461,7 @@ async fn manages_sessions_and_refresh_tokens() {
         .await
         .unwrap();
     assert!(
-        am.rotate_refresh_token(&rotated_payload.jti)
+        am.rotate_refresh_token(&rotated_payload.jti, "did:web:localho.st".to_owned())
             .await
             .unwrap()
             .is_none()
@@ -469,7 +469,7 @@ async fn manages_sessions_and_refresh_tokens() {
 
     // create_session with and without an app password
     let (_, session_refresh) = am
-        .create_session("did:plc:frank".to_owned(), None)
+        .create_session("did:plc:frank".to_owned(), "did:web:localho.st".to_owned(), None)
         .await
         .unwrap();
     let session_payload = auth::decode_refresh_token(session_refresh).unwrap();
@@ -479,7 +479,7 @@ async fn manages_sessions_and_refresh_tokens() {
         .unwrap();
     assert_eq!(stored.app_password_name, None);
     let (_, app_refresh) = am
-        .create_session("did:plc:frank".to_owned(), Some("test app".to_owned()))
+        .create_session("did:plc:frank".to_owned(), "did:web:localho.st".to_owned(), Some("test app".to_owned()))
         .await
         .unwrap();
     let app_payload = auth::decode_refresh_token(app_refresh).unwrap();
@@ -752,7 +752,7 @@ async fn manages_passwords() {
     );
 
     // an app password session gets revoked along with the password
-    am.create_session("did:plc:grace".to_owned(), Some("My App".to_owned()))
+    am.create_session("did:plc:grace".to_owned(), "did:web:localho.st".to_owned(), Some("My App".to_owned()))
         .await
         .unwrap();
     am.revoke_app_password("did:plc:grace".to_owned(), "My App".to_owned())
@@ -931,12 +931,12 @@ async fn rotates_app_password_refresh_tokens() {
         .await
         .unwrap();
     let (_, refresh_jwt) = am
-        .create_session("did:plc:apppw".to_owned(), Some("rotator".to_owned()))
+        .create_session("did:plc:apppw".to_owned(), "did:web:localho.st".to_owned(), Some("rotator".to_owned()))
         .await
         .unwrap();
     let payload = auth::decode_refresh_token(refresh_jwt).unwrap();
     let rotated = am
-        .rotate_refresh_token(&payload.jti)
+        .rotate_refresh_token(&payload.jti, "did:web:localho.st".to_owned())
         .await
         .unwrap()
         .unwrap();

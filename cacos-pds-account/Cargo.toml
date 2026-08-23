@@ -33,37 +33,39 @@ tracing = { workspace = true }
 # --- encoding / dates ---
 serde = { workspace = true }
 serde_json = { workspace = true }
-chrono = "0.4"
+chrono = { workspace = true }
 time = { workspace = true }
 
 # --- crypto / encoding (Plan 03) ---
-sha2 = "0.10"
-hex = "0.4"
-secp256k1 = { version = "0.28", features = ["global-context", "rand"] }
+sha2 = { workspace = true }
+hex = { workspace = true }
+secp256k1 = { workspace = true, features = ["global-context", "rand"] }
 rand = { workspace = true }
 
 # --- auth helper (Plan 05 task 5) ---
-base64-url = "2.0.2"
-jwt-simple = { version = "0.12.9", default-features = false, features = ["pure-rust"] }
+base64-url = "3.0"
+jwt-simple = { version = "0.13.0", default-features = false, features = [
+  "pure-rust",
+] }
 
 # --- passwords / app passwords (Plan 05 task 2) ---
-argon2 = "0.5.3"
-base64ct = "1.6.0"
+argon2 = { workspace = true }
+base64ct = { workspace = true }
 
 # --- email validation (Plan 08 task 7) ---
-email_address = "0.2"
+email_address = { workspace = true }
 
 # --- constant-time comparisons ---
-subtle = "2"
+subtle = { workspace = true }
 
 # --- at-rest hygiene for key material (PDS_JWT_KEYPAIR, PDS_REPO_SIGNING_KEYPAIR,
 #     PDS_PLC_ROTATION_KEYPAIR, PDS_DPOP_SECRET) ---
-secrecy = "0.10"
-zeroize = "1"
+secrecy = { workspace = true }
+zeroize = { workspace = true }
 
 # --- runtime / traits ---
 tokio = { workspace = true }
-async-trait = "0.1"
+async-trait = { workspace = true }
 
 [dev-dependencies]
 camino-tempfile = { workspace = true }

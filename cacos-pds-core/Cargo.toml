@@ -20,7 +20,7 @@ thiserror = { workspace = true }
 # --- encoding / dates ---
 serde = { workspace = true }
 serde_json = { workspace = true }
-base64ct = "1.6.0"
+base64ct = { workspace = true }
 rand = { workspace = true }
 
 # --- atproto protocol crates ---
@@ -29,7 +29,7 @@ lexicon_cid = { workspace = true }
 
 # --- runtime ---
 tokio = { workspace = true }
-async-trait = "0.1"
+async-trait = { workspace = true }
 
 # --- observability ---
 metrics = { workspace = true }

@@ -212,7 +212,7 @@ impl ActorStore {
             return Ok(existing);
         }
         let secp = Secp256k1::new();
-        let (secret_key, _public_key) = secp.generate_keypair(&mut rand::thread_rng());
+        let (secret_key, _public_key) = secp.generate_keypair(&mut secp256k1::rand::thread_rng());
         let keypair = Keypair::from_secret_key(&secp, &secret_key);
         self.store_rotation_keypair(did, &keypair).await?;
         Ok(keypair)
@@ -501,7 +501,7 @@ impl ActorStore {
             key_location = Some(loc);
         }
         let secp = Secp256k1::new();
-        let (secret_key, public_key) = secp.generate_keypair(&mut rand::thread_rng());
+        let (secret_key, public_key) = secp.generate_keypair(&mut secp256k1::rand::thread_rng());
         let key_did = encode_did_key(&public_key);
         let key_location = key_location.unwrap_or_else(|| self.reserved_key_dir.join(&key_did));
         tokio::fs::create_dir_all(&self.reserved_key_dir)

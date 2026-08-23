@@ -136,6 +136,7 @@ impl ParFormData {
         ParRequest {
             client_id: self.client_id.clone().unwrap_or_default(),
             response_type: self.response_type.clone().unwrap_or_default(),
+            response_mode: None,
             redirect_uri: self.redirect_uri.clone(),
             scope: self.scope.clone(),
             state: self.state.clone(),

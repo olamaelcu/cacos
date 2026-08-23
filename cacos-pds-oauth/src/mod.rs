@@ -151,6 +151,7 @@ impl SharedOAuthProvider {
             store: Arc::new(PdsOAuthStore::new(account_db)),
             dpop: DpopManager::new(Some(nonce), replay_store),
             trusted_clients,
+            scope_expander: None,
         });
         Self {
             provider: Arc::new(provider),
@@ -526,6 +527,7 @@ mod tests {
                 Box::new(rsky_oauth::InMemoryReplayStore::default()),
             ),
             trusted_clients: vec![],
+            scope_expander: None,
         }))
     }
 

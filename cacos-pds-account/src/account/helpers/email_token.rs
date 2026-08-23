@@ -4,7 +4,8 @@
 
 use crate::account::helpers::sql;
 use anyhow::{Result, bail};
-use rand::{Rng, distributions::Alphanumeric};
+use rand::RngExt;
+use rand::distr::Alphanumeric;
 use rsky_common::time::{MINUTE, from_str_to_utc, less_than_ago_s};
 use sea_orm::{ConnectionTrait, DatabaseConnection, QueryResult, Value};
 use serde::{Deserialize, Serialize};
@@ -67,8 +68,8 @@ pub(crate) fn email_token_from_row(row: &QueryResult) -> Result<EmailToken, sea_
 /// Formatted xxxxx-xxxxx (the Bluesky Client can't render `1`, `8`, `9`, `0`
 /// in email verification tokens, so the source pool excludes them).
 pub(crate) fn get_random_token() -> String {
-    let token: String = rand::thread_rng()
-        .sample_iter(&Alphanumeric)
+    let token: String = rand::rng()
+        .sample_iter(Alphanumeric)
         .take(50)
         .map(char::from)
         .collect();

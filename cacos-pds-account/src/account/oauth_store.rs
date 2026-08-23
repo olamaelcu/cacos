@@ -926,6 +926,7 @@ mod oauth_store_tests {
         AuthorizationRequestParameters {
             client_id: "https://app.example.com/client".to_string(),
             response_type: "code".to_string(),
+            response_mode: None,
             redirect_uri: "https://app.example.com/cb".to_string(),
             scope: "atproto transition:generic".to_string(),
             state: Some("state-1".to_string()),

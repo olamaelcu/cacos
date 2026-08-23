@@ -41,7 +41,7 @@ thiserror = { workspace = true }
 # --- encoding / dates ---
 serde = { workspace = true }
 serde_json = { workspace = true }
-chrono = "0.4"
+chrono = { workspace = true }
 time = { workspace = true }
 lexicon_cid = { workspace = true }
 
@@ -51,9 +51,9 @@ governor = { workspace = true }
 
 # --- async / futures ---
 tokio = { workspace = true }
-async-trait = "0.1"
+async-trait = { workspace = true }
 futures = { workspace = true }
-tempfile = "3"
+tempfile = { workspace = true }
 
 # --- observability ---
 metrics = { workspace = true }
@@ -61,16 +61,16 @@ tracing = { workspace = true }
 tracing-unwrap = { workspace = true }
 
 # --- at-rest hygiene ---
-secrecy = "0.10"
-zeroize = "1"
+secrecy = { workspace = true }
+zeroize = { workspace = true }
 
 # --- crypto / encoding primitives ---
 sha2 = { workspace = true }
-hex = "0.4"
+hex = { workspace = true }
 rand = { workspace = true }
-base64 = "0.22"
-secp256k1 = { version = "0.28", features = ["global-context", "rand"] }
-email_address = "0.2"
+base64 = { workspace = true }
+secp256k1 = { workspace = true }
+email_address = { workspace = true }
 camino = { workspace = true }
 serde_ipld_dagcbor = { workspace = true }
 serde_cbor = { workspace = true }
@@ -78,7 +78,7 @@ ulid = { workspace = true }
 
 [dev-dependencies]
 camino-tempfile = { workspace = true }
-tempfile = "3"
+tempfile = { workspace = true }
 metrics-exporter-prometheus = { workspace = true }
 metrics-tracing-context = { workspace = true }
 tracing-subscriber = { workspace = true }
