@@ -1,9 +1,12 @@
 # Cacos
 
-> A white-label Rust [ATProto PDS][1] by [Olamaelcu][]
+![The Haitian national state bird](./remote-client/static/cacos.jpg)
+
+> A white-label Rust [ATProto PDS][1] by [Olamaelcu][] named [after farmers and the national bird of Haiti][cacos]
 
 [1]: https://atproto.com/guides/glossary#pds-personal-data-server
 [Olamaelcu]: https://github.com/olamaelcu
+[cacos]: https://en.wikipedia.org/wiki/Cacos_(military_group)
 
 Cacos is a white-label ATProto Personal Data Server written in Rust. It
 organises its data across four SQLite domains (Account, Sequencer, DID cache,
@@ -12,18 +15,15 @@ actor's repository under their own SQLite file, and serves blob traffic
 through an [OpenDAL](https://docs.rs/opendal)-backed blobstore with per-DID partitioning so a single
 backend (S3/MinIO or local disk) can host every tenant without leakage.
 Observability is first-class: a Prometheus recorder exposes a `cacos_`-prefixed
-metric set at `/metrics` alongside tracing/timing layers. Account lifecycle, sessions, app passwords, invites, and the headless
-OAuth provider (`/oauth/*`, `/oauth/remote/*`) are wired in front of the
-[sea-orm](https://docs.rs/sea-orm) account store; the OAuth surface is conditionally mounted — it
-only boots when `PDS_JWT_KEY_K256_PRIVATE_KEY_HEX` is set, and
-deployments that don't need federated OAuth still get the same PDS
-surface with no extra surface area or dependencies. The typed
-`Sequencer` populates `repo_seq` and feeds `com.atproto.sync.subscribeRepos`
-over a WebSocket backed by an apalis-shaped SQLite jobs table.
-
-[ATProto]: https://atproto.com
-
-[Olamaelcu]: https://github.com/olamaelcu
+metric set at `/metrics` alongside tracing/timing layers. Account lifecycle,
+sessions, app passwords, invites, and the headless OAuth provider (`/oauth/*`,
+`/oauth/remote/*`) are wired in front of the [sea-orm](https://docs.rs/sea-orm)
+account store; the OAuth surface is conditionally mounted — it only boots when
+`PDS_JWT_KEY_K256_PRIVATE_KEY_HEX` is set, and deployments that don't need
+federated OAuth still get the same PDS surface with no extra surface area or
+dependencies. The typed `Sequencer` populates `repo_seq` and feeds
+`com.atproto.sync.subscribeRepos` over a WebSocket backed by an `apalis`-shaped
+SQLite jobs table.
 
 ## Status
 
@@ -42,22 +42,22 @@ A 12-crate Cargo workspace. Foundation and leaves are pure libraries;
 a thin shell whose only purpose is to host the `pds/tests/*.rs`
 integration suite.
 
-| Crate                        | Layer | Kind   | Owns                                                                                  |
-|------------------------------|-------|--------|---------------------------------------------------------------------------------------|
-| `migration/`                 | L0    | lib    | [sea-orm](https://docs.rs/sea-orm) entities + migrators for every PDS database         |
-| `pds/`                       | L0    | lib    | `pds/tests/*.rs` integration suite (thin shell)                                         |
-| `cacos-pds-blobstore/`       | L1    | lib    | `BlobStore` trait re-export + OpenDAL backend                                          |
-| `cacos-pds-plc/`             | L1    | lib    | `PlcClient` trait + PLC operations (`create_op`, `create_atproto_update_op`, ...)        |
-| `cacos-pds-identity/`        | L1    | lib    | SQLite-backed `DidSqliteCache` for resolved DID documents                              |
-| `cacos-pds-handle/`          | L1    | lib    | Handle normalization + TLD validation                                                 |
-| `cacos-pds-mailer/`          | L1    | lib    | Templated mailer functions                                                            |
-| `cacos-pds-core/`             | L2    | lib    | `PdsError` + `ServerConfig` + observability (metrics, tracing, timing) + DB openers + `BackgroundQueue` |
-| `cacos-pds-account/`         | L3    | lib    | `AccountManager` + auth helpers + auth verifier (split into `register`/`bearer`/`dpop`/`admin`/`service_jwt`) + service-signing keypairs |
-| `cacos-pds-actor-store/`     | L3    | lib    | Per-DID SQLite store, blob/record/repo/preference readers                              |
-| `cacos-pds-sequencer/`       | L3    | lib    | `Sequencer` + apalis-shaped worker + `SharedSequencer`                                |
-| `cacos-pds-oauth/`           | L4    | lib    | OAuth provider + remote API + per-IP `governor` rate-limit middleware                   |
-| `cacos-pds-server/`          | L4    | lib+bin| XRPC HTTP surface + `auth_extractors` + the `cacos-pds-server` binary (HTTP daemon)    |
-| `cacos-pds-migrate/`         | L4    | bin    | Operator migration CLI: `cacos-pds-migrate {rotation-keys,plc-rotation-keys}`         |
+| Crate                    | Layer | Kind    | Owns                                                                                                                                     |
+| ------------------------ | ----- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `migration/`             | L0    | lib     | [sea-orm](https://docs.rs/sea-orm) entities + migrators for every PDS database                                                           |
+| `pds/`                   | L0    | lib     | `pds/tests/*.rs` integration suite (thin shell)                                                                                          |
+| `cacos-pds-blobstore/`   | L1    | lib     | `BlobStore` trait re-export + OpenDAL backend                                                                                            |
+| `cacos-pds-plc/`         | L1    | lib     | `PlcClient` trait + PLC operations (`create_op`, `create_atproto_update_op`, ...)                                                        |
+| `cacos-pds-identity/`    | L1    | lib     | SQLite-backed `DidSqliteCache` for resolved DID documents                                                                                |
+| `cacos-pds-handle/`      | L1    | lib     | Handle normalization + TLD validation                                                                                                    |
+| `cacos-pds-mailer/`      | L1    | lib     | Templated mailer functions                                                                                                               |
+| `cacos-pds-core/`        | L2    | lib     | `PdsError` + `ServerConfig` + observability (metrics, tracing, timing) + DB openers + `BackgroundQueue`                                  |
+| `cacos-pds-account/`     | L3    | lib     | `AccountManager` + auth helpers + auth verifier (split into `register`/`bearer`/`dpop`/`admin`/`service_jwt`) + service-signing keypairs |
+| `cacos-pds-actor-store/` | L3    | lib     | Per-DID SQLite store, blob/record/repo/preference readers                                                                                |
+| `cacos-pds-sequencer/`   | L3    | lib     | `Sequencer` + apalis-shaped worker + `SharedSequencer`                                                                                   |
+| `cacos-pds-oauth/`       | L4    | lib     | OAuth provider + remote API + per-IP `governor` rate-limit middleware                                                                    |
+| `cacos-pds-server/`      | L4    | lib+bin | XRPC HTTP surface + `auth_extractors` + the `cacos-pds-server` binary (HTTP daemon)                                                      |
+| `cacos-pds-migrate/`     | L4    | bin     | Operator migration CLI: `cacos-pds-migrate {rotation-keys,plc-rotation-keys}`                                                            |
 
 The workspace pins the [rsky][rsky] ATProto protocol crates from a fork at a
 specific git rev, so updates pull a known revision rather than whatever
@@ -69,12 +69,12 @@ upstream `main` happens to be.
 
 Four SQLite databases, one file per concern, all opened with WAL and `foreign_keys=ON`:
 
-| Database  | File pattern          | Migrator           | Purpose                                  |
-|-----------|-----------------------|--------------------|------------------------------------------|
-| Account   | `account.sqlite`      | `AccountMigrator`  | Accounts, actors, sessions, invites, OAuth |
-| Sequencer | `sequencer.sqlite`    | `SequencerMigrator`| `repo_seq` event log for firehose        |
-| DID cache | `did_cache.sqlite`    | `DidCacheMigrator` | Resolved `did_doc` rows                  |
-| Actor     | `store.sqlite` per DID | `ActorMigrator`    | Per-user records, blocks, blobs, spaces |
+| Database  | File pattern           | Migrator            | Purpose                                    |
+| --------- | ---------------------- | ------------------- | ------------------------------------------ |
+| Account   | `account.sqlite`       | `AccountMigrator`   | Accounts, actors, sessions, invites, OAuth |
+| Sequencer | `sequencer.sqlite`     | `SequencerMigrator` | `repo_seq` event log for firehose          |
+| DID cache | `did_cache.sqlite`     | `DidCacheMigrator`  | Resolved `did_doc` rows                    |
+| Actor     | `store.sqlite` per DID | `ActorMigrator`     | Per-user records, blocks, blobs, spaces    |
 
 Open and migrate via `pds::db::DatabaseKind::open`. Migrations are idempotent
 and use a custom bookkeeping table name per database (`account_migrations`,
@@ -190,17 +190,17 @@ lives at exactly one call site per variant today.
 
 `mise.toml` pins Rust 1.97.0, [cargo-nextest](https://docs.rs/cargo-nextest), and `nose`, and defines tasks:
 
-| Task                 | What it does                                  |
-|----------------------|-----------------------------------------------|
-| `mise run check`     | `cargo check --workspace --all-targets`       |
-| `mise run fmt`       | `cargo fmt --all -- --check`                  |
-| `mise run format`    | `cargo fmt --all`                             |
-| `mise run lint`      | `cargo clippy --workspace --all-targets -- -D warnings` |
-| `mise run test`      | `cargo nextest run --workspace`               |
-| `mise run build`     | `cargo build --workspace`                     |
-| `mise run dup`       | `nose` duplication report (excludes migration files) |
-| `mise run infra-up`  | Start MinIO in the background                 |
-| `mise run infra-down`| Stop MinIO                                    |
-| `mise run dev`       | `cargo run -p cacos-pds-server` (depends on `infra-up`) |
+| Task                  | What it does                                            |
+| --------------------- | ------------------------------------------------------- |
+| `mise run check`      | `cargo check --workspace --all-targets`                 |
+| `mise run fmt`        | `cargo fmt --all -- --check`                            |
+| `mise run format`     | `cargo fmt --all`                                       |
+| `mise run lint`       | `cargo clippy --workspace --all-targets -- -D warnings` |
+| `mise run test`       | `cargo nextest run --workspace`                         |
+| `mise run build`      | `cargo build --workspace`                               |
+| `mise run dup`        | `nose` duplication report (excludes migration files)    |
+| `mise run infra-up`   | Start MinIO in the background                           |
+| `mise run infra-down` | Stop MinIO                                              |
+| `mise run dev`        | `cargo run -p cacos-pds-server` (depends on `infra-up`) |
 
 `docker-compose.yaml` runs MinIO plus a `mc-init` sidecar that creates the `cacos` bucket on first boot.

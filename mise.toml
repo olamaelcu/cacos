@@ -36,8 +36,8 @@ description = "Report code duplication (nose)"
 run = "nose query -r pds/src -r pds/tests -r migration/src"
 
 [tasks.infra-up]
-description = "Start MinIO headlessly and detached"
-run = "docker compose up -d --wait"
+description = "Start MinIO headlessly and detached, run bucket init"
+run = "docker compose up -d --wait minio && docker compose up mc-init"
 
 [tasks.infra-down]
 description = "Stop MinIO containers"
