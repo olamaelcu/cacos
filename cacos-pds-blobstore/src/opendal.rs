@@ -131,10 +131,12 @@ impl OpenDALBlobStore {
                 .context("S3_ENDPOINT is set but S3_ACCESS_KEY_ID is not")?;
             let secret_access_key = std::env::var("S3_SECRET_ACCESS_KEY")
                 .context("S3_ENDPOINT is set but S3_SECRET_ACCESS_KEY is not")?;
+            let region = std::env::var("S3_REGION").unwrap_or_else(|_| "us-east-1".to_owned());
             Operator::new(
                 services::S3::default()
                     .endpoint(&endpoint)
                     .bucket(&bucket)
+                    .region(&region)
                     .access_key_id(&access_key_id)
                     .secret_access_key(&secret_access_key),
             )
